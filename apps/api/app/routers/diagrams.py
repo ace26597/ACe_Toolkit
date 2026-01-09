@@ -81,7 +81,7 @@ async def update_diagram(
 @router.delete("/{diagram_id}")
 async def delete_diagram(
     diagram_id: uuid.UUID,
-    current_user: User = Depends(get_current_user), 
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     result = await db.execute(
@@ -90,7 +90,8 @@ async def delete_diagram(
     diagram = result.scalars().first()
     if not diagram:
         raise HTTPException(status_code=404, detail="Diagram not found")
-    
+
+    # Correct way to delete in async SQLAlchemy
     await db.delete(diagram)
     await db.commit()
     return {"message": "Diagram deleted"}
