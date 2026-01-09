@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /c/Users/chank/OneDrive/Documents/ACe_Toolkit diff apps/api/app/core/config.py)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(taskkill:*)",
+      "Bash(.venv/Scripts/python:*)",
+      "Bash(npm run dev:*)"
+    ]
+  }
+}

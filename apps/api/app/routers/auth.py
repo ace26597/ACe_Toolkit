@@ -73,12 +73,13 @@ async def login(response: Response, user_in: UserLogin, db: AsyncSession = Depen
     db.add(rt_entry)
     await db.commit()
     
-    # Set cookies
+    # Set cookies (secure=False for localhost, True for production)
+    is_secure = False  # Set to True when using HTTPS in production
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=True, # Should be True in prod, verify if localhost handles it (usually needs https or exception)
+        secure=is_secure,
         samesite="lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
@@ -86,7 +87,7 @@ async def login(response: Response, user_in: UserLogin, db: AsyncSession = Depen
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=True, 
+        secure=is_secure,
         samesite="lax",
         max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
     )
@@ -116,12 +117,13 @@ async def refresh(request: Request, response: Response, db: AsyncSession = Depen
     
     # Issue new access token
     access_token = create_access_token(subject=stored_token.user_id)
-    
+
+    is_secure = False  # Set to True when using HTTPS in production
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=True,
+        secure=is_secure,
         samesite="lax",
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )

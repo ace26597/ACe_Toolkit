@@ -1,16 +1,27 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
 import mermaid from 'mermaid';
-import { useAuth } from '@/context/AuthContext';
+import elkLayouts from '@mermaid-js/layout-elk';
 import { useRouter } from 'next/navigation';
-import api from '@/lib/api';
-import { Save, Download, FileJson, ZoomIn, ZoomOut, Maximize, LogOut, Home, FileText, Trash2, PlusCircle } from 'lucide-react';
-// import { Button } from '@/components/ui/button'; // If using shadcn later, but now use raw HTML/Tailwind
+import { Download, ZoomIn, ZoomOut, Maximize, Home, PlusCircle } from 'lucide-react';
+
+const STORAGE_KEY = 'mermaid_diagrams';
+const CURRENT_KEY = 'mermaid_current';
+
+interface Diagram {
+    id: string;
+    title: string;
+    code: string;
+    theme: string;
+    updatedAt: string;
+}
+
+// Track if mermaid has been initialized
+let mermaidInitialized = false;
 
 export default function MermaidPage() {
-    const { user, loading, logout } = useAuth();
     const router = useRouter();
     const [code, setCode] = useState(`graph TD
     A[Christmas] -->|Get money| B(Go shopping)
@@ -20,310 +31,264 @@ export default function MermaidPage() {
     C -->|Three| F[fa:fa-car Car]
   `);
     const [theme, setTheme] = useState('default');
-    const [diagramId, setDiagramId] = useState<string | null>(null);
-    const [diagramTitle, setDiagramTitle] = useState<string>('');
-    const [svgUrl, setSvgUrl] = useState<string | null>(null);
+    const [diagramTitle, setDiagramTitle] = useState('Untitled Diagram');
+    const [svgOutput, setSvgOutput] = useState<string>('');
     const previewRef = useRef<HTMLDivElement>(null);
     const [zoom, setZoom] = useState(1);
     const [renderError, setRenderError] = useState<string | null>(null);
-    const [isSaving, setIsSaving] = useState(false);
-    const [isExporting, setIsExporting] = useState(false);
-    const [diagrams, setDiagrams] = useState<any[]>([]);
+    const [diagrams, setDiagrams] = useState<Diagram[]>([]);
+    const [currentId, setCurrentId] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(false);
+    const renderIdRef = useRef(0);
 
-    // Redirect if not authenticated
+    // Initialize mermaid once with elk layout
     useEffect(() => {
-        if (!loading && !user) {
-            router.push('/auth/login');
+        if (!mermaidInitialized) {
+            mermaid.registerLayoutLoaders(elkLayouts);
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: theme,
+                securityLevel: 'loose',
+                flowchart: {
+                    useMaxWidth: true,
+                    htmlLabels: true,
+                },
+                logLevel: 'error',
+            });
+            mermaidInitialized = true;
         }
-    }, [loading, user, router]);
+    }, []);
 
-    // Load saved diagrams
+    // Update theme when changed
     useEffect(() => {
-        const loadDiagrams = async () => {
-            if (user) {
-                try {
-                    const { data } = await api.get('/diagrams');
-                    setDiagrams(data);
-                } catch (e) {
-                    console.error('Failed to load diagrams:', e);
-                }
-            }
-        };
-        loadDiagrams();
-    }, [user]);
-
-    // Initialize mermaid
-    useEffect(() => {
-        mermaid.initialize({ startOnLoad: true, theme: theme, securityLevel: 'loose' });
+        if (mermaidInitialized) {
+            mermaid.initialize({
+                startOnLoad: false,
+                theme: theme,
+                securityLevel: 'loose',
+                flowchart: {
+                    useMaxWidth: true,
+                    htmlLabels: true,
+                },
+                logLevel: 'error',
+            });
+        }
     }, [theme]);
 
-    // Render diagram on code change
+    // Load from localStorage on mount
     useEffect(() => {
-        const renderDiagram = async () => {
-            if (previewRef.current) {
-                try {
-                    const { svg } = await mermaid.render('mermaid-svg', code);
-                    previewRef.current.innerHTML = svg;
-                    // Store for export
-                    const blob = new Blob([svg], { type: 'image/svg+xml' });
-                    setSvgUrl(URL.createObjectURL(blob));
-                    setRenderError(null);
-                } catch (e: any) {
-                    setRenderError(e?.message || 'Invalid Mermaid syntax');
-                    console.error('Mermaid render error:', e);
-                }
-            }
-        };
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            setDiagrams(JSON.parse(saved));
+        }
+        const current = localStorage.getItem(CURRENT_KEY);
+        if (current) {
+            const parsed = JSON.parse(current);
+            setCode(parsed.code);
+            setTheme(parsed.theme || 'default');
+            setDiagramTitle(parsed.title);
+            setCurrentId(parsed.id);
+        }
+    }, []);
 
-        // Debounce
+    // Autosave current diagram
+    useEffect(() => {
+        const current = { id: currentId, code, theme, title: diagramTitle };
+        localStorage.setItem(CURRENT_KEY, JSON.stringify(current));
+    }, [code, theme, diagramTitle, currentId]);
+
+    // Render diagram on code change
+    const renderDiagram = useCallback(async () => {
+        if (!previewRef.current || !code.trim()) return;
+
+        try {
+            // Generate unique ID for each render
+            renderIdRef.current += 1;
+            const renderId = `mermaid-diagram-${renderIdRef.current}`;
+
+            // Create a temporary container for rendering (avoid React DOM conflicts)
+            const tempContainer = document.createElement('div');
+            tempContainer.id = renderId;
+            document.body.appendChild(tempContainer);
+
+            // Parse and render
+            const { svg } = await mermaid.render(renderId, code);
+
+            // Clean up temp container
+            tempContainer.remove();
+
+            if (previewRef.current) {
+                previewRef.current.innerHTML = svg;
+                setSvgOutput(svg);
+                setRenderError(null);
+            }
+        } catch (e: any) {
+            console.error('Mermaid render error:', e);
+            // Extract error message safely without circular refs
+            let errorMsg = 'Invalid Mermaid syntax';
+            if (typeof e === 'string') {
+                errorMsg = e;
+            } else if (e?.message) {
+                errorMsg = e.message;
+            } else if (e?.str) {
+                errorMsg = e.str;
+            }
+            setRenderError(errorMsg);
+        }
+    }, [code]);
+
+    useEffect(() => {
         const timer = setTimeout(renderDiagram, 500);
         return () => clearTimeout(timer);
-    }, [code, theme]);
+    }, [renderDiagram, theme]);
 
-    const handleSave = async () => {
-        const title = diagramTitle.trim() || `Diagram ${new Date().toLocaleString()}`;
-        setIsSaving(true);
-        try {
-            if (diagramId) {
-                await api.put(`/diagrams/${diagramId}`, { title, mermaid_code: code, theme });
-            } else {
-                const { data } = await api.post('/diagrams', { title, mermaid_code: code, theme });
-                setDiagramId(data.id);
-                setDiagramTitle(title);
-            }
-            // Reload diagram list
-            const { data } = await api.get('/diagrams');
-            setDiagrams(data);
-            alert('Saved successfully!');
-        } catch (e) {
-            alert('Failed to save diagram');
-        } finally {
-            setIsSaving(false);
-        }
+    const saveDiagram = () => {
+        const id = currentId || Date.now().toString();
+        const diagram: Diagram = {
+            id,
+            title: diagramTitle || 'Untitled',
+            code,
+            theme,
+            updatedAt: new Date().toISOString(),
+        };
+
+        const updated = currentId
+            ? diagrams.map(d => d.id === id ? diagram : d)
+            : [...diagrams, diagram];
+
+        setDiagrams(updated);
+        setCurrentId(id);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     };
 
-    const handleLoadDiagram = (diagram: any) => {
-        setCode(diagram.mermaid_code);
+    const loadDiagram = (diagram: Diagram) => {
+        setCode(diagram.code);
         setTheme(diagram.theme || 'default');
-        setDiagramId(diagram.id);
         setDiagramTitle(diagram.title);
+        setCurrentId(diagram.id);
         setShowSidebar(false);
     };
 
-    const handleNewDiagram = () => {
+    const newDiagram = () => {
         setCode(`graph TD
     A[Start] --> B[End]`);
         setTheme('default');
-        setDiagramId(null);
-        setDiagramTitle('');
+        setDiagramTitle('Untitled Diagram');
+        setCurrentId(null);
         setShowSidebar(false);
     };
 
-    const handleDeleteDiagram = async (diagramId: string, e: React.MouseEvent) => {
+    const deleteDiagram = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (!confirm('Are you sure you want to delete this diagram?')) return;
-
-        try {
-            await api.delete(`/diagrams/${diagramId}`);
-            const { data } = await api.get('/diagrams');
-            setDiagrams(data);
-            // If deleting current diagram, reset
-            if (diagramId === diagramId) {
-                handleNewDiagram();
-            }
-        } catch (e) {
-            alert('Failed to delete diagram');
-        }
+        const updated = diagrams.filter(d => d.id !== id);
+        setDiagrams(updated);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        if (id === currentId) newDiagram();
     };
 
-    const handleExport = async (format: 'png' | 'pdf') => {
-        setIsExporting(true);
-        try {
-            const response = await api.post(`/export/${format}`, { mermaid_code: code, theme }, { responseType: 'blob' });
-            const url = window.URL.createObjectURL(new Blob([response.data]));
+    const exportSvg = () => {
+        if (svgOutput) {
+            const blob = new Blob([svgOutput], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `diagram.${format}`);
-            document.body.appendChild(link);
+            link.download = `${diagramTitle || 'diagram'}.svg`;
             link.click();
-            link.remove();
-        } catch (e) {
-            alert('Export failed');
-        } finally {
-            setIsExporting(false);
+            URL.revokeObjectURL(url);
         }
     };
-
-    const handleClientExportSvg = () => {
-        if (svgUrl) {
-            const link = document.createElement('a');
-            link.href = svgUrl;
-            link.setAttribute('download', 'diagram.svg');
-            document.body.appendChild(link);
-            link.click();
-        }
-    };
-
-    // Show loading spinner
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-                </div>
-            </div>
-        );
-    }
-
-    // Return null while redirecting (useEffect handles redirect)
-    if (!user) return null;
 
     return (
         <div className="flex flex-col h-screen overflow-hidden bg-gray-100 dark:bg-gray-900">
             {/* Header */}
-            <header className="flex-none h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-6 z-10">
-                <div className="flex items-center space-x-4">
-                    <h1 className="text-xl font-bold text-gray-800 dark:text-white">Mermaid Editor</h1>
+            <header className="flex-none h-14 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-4">
+                <div className="flex items-center space-x-3">
                     <button
                         onClick={() => router.push('/')}
-                        className="p-2 text-gray-600 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400"
+                        className="p-2 text-gray-600 hover:text-indigo-600 dark:text-gray-300"
                         title="Home"
                     >
                         <Home size={20} />
                     </button>
+                    <h1 className="text-lg font-bold text-gray-800 dark:text-white">Mermaid Editor</h1>
                     <button
                         onClick={() => setShowSidebar(!showSidebar)}
-                        className="p-2 text-gray-600 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400"
-                        title="My Diagrams"
+                        className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 rounded"
                     >
-                        <FileText size={20} />
+                        My Diagrams ({diagrams.length})
                     </button>
                     <button
-                        onClick={handleNewDiagram}
-                        className="p-2 text-gray-600 hover:text-green-600 dark:text-gray-300 dark:hover:text-green-400"
+                        onClick={newDiagram}
+                        className="p-2 text-gray-600 hover:text-green-600"
                         title="New Diagram"
                     >
                         <PlusCircle size={20} />
                     </button>
                     <input
                         type="text"
-                        placeholder="Diagram title (optional)"
+                        placeholder="Diagram title"
                         value={diagramTitle}
                         onChange={(e) => setDiagramTitle(e.target.value)}
-                        className="w-64 px-3 py-1.5 text-sm border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-48 px-3 py-1 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                     />
                 </div>
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-3">
                     <select
                         value={theme}
                         onChange={(e) => setTheme(e.target.value)}
-                        className="block w-32 rounded-md border-0 py-1.5 text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-custom-600 sm:text-sm sm:leading-6 dark:bg-gray-700 dark:text-white dark:ring-gray-600"
+                        className="px-3 py-1 text-sm border rounded dark:bg-gray-700 dark:text-white"
                     >
                         <option value="default">Default</option>
                         <option value="dark">Dark</option>
                         <option value="forest">Forest</option>
                         <option value="neutral">Neutral</option>
+                        <option value="base">Base</option>
                     </select>
-
                     <button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="p-2 text-gray-600 hover:text-blue-600 dark:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Save"
+                        onClick={saveDiagram}
+                        className="px-4 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
                     >
-                        {isSaving ? (
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                        ) : (
-                            <Save size={20} />
-                        )}
+                        Save
                     </button>
-
-                    {/* Export Dropdown - simplified */}
-                    <div className="flex space-x-2">
-                        <button
-                            onClick={handleClientExportSvg}
-                            disabled={isExporting}
-                            className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            SVG
-                        </button>
-                        <button
-                            onClick={() => handleExport('png')}
-                            disabled={isExporting}
-                            className="px-3 py-1 bg-green-200 rounded hover:bg-green-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isExporting ? '...' : 'PNG (Pro)'}
-                        </button>
-                        <button
-                            onClick={() => handleExport('pdf')}
-                            disabled={isExporting}
-                            className="px-3 py-1 bg-red-200 rounded hover:bg-red-300 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isExporting ? '...' : 'PDF (Pro)'}
-                        </button>
-                    </div>
-
-                    {/* User Menu */}
-                    <div className="flex items-center space-x-3 border-l border-gray-300 dark:border-gray-600 pl-4">
-                        <span className="text-sm text-gray-600 dark:text-gray-300">{user?.email}</span>
-                        <button
-                            onClick={logout}
-                            className="p-2 text-gray-600 hover:text-red-600 dark:text-gray-300 dark:hover:text-red-400"
-                            title="Logout"
-                        >
-                            <LogOut size={20} />
-                        </button>
-                    </div>
+                    <button
+                        onClick={exportSvg}
+                        disabled={!svgOutput}
+                        className="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm flex items-center gap-1 disabled:opacity-50"
+                    >
+                        <Download size={16} /> SVG
+                    </button>
                 </div>
             </header>
 
             {/* Main Content */}
             <div className="flex-1 flex overflow-hidden relative">
-                {/* Sidebar - Diagram List */}
+                {/* Sidebar */}
                 {showSidebar && (
-                    <div className="absolute left-0 top-0 h-full w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 z-20 shadow-lg overflow-y-auto">
+                    <div className="absolute left-0 top-0 h-full w-72 bg-white dark:bg-gray-800 border-r z-20 shadow-lg overflow-y-auto">
                         <div className="p-4">
-                            <div className="flex items-center justify-between mb-4">
-                                <h2 className="text-lg font-bold text-gray-800 dark:text-white">My Diagrams</h2>
-                                <button
-                                    onClick={() => setShowSidebar(false)}
-                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                                >
-                                    ✕
-                                </button>
+                            <div className="flex justify-between items-center mb-4">
+                                <h2 className="font-bold text-gray-800 dark:text-white">My Diagrams</h2>
+                                <button onClick={() => setShowSidebar(false)} className="text-gray-500 hover:text-gray-700">✕</button>
                             </div>
                             {diagrams.length === 0 ? (
-                                <p className="text-gray-500 dark:text-gray-400 text-sm">No saved diagrams yet</p>
+                                <p className="text-gray-500 text-sm">No saved diagrams</p>
                             ) : (
                                 <div className="space-y-2">
-                                    {diagrams.map((diagram) => (
+                                    {diagrams.map((d) => (
                                         <div
-                                            key={diagram.id}
-                                            onClick={() => handleLoadDiagram(diagram)}
-                                            className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                                                diagram.id === diagramId
-                                                    ? 'bg-indigo-100 dark:bg-indigo-900'
-                                                    : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
-                                            }`}
+                                            key={d.id}
+                                            onClick={() => loadDiagram(d)}
+                                            className={`p-3 rounded cursor-pointer ${d.id === currentId ? 'bg-indigo-100 dark:bg-indigo-900' : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100'}`}
                                         >
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1">
-                                                    <h3 className="font-medium text-gray-900 dark:text-white text-sm truncate">
-                                                        {diagram.title}
-                                                    </h3>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                                        {new Date(diagram.created_at).toLocaleDateString()}
-                                                    </p>
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h3 className="font-medium text-sm truncate">{d.title}</h3>
+                                                    <p className="text-xs text-gray-500">{new Date(d.updatedAt).toLocaleDateString()}</p>
                                                 </div>
                                                 <button
-                                                    onClick={(e) => handleDeleteDiagram(diagram.id, e)}
-                                                    className="ml-2 p-1 text-gray-400 hover:text-red-600 dark:text-gray-500 dark:hover:text-red-400"
-                                                    title="Delete"
-                                                >
-                                                    <Trash2 size={16} />
-                                                </button>
+                                                    onClick={(e) => deleteDiagram(d.id, e)}
+                                                    className="text-gray-400 hover:text-red-600"
+                                                >✕</button>
                                             </div>
                                         </div>
                                     ))}
@@ -333,11 +298,11 @@ export default function MermaidPage() {
                     </div>
                 )}
 
-                {/* Editor Pane */}
-                <div className="w-1/2 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+                {/* Editor */}
+                <div className="w-1/2 border-r border-gray-200 dark:border-gray-700">
                     <Editor
                         height="100%"
-                        defaultLanguage="markdown" // No mermaid lang support out of box easily, markdown is close enough
+                        defaultLanguage="yaml"
                         theme={theme === 'dark' ? 'vs-dark' : 'light'}
                         value={code}
                         onChange={(value) => setCode(value || '')}
@@ -345,30 +310,28 @@ export default function MermaidPage() {
                             minimap: { enabled: false },
                             fontSize: 14,
                             scrollBeyondLastLine: false,
+                            wordWrap: 'on',
                         }}
                     />
                 </div>
 
-                {/* Preview Pane */}
+                {/* Preview */}
                 <div className="w-1/2 p-4 bg-white dark:bg-gray-800 overflow-auto relative">
-                    {/* Zoom Controls */}
-                    <div className="absolute top-4 right-4 flex space-x-2 bg-gray-100 p-1 rounded z-10 opacity-75 hover:opacity-100 transition-opacity">
-                        <button onClick={() => setZoom(z => Math.min(z + 0.1, 3))} className="p-1 hover:bg-gray-300 rounded"><ZoomIn size={16} /></button>
-                        <button onClick={() => setZoom(1)} className="p-1 hover:bg-gray-300 rounded"><Maximize size={16} /></button>
-                        <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.5))} className="p-1 hover:bg-gray-300 rounded"><ZoomOut size={16} /></button>
+                    <div className="absolute top-4 right-4 flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded z-10">
+                        <button onClick={() => setZoom(z => Math.min(z + 0.1, 3))} className="p-1 hover:bg-gray-300 dark:hover:bg-gray-600 rounded"><ZoomIn size={16} /></button>
+                        <button onClick={() => setZoom(1)} className="p-1 hover:bg-gray-300 dark:hover:bg-gray-600 rounded"><Maximize size={16} /></button>
+                        <button onClick={() => setZoom(z => Math.max(z - 0.1, 0.2))} className="p-1 hover:bg-gray-300 dark:hover:bg-gray-600 rounded"><ZoomOut size={16} /></button>
+                        <span className="px-2 py-1 text-xs text-gray-600 dark:text-gray-300">{Math.round(zoom * 100)}%</span>
                     </div>
-
-                    {/* Error Display */}
                     {renderError && (
-                        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-                            <p className="text-red-800 font-semibold">Syntax Error</p>
-                            <p className="text-red-600 text-sm mt-1">{renderError}</p>
+                        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded">
+                            <p className="text-red-800 dark:text-red-300 font-semibold text-sm">Syntax Error</p>
+                            <p className="text-red-600 dark:text-red-400 text-xs mt-1 whitespace-pre-wrap">{renderError}</p>
                         </div>
                     )}
-
                     <div
                         ref={previewRef}
-                        className="flex justify-center items-start min-h-full transition-transform origin-top-left"
+                        className="flex justify-center items-start min-h-full"
                         style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
                     />
                 </div>

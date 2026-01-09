@@ -6,33 +6,54 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50 dark:bg-gray-900">
       <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex flex-col">
-        <h1 className="text-4xl font-bold mb-8 text-indigo-600">Mermaid Monorepo Hub</h1>
+        <h1 className="text-4xl font-bold mb-8 text-indigo-600">ACe Toolkit</h1>
+        <p className="text-gray-600 dark:text-gray-400 mb-8">Your personal productivity apps - no login required</p>
 
-        <div className="grid grid-cols-1 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
           <Link
             href="/mermaid"
-            className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
+            className="group rounded-lg border border-gray-200 dark:border-gray-700 px-6 py-5 transition-all hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:shadow-lg"
           >
-            <h2 className={`mb-3 text-2xl font-semibold`}>
-              Mermaid Editor{' '}
-              <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-                -&gt;
-              </span>
+            <h2 className="mb-2 text-xl font-semibold text-gray-800 dark:text-white">
+              Mermaid Editor
+              <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
             </h2>
-            <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-              Create, edit, and export flowcharts and diagrams.
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Create flowcharts, diagrams, and visualizations
             </p>
           </Link>
 
-          <div className="opacity-50 pointer-events-none group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100">
-            <h2 className={`mb-3 text-2xl font-semibold`}>
-              Notes (Coming Soon)
+          <Link
+            href="/notes"
+            className="group rounded-lg border border-gray-200 dark:border-gray-700 px-6 py-5 transition-all hover:border-green-500 hover:bg-green-50 dark:hover:bg-green-900/20 hover:shadow-lg"
+          >
+            <h2 className="mb-2 text-xl font-semibold text-gray-800 dark:text-white">
+              Notes
+              <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
             </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Quick notes with autosave and image support
+            </p>
+          </Link>
+
+          <div className="opacity-40 rounded-lg border border-gray-200 dark:border-gray-700 px-6 py-5">
+            <h2 className="mb-2 text-xl font-semibold text-gray-800 dark:text-white">
+              Drive
+              <span className="text-xs ml-2 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">Soon</span>
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              File storage and sharing
+            </p>
           </div>
-          <div className="opacity-50 pointer-events-none group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100">
-            <h2 className={`mb-3 text-2xl font-semibold`}>
-              Drive (Coming Soon)
+
+          <div className="opacity-40 rounded-lg border border-gray-200 dark:border-gray-700 px-6 py-5">
+            <h2 className="mb-2 text-xl font-semibold text-gray-800 dark:text-white">
+              Tasks
+              <span className="text-xs ml-2 bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">Soon</span>
             </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Task management and to-do lists
+            </p>
           </div>
         </div>
       </div>
