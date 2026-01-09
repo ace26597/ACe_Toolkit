@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Editor from '@monaco-editor/react';
-import mermaid from 'mermaid';
-import elkLayouts from '@mermaid-js/layout-elk';
 import { useRouter } from 'next/navigation';
 import { Download, ZoomIn, ZoomOut, Maximize, Home, PlusCircle } from 'lucide-react';
 
@@ -18,9 +16,6 @@ interface Diagram {
     updatedAt: string;
 }
 
-// Track if mermaid has been initialized
-let mermaidInitialized = false;
-
 export default function MermaidPage() {
     const router = useRouter();
     const [code, setCode] = useState(`graph TD
@@ -33,47 +28,12 @@ export default function MermaidPage() {
     const [theme, setTheme] = useState('default');
     const [diagramTitle, setDiagramTitle] = useState('Untitled Diagram');
     const [svgOutput, setSvgOutput] = useState<string>('');
-    const previewRef = useRef<HTMLDivElement>(null);
     const [zoom, setZoom] = useState(1);
     const [renderError, setRenderError] = useState<string | null>(null);
     const [diagrams, setDiagrams] = useState<Diagram[]>([]);
     const [currentId, setCurrentId] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(false);
-    const renderIdRef = useRef(0);
-
-    // Initialize mermaid once with elk layout
-    useEffect(() => {
-        if (!mermaidInitialized) {
-            mermaid.registerLayoutLoaders(elkLayouts);
-            mermaid.initialize({
-                startOnLoad: false,
-                theme: theme,
-                securityLevel: 'loose',
-                flowchart: {
-                    useMaxWidth: true,
-                    htmlLabels: true,
-                },
-                logLevel: 'error',
-            });
-            mermaidInitialized = true;
-        }
-    }, []);
-
-    // Update theme when changed
-    useEffect(() => {
-        if (mermaidInitialized) {
-            mermaid.initialize({
-                startOnLoad: false,
-                theme: theme,
-                securityLevel: 'loose',
-                flowchart: {
-                    useMaxWidth: true,
-                    htmlLabels: true,
-                },
-                logLevel: 'error',
-            });
-        }
-    }, [theme]);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
 
     // Load from localStorage on mount
     useEffect(() => {
@@ -97,50 +57,79 @@ export default function MermaidPage() {
         localStorage.setItem(CURRENT_KEY, JSON.stringify(current));
     }, [code, theme, diagramTitle, currentId]);
 
-    // Render diagram on code change
+    // Render diagram using iframe isolation
     const renderDiagram = useCallback(async () => {
-        if (!previewRef.current || !code.trim()) return;
+        if (!iframeRef.current || !code.trim()) return;
 
-        try {
-            // Generate unique ID for each render
-            renderIdRef.current += 1;
-            const renderId = `mermaid-diagram-${renderIdRef.current}`;
+        const iframe = iframeRef.current;
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (!iframeDoc) return;
 
-            // Create a temporary container for rendering (avoid React DOM conflicts)
-            const tempContainer = document.createElement('div');
-            tempContainer.id = renderId;
-            document.body.appendChild(tempContainer);
+        // Create isolated HTML document for mermaid rendering
+        const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <style>
+        body { margin: 0; padding: 20px; display: flex; justify-content: center; background: white; }
+        #output { width: 100%; }
+        .error { color: red; padding: 20px; font-family: monospace; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div id="output"></div>
+    <script>
+        const code = ${JSON.stringify(code)};
+        const theme = ${JSON.stringify(theme)};
 
-            // Parse and render
-            const { svg } = await mermaid.render(renderId, code);
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: theme,
+            securityLevel: 'loose',
+            flowchart: { useMaxWidth: true, htmlLabels: true }
+        });
 
-            // Clean up temp container
-            tempContainer.remove();
+        (async () => {
+            try {
+                const { svg } = await mermaid.render('mermaid-output', code);
+                document.getElementById('output').innerHTML = svg;
+                window.parent.postMessage({ type: 'mermaid-success', svg: svg }, '*');
+            } catch (e) {
+                const errorMsg = e?.message || e?.str || 'Invalid Mermaid syntax';
+                document.getElementById('output').innerHTML = '<div class="error">' + errorMsg + '</div>';
+                window.parent.postMessage({ type: 'mermaid-error', error: errorMsg }, '*');
+            }
+        })();
+    </script>
+</body>
+</html>`;
 
-            if (previewRef.current) {
-                previewRef.current.innerHTML = svg;
-                setSvgOutput(svg);
+        iframeDoc.open();
+        iframeDoc.write(html);
+        iframeDoc.close();
+    }, [code, theme]);
+
+    // Listen for messages from iframe
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            if (event.data?.type === 'mermaid-success') {
+                setSvgOutput(event.data.svg);
                 setRenderError(null);
+            } else if (event.data?.type === 'mermaid-error') {
+                setRenderError(event.data.error);
             }
-        } catch (e: any) {
-            console.error('Mermaid render error:', e);
-            // Extract error message safely without circular refs
-            let errorMsg = 'Invalid Mermaid syntax';
-            if (typeof e === 'string') {
-                errorMsg = e;
-            } else if (e?.message) {
-                errorMsg = e.message;
-            } else if (e?.str) {
-                errorMsg = e.str;
-            }
-            setRenderError(errorMsg);
-        }
-    }, [code]);
+        };
 
+        window.addEventListener('message', handleMessage);
+        return () => window.removeEventListener('message', handleMessage);
+    }, []);
+
+    // Trigger render on code/theme change
     useEffect(() => {
         const timer = setTimeout(renderDiagram, 500);
         return () => clearTimeout(timer);
-    }, [renderDiagram, theme]);
+    }, [renderDiagram]);
 
     const saveDiagram = () => {
         const id = currentId || Date.now().toString();
@@ -316,7 +305,7 @@ export default function MermaidPage() {
                 </div>
 
                 {/* Preview */}
-                <div className="w-1/2 p-4 bg-white dark:bg-gray-800 overflow-auto relative">
+                <div className="w-1/2 bg-white dark:bg-gray-800 overflow-hidden relative flex flex-col">
                     <div className="absolute top-4 right-4 flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded z-10">
                         <button onClick={() => setZoom(z => Math.min(z + 0.1, 3))} className="p-1 hover:bg-gray-300 dark:hover:bg-gray-600 rounded"><ZoomIn size={16} /></button>
                         <button onClick={() => setZoom(1)} className="p-1 hover:bg-gray-300 dark:hover:bg-gray-600 rounded"><Maximize size={16} /></button>
@@ -324,15 +313,17 @@ export default function MermaidPage() {
                         <span className="px-2 py-1 text-xs text-gray-600 dark:text-gray-300">{Math.round(zoom * 100)}%</span>
                     </div>
                     {renderError && (
-                        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded">
+                        <div className="m-4 p-3 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded">
                             <p className="text-red-800 dark:text-red-300 font-semibold text-sm">Syntax Error</p>
                             <p className="text-red-600 dark:text-red-400 text-xs mt-1 whitespace-pre-wrap">{renderError}</p>
                         </div>
                     )}
-                    <div
-                        ref={previewRef}
-                        className="flex justify-center items-start min-h-full"
-                        style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
+                    <iframe
+                        ref={iframeRef}
+                        className="flex-1 w-full border-0"
+                        style={{ transform: `scale(${zoom})`, transformOrigin: 'top left', width: `${100/zoom}%`, height: `${100/zoom}%` }}
+                        sandbox="allow-scripts"
+                        title="Mermaid Preview"
                     />
                 </div>
             </div>
