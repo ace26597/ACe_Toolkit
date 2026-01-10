@@ -76,3 +76,80 @@ class NoteResponse(NoteBase):
 class AiRequest(BaseModel):
     prompt: str
     current_code: Optional[str] = None
+
+
+# Session-based Schemas (no auth required)
+class EditionSchema(BaseModel):
+    id: str
+    code: str
+    description: str
+    updatedAt: str
+
+
+class ChartMetadataSchema(BaseModel):
+    description: Optional[str] = None
+    source: Optional[str] = None  # 'manual' | 'markdown' | 'ai'
+    sourceFile: Optional[str] = None
+
+
+class SessionChartCreate(BaseModel):
+    id: str
+    projectId: str
+    name: str
+    code: str
+    editions: List[EditionSchema] = []
+    currentEditionId: Optional[str] = None
+    metadata: Optional[ChartMetadataSchema] = None
+
+
+class SessionChartUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    editions: Optional[List[EditionSchema]] = None
+    currentEditionId: Optional[str] = None
+    metadata: Optional[ChartMetadataSchema] = None
+
+
+class SessionChartResponse(BaseModel):
+    id: str
+    projectId: str
+    name: str
+    code: str
+    editions: List[EditionSchema]
+    currentEditionId: Optional[str]
+    metadata: Optional[ChartMetadataSchema]
+    createdAt: str
+    updatedAt: str
+
+    class Config:
+        from_attributes = True
+
+
+class SessionProjectCreate(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    charts: List[SessionChartCreate] = []
+
+
+class SessionProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class SessionProjectResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str]
+    charts: List[SessionChartResponse]
+    createdAt: str
+    updatedAt: str
+
+    class Config:
+        from_attributes = True
+
+
+# Bulk sync schema for frontend
+class BulkSyncRequest(BaseModel):
+    projects: List[SessionProjectCreate]
+

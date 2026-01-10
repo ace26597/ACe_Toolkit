@@ -53,3 +53,34 @@ class Note(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     owner = relationship("User", back_populates="notes")
+
+
+# Session-based models (no authentication required)
+class SessionProject(Base):
+    """Project model for session-based storage (shared across all users)"""
+    __tablename__ = "session_projects"
+
+    id = Column(String, primary_key=True)  # Using client-generated string IDs
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    charts = relationship("SessionChart", back_populates="project", cascade="all, delete-orphan")
+
+
+class SessionChart(Base):
+    """Chart model for session-based storage"""
+    __tablename__ = "session_charts"
+
+    id = Column(String, primary_key=True)  # Using client-generated string IDs
+    project_id = Column(String, ForeignKey("session_projects.id"), nullable=False)
+    name = Column(String, nullable=False)
+    code = Column(Text, nullable=False)
+    editions = Column(Text, nullable=False, default="[]")  # JSON array of editions
+    current_edition_id = Column(String, nullable=True)
+    metadata_json = Column(Text, nullable=True)  # JSON for chart metadata
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project = relationship("SessionProject", back_populates="charts")

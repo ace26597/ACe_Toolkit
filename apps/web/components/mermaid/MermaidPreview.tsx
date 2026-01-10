@@ -30,6 +30,15 @@ const MermaidPreview = forwardRef<HTMLIFrameElement, MermaidPreviewProps>(({
 
         const bgColor = theme === 'dark' ? '#1e1e1e' : '#ffffff';
 
+        // Pre-process code to fix malformed config blocks
+        let processedCode = code;
+        if (processedCode.trim().startsWith('config:') && !processedCode.trim().startsWith('---')) {
+            processedCode = '---\n' + processedCode;
+        }
+
+        // Escape backticks and dollar signs for template literal
+        const escapedCode = processedCode.replace(/`/g, '\\`').replace(/\$/g, '\\$');
+
         const html = `
 <!DOCTYPE html>
 <html>
@@ -103,7 +112,7 @@ const MermaidPreview = forwardRef<HTMLIFrameElement, MermaidPreviewProps>(({
             }
         });
 
-        const diagramCode = \`${code.replace(/`/g, '\\`').replace(/\${/g, '\\${')}\`;
+        const diagramCode = \`${escapedCode}\`;
 
         try {
             mermaid.registerLayoutLoaders(elkLayouts);

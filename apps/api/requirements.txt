@@ -9,3 +9,4 @@ python-jose[cryptography]==3.3.0
 passlib[argon2]==1.7.4
 python-multipart==0.0.6
 playwright==1.41.0
+openai>=1.0.0

@@ -14,6 +14,10 @@ npm run dev:api
 npm run dev:web
 ```
 
+> [!NOTE]
+> Docker is currently not required for local development and is intended for future production/Raspberry Pi deployment.
+
+
 ---
 
 ## Project Structure
@@ -26,45 +30,53 @@ npm run dev:web
 ## Getting Started
 
 ### Prerequisites
-- Docker (for Backend)
 - Node.js 18+ (for Frontend)
-- Python 3.11+ (for Backend dev)
+- Python 3.11+ (for Backend)
+- Docker (Optional: only for production deployment)
+
 
 ### 1. Backend Setup (Local)
-1.  Navigate to infra:
-    ```bash
-    cd infra
-    docker-compose up -d
-    ```
-2.  Navigate to api:
+
+1.  Navigate to the API directory:
     ```bash
     cd apps/api
-    # Create virtual env
+    ```
+2.  Create and activate a virtual environment:
+    ```bash
+    # Windows
     python -m venv .venv
     .venv\Scripts\activate
-    # Install deps
+
+    # macOS/Linux
+    python3 -m venv .venv
+    source .venv/bin/activate
+    ```
+3.  Install dependencies:
+    ```bash
     pip install -r requirements.txt
-    # Run dev server
+    ```
+4.  Run the dev server:
+    ```bash
     uvicorn app.main:app --reload
     ```
     API will be at `http://localhost:8000`.
 
 ### 2. Frontend Setup (Local)
-**Note:** Ensure `create-next-app` has finished initializing.
-1.  Navigate to web:
+
+1.  Navigate to the web directory:
     ```bash
     cd apps/web
     ```
-2.  Install additional dependencies (if not already installed):
+2.  Install dependencies:
     ```bash
-    npm install mermaid @monaco-editor/react lucide-react axios js-cookie clsx tailwind-merge
-    npm install -D @types/js-cookie @types/node @types/react @types/react-dom
+    npm install
     ```
-3.  Run dev server:
+3.  Run the dev server:
     ```bash
     npm run dev
     ```
     Frontend will be at `http://localhost:3000`.
+
 
 ### 3. Raspberry Pi Deployment
 1.  Copy `infra`, `apps/api` to the Pi.
