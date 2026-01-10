@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
-from app.routers import auth, diagrams, export
+from app.routers import auth, diagrams, export, notes, ai
 from app.core.database import engine
 from app.models.models import Base
 
@@ -31,6 +31,8 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(diagrams.router, prefix="/diagrams", tags=["diagrams"])
 app.include_router(export.router, prefix="/export", tags=["export"])
+app.include_router(notes.router, prefix="/notes", tags=["notes"])
+app.include_router(ai.router, prefix="/ai", tags=["ai"])
 
 @app.get("/")
 def read_root():

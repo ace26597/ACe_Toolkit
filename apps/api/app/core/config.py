@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     # Export
     PLAYWRIGHT_BROWSERS_PATH: Optional[str] = None
 
+    # AI
+    OPENAI_API_KEY: Optional[str] = None
+
     class Config:
         env_file = ".env"
         case_sensitive = True

@@ -15,6 +15,7 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     
     diagrams = relationship("Diagram", back_populates="owner")
+    notes = relationship("Note", back_populates="owner")
     refresh_tokens = relationship("RefreshToken", back_populates="user")
 
 class RefreshToken(Base):
@@ -40,3 +41,15 @@ class Diagram(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     owner = relationship("User", back_populates="diagrams")
+
+class Note(Base):
+    __tablename__ = "notes"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    user_id = Column(Uuid, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    owner = relationship("User", back_populates="notes")

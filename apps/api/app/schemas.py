@@ -53,3 +53,26 @@ class DiagramResponse(DiagramBase):
 class ExportRequest(BaseModel):
     mermaid_code: str
     theme: Optional[str] = "default"
+
+# Note Schemas
+class NoteBase(BaseModel):
+    title: str
+    content: str
+
+class NoteCreate(NoteBase):
+    pass
+
+class NoteUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+
+class NoteResponse(NoteBase):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+    
+# AI Schemas
+class AiRequest(BaseModel):
+    prompt: str
+    current_code: Optional[str] = None
