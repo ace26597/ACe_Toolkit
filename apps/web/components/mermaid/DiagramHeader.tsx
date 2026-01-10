@@ -1,7 +1,7 @@
 "use client";
 
 import React from 'react';
-import { Download, Home, PlusCircle, Sparkles } from 'lucide-react';
+import { Download, History, Home, PlusCircle, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 interface DiagramHeaderProps {
@@ -17,6 +17,8 @@ interface DiagramHeaderProps {
     exportSvg: () => void;
     showAi: boolean;
     setShowAi: (show: boolean) => void;
+    showHistory: boolean;
+    setShowHistory: (show: boolean) => void;
 }
 
 export default function DiagramHeader({
@@ -31,7 +33,9 @@ export default function DiagramHeader({
     saveDiagram,
     exportSvg,
     showAi,
-    setShowAi
+    setShowAi,
+    showHistory,
+    setShowHistory
 }: DiagramHeaderProps) {
     const router = useRouter();
 
@@ -79,6 +83,15 @@ export default function DiagramHeader({
                 >
                     <Sparkles size={16} />
                     <span className="hidden md:inline">Ask AI</span>
+                </button>
+                <button
+                    onClick={() => setShowHistory(!showHistory)}
+                    className={`flex items-center gap-2 px-3 py-1 rounded text-sm font-medium transition-all ${showHistory
+                        ? 'bg-indigo-600 text-white shadow-md'
+                        : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50'}`}
+                >
+                    <History size={16} />
+                    <span className="hidden md:inline">History</span>
                 </button>
                 <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Theme:</span>
                 <select

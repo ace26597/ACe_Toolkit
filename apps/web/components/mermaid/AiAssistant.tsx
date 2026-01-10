@@ -6,7 +6,7 @@ import { aiApi } from '@/lib/api';
 
 interface AiAssistantProps {
     currentCode: string;
-    onApplyCode: (newCode: string) => void;
+    onApplyCode: (newCode: string, description: string) => void;
     onClose: () => void;
 }
 
@@ -14,6 +14,22 @@ export default function AiAssistant({ currentCode, onApplyCode, onClose }: AiAss
     const [prompt, setPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    const cleanMermaidCode = (text: string): string => {
+        let cleaned = text.trim();
+        // Remove markdown code blocks if present
+        if (cleaned.startsWith('```')) {
+            const lines = cleaned.split('\n');
+            if (lines[0].startsWith('```')) lines.shift();
+            if (lines[lines.length - 1].startsWith('```')) lines.pop();
+            cleaned = lines.join('\n').trim();
+        }
+        // Remove 'mermaid' language identifier if it remained
+        if (cleaned.toLowerCase().startsWith('mermaid')) {
+            cleaned = cleaned.substring(7).trim();
+        }
+        return cleaned;
+    };
 
     const handleGenerate = async (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -25,7 +41,8 @@ export default function AiAssistant({ currentCode, onApplyCode, onClose }: AiAss
         try {
             const response = await aiApi.generate(prompt, currentCode);
             if (response && response.mermaid_code) {
-                onApplyCode(response.mermaid_code);
+                const cleanedCode = cleanMermaidCode(response.mermaid_code);
+                onApplyCode(cleanedCode, prompt);
                 setPrompt('');
             } else {
                 setError("Failed to generate diagram. Please try again.");

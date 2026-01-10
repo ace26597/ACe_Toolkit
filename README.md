@@ -2,6 +2,20 @@
 
 A hybrid personal platform for diagramming, running on Raspberry Pi (Backend) and Vercel (Frontend).
 
+## Quick Start
+
+Run both Backend and Frontend from the root directory:
+
+```bash
+# Terminal 1: Backend
+npm run dev:api
+
+# Terminal 2: Frontend
+npm run dev:web
+```
+
+---
+
 ## Project Structure
 
 - `apps/web`: Next.js 14 App Router (Frontend)

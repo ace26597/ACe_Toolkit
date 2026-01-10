@@ -10,12 +10,21 @@ import AiAssistant from '@/components/mermaid/AiAssistant';
 const STORAGE_KEY = 'mermaid_diagrams';
 const CURRENT_KEY = 'mermaid_current';
 
+interface Edition {
+    id: string;
+    code: string;
+    description: string;
+    updatedAt: string;
+}
+
 interface Diagram {
     id: string;
     title: string;
     code: string;
     theme: string;
     updatedAt: string;
+    editions?: Edition[];
+    currentEditionId?: string;
 }
 
 export default function MermaidPage() {
@@ -33,6 +42,9 @@ export default function MermaidPage() {
     const [currentId, setCurrentId] = useState<string | null>(null);
     const [showSidebar, setShowSidebar] = useState(true);
     const [showAi, setShowAi] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
+    const [editions, setEditions] = useState<Edition[]>([]);
+    const [currentEditionId, setCurrentEditionId] = useState<string | null>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
     // Load from localStorage on mount
@@ -47,7 +59,8 @@ export default function MermaidPage() {
         // Initialize with default if empty
         if (loadedDiagrams.length === 0) {
             const defaultId = Date.now().toString();
-            const defaultDiagram = {
+            const editionId = Date.now().toString() + '-e1';
+            const defaultDiagram: Diagram = {
                 id: defaultId,
                 title: 'Untitled Diagram',
                 code: `graph TD
@@ -57,7 +70,19 @@ export default function MermaidPage() {
     C -->|Two| E[iPhone]
     C -->|Three| F[fa:fa-car Car]`,
                 theme: 'default',
-                updatedAt: new Date().toISOString()
+                updatedAt: new Date().toISOString(),
+                editions: [{
+                    id: editionId,
+                    code: `graph TD
+    A[Christmas] -->|Get money| B(Go shopping)
+    B --> C{Let me think}
+    C -->|One| D[Laptop]
+    C -->|Two| E[iPhone]
+    C -->|Three| F[fa:fa-car Car]`,
+                    description: 'Initial Version',
+                    updatedAt: new Date().toISOString()
+                }],
+                currentEditionId: editionId
             };
             loadedDiagrams = [defaultDiagram];
             setDiagrams(loadedDiagrams);
@@ -66,7 +91,31 @@ export default function MermaidPage() {
             setTheme(defaultDiagram.theme);
             setDiagramTitle(defaultDiagram.title);
             setCurrentId(defaultDiagram.id);
+            setEditions(defaultDiagram.editions || []);
+            setCurrentEditionId(defaultDiagram.currentEditionId || null);
         } else {
+            // Migration for old diagrams
+            let migrated = false;
+            const updatedDiagrams = loadedDiagrams.map(d => {
+                if (!d.editions || d.editions.length === 0) {
+                    const eId = d.id + '-e-initial';
+                    d.editions = [{
+                        id: eId,
+                        code: d.code,
+                        description: 'Initial Version',
+                        updatedAt: d.updatedAt
+                    }];
+                    d.currentEditionId = eId;
+                    migrated = true;
+                }
+                return d;
+            });
+
+            if (migrated) {
+                setDiagrams(updatedDiagrams);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedDiagrams));
+            }
+
             const current = localStorage.getItem(CURRENT_KEY);
             if (current) {
                 const parsed = JSON.parse(current);
@@ -74,6 +123,12 @@ export default function MermaidPage() {
                 setTheme(parsed.theme || 'default');
                 setDiagramTitle(parsed.title);
                 setCurrentId(parsed.id);
+
+                const diag = updatedDiagrams.find(d => d.id === parsed.id);
+                if (diag) {
+                    setEditions(diag.editions || []);
+                    setCurrentEditionId(parsed.currentEditionId || diag.currentEditionId || null);
+                }
             }
         }
     }, []);
@@ -81,9 +136,9 @@ export default function MermaidPage() {
     // Autosave current diagram
     useEffect(() => {
         if (!currentId && diagrams.length > 0) return;
-        const current = { id: currentId, code, theme, title: diagramTitle };
+        const current = { id: currentId, code, theme, title: diagramTitle, currentEditionId, editions };
         localStorage.setItem(CURRENT_KEY, JSON.stringify(current));
-    }, [code, theme, diagramTitle, currentId, diagrams.length]);
+    }, [code, theme, diagramTitle, currentId, diagrams.length, currentEditionId, editions]);
 
     const handleEdit = useCallback((oldText: string) => {
         const newText = window.prompt(`Edit text for "${oldText}":`, oldText);
@@ -97,15 +152,36 @@ export default function MermaidPage() {
 
     const saveDiagram = () => {
         const id = currentId || Date.now().toString();
+
+        // Update current edition code if it exists
+        let updatedEditions = [...editions];
+        if (currentEditionId) {
+            updatedEditions = editions.map(e =>
+                e.id === currentEditionId ? { ...e, code, updatedAt: new Date().toISOString() } : e
+            );
+        } else {
+            const eId = id + '-e' + Date.now();
+            updatedEditions = [{
+                id: eId,
+                code,
+                description: 'Manual Save',
+                updatedAt: new Date().toISOString()
+            }];
+            setCurrentEditionId(eId);
+        }
+
         const diagram: Diagram = {
             id,
             title: diagramTitle || 'Untitled',
             code,
             theme,
             updatedAt: new Date().toISOString(),
+            editions: updatedEditions,
+            currentEditionId: currentEditionId || updatedEditions[0].id
         };
         const updated = currentId ? diagrams.map(d => d.id === id ? diagram : d) : [...diagrams, diagram];
         setDiagrams(updated);
+        setEditions(updatedEditions);
         setCurrentId(id);
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     };
@@ -115,18 +191,28 @@ export default function MermaidPage() {
         setTheme(diagram.theme || 'default');
         setDiagramTitle(diagram.title);
         setCurrentId(diagram.id);
+        setEditions(diagram.editions || []);
+        setCurrentEditionId(diagram.currentEditionId || null);
     };
 
     const newDiagram = () => {
         const defaultCode = `graph TD
     A[Start] --> B[End]`;
         const id = Date.now().toString();
+        const editionId = id + '-e-initial';
         const diagram: Diagram = {
             id,
             title: 'Untitled Diagram',
             code: defaultCode,
             theme: 'default',
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
+            editions: [{
+                id: editionId,
+                code: defaultCode,
+                description: 'Initial Version',
+                updatedAt: new Date().toISOString()
+            }],
+            currentEditionId: editionId
         };
         const updated = [...diagrams, diagram];
         setDiagrams(updated);
@@ -135,6 +221,8 @@ export default function MermaidPage() {
         setTheme('default');
         setDiagramTitle('Untitled Diagram');
         setCurrentId(id);
+        setEditions(diagram.editions || []);
+        setCurrentEditionId(editionId);
     };
 
     const deleteDiagram = (id: string, e: React.MouseEvent) => {
@@ -210,6 +298,8 @@ export default function MermaidPage() {
                 exportSvg={exportSvg}
                 showAi={showAi}
                 setShowAi={setShowAi}
+                showHistory={showHistory}
+                setShowHistory={setShowHistory}
             />
 
             <div className="flex-1 flex overflow-hidden relative">
@@ -218,7 +308,32 @@ export default function MermaidPage() {
                     setShowSidebar={setShowSidebar}
                     diagrams={diagrams}
                     currentId={currentId}
+                    currentEditionId={currentEditionId}
                     loadDiagram={loadDiagram}
+                    loadEdition={(diagId: string, edition: Edition) => {
+                        // If switching edition within same diagram
+                        if (diagId === currentId) {
+                            setCode(edition.code);
+                            setCurrentEditionId(edition.id);
+                            // Update current diagram's state in storage immediately
+                            const updatedDiagrams = diagrams.map(d =>
+                                d.id === currentId ? { ...d, currentEditionId: edition.id, code: edition.code } : d
+                            );
+                            setDiagrams(updatedDiagrams);
+                            localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedDiagrams));
+                        } else {
+                            // If switching to an edition of a different diagram
+                            const targetDiagram = diagrams.find(d => d.id === diagId);
+                            if (targetDiagram) {
+                                setCode(edition.code);
+                                setTheme(targetDiagram.theme || 'default');
+                                setDiagramTitle(targetDiagram.title);
+                                setCurrentId(targetDiagram.id);
+                                setEditions(targetDiagram.editions || []);
+                                setCurrentEditionId(edition.id);
+                            }
+                        }
+                    }}
                     deleteDiagram={deleteDiagram}
                 />
 
@@ -249,9 +364,30 @@ export default function MermaidPage() {
                 {showAi && (
                     <AiAssistant
                         currentCode={code}
-                        onApplyCode={(newCode) => {
+                        onApplyCode={(newCode, description) => {
                             setCode(newCode);
-                            // Optionally close AI sidebar on apply if prompt-based edit
+                            // Auto-save a new edition for AI actions
+                            const newEditionId = Date.now().toString();
+                            const newEdition: Edition = {
+                                id: newEditionId,
+                                code: newCode,
+                                description: description || 'AI Re-imagine',
+                                updatedAt: new Date().toISOString()
+                            };
+                            const updatedEditions = [...editions, newEdition];
+                            setEditions(updatedEditions);
+                            setCurrentEditionId(newEditionId);
+
+                            // Also update the diagram list
+                            if (currentId) {
+                                const updatedDiagrams = diagrams.map(d =>
+                                    d.id === currentId
+                                        ? { ...d, code: newCode, editions: updatedEditions, currentEditionId: newEditionId, updatedAt: new Date().toISOString() }
+                                        : d
+                                );
+                                setDiagrams(updatedDiagrams);
+                                localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedDiagrams));
+                            }
                         }}
                         onClose={() => setShowAi(false)}
                     />

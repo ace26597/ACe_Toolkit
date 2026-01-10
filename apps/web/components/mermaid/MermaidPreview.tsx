@@ -103,6 +103,8 @@ const MermaidPreview = forwardRef<HTMLIFrameElement, MermaidPreviewProps>(({
             }
         });
 
+        const diagramCode = \`${code.replace(/`/g, '\\`').replace(/\${/g, '\\${')}\`;
+
         try {
             mermaid.registerLayoutLoaders(elkLayouts);
             mermaid.initialize({
@@ -113,13 +115,12 @@ const MermaidPreview = forwardRef<HTMLIFrameElement, MermaidPreviewProps>(({
                 flowchart: { useMaxWidth: false, htmlLabels: true }
             });
 
-            const code = \`${code.replace(/`/g, '\\`').replace(/\${/g, '\\${')}\`;
-            const { svg } = await mermaid.render('graphDiv', code);
+            const { svg } = await mermaid.render('graphDiv', diagramCode);
             output.innerHTML = svg;
             
         } catch (e) {
             let errorMsg = e.message;
-            if (code.trim().search(/^[\\s\\S]+\\n---/) !== -1 && (code.includes('config:') || code.includes('init:'))) {
+            if (diagramCode.trim().search(/^[\\s\\S]+\\n---/) !== -1 && (diagramCode.includes('config:') || diagramCode.includes('init:'))) {
                  errorMsg += '\\n\\n💡 HINT: It looks like you have a configuration block (---). Make sure it is at the very top of the editor, before any graph definitions.';
             }
             output.innerHTML = '<div class="error">' + errorMsg + '</div>';
