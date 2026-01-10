@@ -1,9 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from openai import AsyncOpenAI
 from app.core.config import settings
 from app.schemas import AiRequest
-from app.routers.auth import get_current_user
-from app.models.models import User
 
 router = APIRouter()
 
@@ -20,8 +18,7 @@ You are a Mermaid.js expert. Your task is to generate or edit Mermaid diagram co
 
 @router.post("/generate")
 async def generate_diagram(
-    req: AiRequest,
-    current_user: User = Depends(get_current_user)
+    req: AiRequest
 ):
     if not settings.OPENAI_API_KEY:
         raise HTTPException(status_code=500, detail="OpenAI API key not configured")
