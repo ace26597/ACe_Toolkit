@@ -62,9 +62,18 @@ export interface ChartMetadata {
     sourceFile?: string;
 }
 
+export interface Document {
+    id: string;
+    name: string;
+    sourceMarkdown?: string;
+    chartIds: string[];
+    createdAt: string;
+}
+
 export interface Chart {
     id: string;
     projectId: string;
+    documentId?: string;
     name: string;
     code: string;
     editions: Edition[];
@@ -79,6 +88,7 @@ export interface Project {
     name: string;
     description?: string;
     charts: Chart[];
+    documents: Document[];
     createdAt: string;
     updatedAt: string;
 }
@@ -152,6 +162,7 @@ export const chartsApi = {
         projectId: string;
         name: string;
         code: string;
+        documentId?: string;
         editions?: Edition[];
         currentEditionId?: string;
         metadata?: ChartMetadata;
@@ -186,5 +197,103 @@ export const chartsApi = {
             method: 'DELETE',
         });
         if (!res.ok) throw new Error('Failed to delete chart');
+    },
+};
+
+// Session-based Notes API (no auth required)
+export interface SessionNoteMetadata {
+    tags: string[];
+    pinned: boolean;
+    source?: 'manual' | 'upload';
+}
+
+export interface SessionNote {
+    id: string;
+    projectId: string;
+    title: string;
+    content: string;
+    metadata?: SessionNoteMetadata;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface SessionNoteProject {
+    id: string;
+    name: string;
+    description?: string;
+    notes: SessionNote[];
+    createdAt: string;
+    updatedAt: string;
+}
+
+export const sessionNotesApi = {
+    getAllProjects: async (): Promise<SessionNoteProject[]> => {
+        const res = await fetch(`${API_URL}/session-notes/projects`);
+        if (!res.ok) throw new Error('Failed to fetch note projects');
+        return res.json();
+    },
+
+    createProject: async (project: { id: string; name: string; description?: string }): Promise<SessionNoteProject> => {
+        const res = await fetch(`${API_URL}/session-notes/projects`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(project),
+        });
+        if (!res.ok) throw new Error('Failed to create note project');
+        return res.json();
+    },
+
+    updateProject: async (id: string, data: { name?: string; description?: string }): Promise<SessionNoteProject> => {
+        const res = await fetch(`${API_URL}/session-notes/projects/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) throw new Error('Failed to update note project');
+        return res.json();
+    },
+
+    deleteProject: async (id: string): Promise<void> => {
+        const res = await fetch(`${API_URL}/session-notes/projects/${id}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) throw new Error('Failed to delete note project');
+    },
+
+    createNote: async (note: { id: string; projectId: string; title: string; content: string; metadata?: SessionNoteMetadata }): Promise<SessionNote> => {
+        const res = await fetch(`${API_URL}/session-notes/note`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(note),
+        });
+        if (!res.ok) throw new Error('Failed to create note');
+        return res.json();
+    },
+
+    updateNote: async (id: string, data: { title?: string; content?: string; metadata?: SessionNoteMetadata }): Promise<SessionNote> => {
+        const res = await fetch(`${API_URL}/session-notes/note/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) throw new Error('Failed to update note');
+        return res.json();
+    },
+
+    deleteNote: async (id: string): Promise<void> => {
+        const res = await fetch(`${API_URL}/session-notes/note/${id}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) throw new Error('Failed to delete note');
+    },
+
+    sync: async (projects: SessionNoteProject[]): Promise<SessionNoteProject[]> => {
+        const res = await fetch(`${API_URL}/session-notes/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projects }),
+        });
+        if (!res.ok) throw new Error('Failed to sync note projects');
+        return res.json();
     },
 };
