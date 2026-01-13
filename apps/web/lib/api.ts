@@ -1,5 +1,33 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+// Scientific Skills types (defined here to avoid import issues)
+export interface Skill {
+    name: string;
+    category: string;
+    description: string;
+    parameters: Record<string, string>;
+}
+
+export interface SkillExecution {
+    id: string;
+    skill_name: string;
+    command: string;
+    output: string | null;
+    error: string | null;
+    status: 'running' | 'success' | 'failed';
+    execution_time_ms: number | null;
+    created_at: string;
+}
+
+export interface MCPStatus {
+    running: boolean;
+    pid: number | null;
+    uptime_seconds: number;
+    skills_count: number;
+    execution_count: number;
+    memory_mb: number;
+}
+
 export async function fetchWithAuth(endpoint: string, options: RequestInit = {}) {
     const token = localStorage.getItem('token');
     const headers = {
@@ -41,11 +69,21 @@ export const notesApi = {
 };
 
 export const aiApi = {
-    generate: (prompt: string, currentCode?: string) =>
-        fetchWithAuth('/ai/generate', {
+    generate: async (prompt: string, currentCode?: string) => {
+        const res = await fetchWithAuth('/ai/generate', {
             method: 'POST',
             body: JSON.stringify({ prompt, current_code: currentCode }),
-        }).then(res => res.json()),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            // Backend returns error with detail field
+            throw new Error(data.detail || 'AI generation failed');
+        }
+
+        return data;
+    },
 };
 
 // Session-based Projects API (no auth required)
@@ -209,3 +247,213 @@ export const chartsApi = {
 
 // Note: Session-based notes have been unified with the projects/documents system.
 // Use projectsApi with documents that have sourceMarkdown for note-like functionality.
+
+// Scientific Skills API
+export const skillsApi = {
+    getStatus: async (): Promise<MCPStatus> => {
+        const res = await fetch(`${API_URL}/skills/status`);
+        if (!res.ok) throw new Error('Failed to fetch MCP status');
+        return res.json();
+    },
+
+    listSkills: async (): Promise<Skill[]> => {
+        const res = await fetch(`${API_URL}/skills/list`);
+        if (!res.ok) throw new Error('Failed to fetch skills');
+        return res.json();
+    },
+
+    executeSkill: async (skillName: string, params: Record<string, any>, sessionId: string): Promise<any> => {
+        const res = await fetch(`${API_URL}/skills/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                skill_name: skillName,
+                params,
+                session_id: sessionId
+            }),
+        });
+        if (!res.ok) throw new Error('Failed to execute skill');
+        return res.json();
+    },
+
+    getHistory: async (sessionId: string): Promise<SkillExecution[]> => {
+        const res = await fetch(`${API_URL}/skills/history/${sessionId}`);
+        if (!res.ok) throw new Error('Failed to fetch execution history');
+        return res.json();
+    },
+};
+
+// Scientific Chat API Types
+export interface ToolCall {
+    id: string;
+    name: string;
+    input: Record<string, any>;
+}
+
+export interface ToolResult {
+    tool_call_id: string;
+    success: boolean;
+    output?: string;
+    error?: string;
+    execution_time_ms: number;
+}
+
+export interface ChatMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    thinking?: string;
+    tool_calls?: ToolCall[];
+    tool_results?: ToolResult[];
+    created_at: string;
+}
+
+export interface ChatConversation {
+    id: string;
+    session_id: string;
+    title: string;
+    message_count: number;
+    sandbox_dir: string;
+    model_name: string;
+    total_tokens_used: number;
+    created_at: string;
+    last_message_at: string;
+}
+
+export interface SandboxFile {
+    name: string;
+    path: string;
+    size: number;
+    is_dir: boolean;
+    modified_at: string;
+}
+
+// Scientific Chat API
+export const scientificChatApi = {
+    createConversation: async (sessionId: string): Promise<ChatConversation> => {
+        const res = await fetch(`${API_URL}/scientific-chat/conversations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: sessionId }),
+        });
+        if (!res.ok) throw new Error('Failed to create conversation');
+        return res.json();
+    },
+
+    listConversations: async (sessionId: string): Promise<ChatConversation[]> => {
+        const res = await fetch(`${API_URL}/scientific-chat/conversations/${sessionId}`);
+        if (!res.ok) throw new Error('Failed to list conversations');
+        return res.json();
+    },
+
+    getMessages: async (conversationId: string): Promise<ChatMessage[]> => {
+        const res = await fetch(`${API_URL}/scientific-chat/conversations/${conversationId}/messages`);
+        if (!res.ok) throw new Error('Failed to get messages');
+        return res.json();
+    },
+
+    deleteConversation: async (conversationId: string): Promise<void> => {
+        const res = await fetch(`${API_URL}/scientific-chat/conversations/${conversationId}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) throw new Error('Failed to delete conversation');
+    },
+
+    listSandboxFiles: async (conversationId: string, subpath: string = ''): Promise<SandboxFile[]> => {
+        const params = new URLSearchParams(subpath ? { subpath } : {});
+        const res = await fetch(`${API_URL}/scientific-chat/sandbox/${conversationId}/files?${params}`);
+        if (!res.ok) throw new Error('Failed to list sandbox files');
+        const data = await res.json();
+        return data.files;
+    },
+
+    downloadSandboxFile: (conversationId: string, filePath: string): string => {
+        return `${API_URL}/scientific-chat/sandbox/${conversationId}/download/${filePath}`;
+    },
+
+    connectWebSocket: (): WebSocket => {
+        const wsUrl = API_URL.replace(/^http/, 'ws') + '/scientific-chat/stream';
+        return new WebSocket(wsUrl);
+    }
+};
+
+// Research Assistant API (multi-model, LangGraph workflows, file processing, reports)
+export interface ResearchConversation {
+    id: string;
+    session_id: string;
+    title: string;
+    provider: string;
+    model_name: string;
+    created_at: string;
+}
+
+export interface ResearchMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    synthesis?: string;
+    report?: string;
+    tokens_used: number;
+    created_at: string;
+}
+
+export const researchApi = {
+    createConversation: async (data: {
+        session_id: string;
+        title: string;
+        provider: string;
+        model_name: string;
+    }): Promise<ResearchConversation> => {
+        const formData = new FormData();
+        formData.append('session_id', data.session_id);
+        formData.append('title', data.title);
+        formData.append('provider', data.provider);
+        formData.append('model_name', data.model_name);
+
+        const res = await fetch(`${API_URL}/research/conversations`, {
+            method: 'POST',
+            body: formData,
+        });
+        if (!res.ok) throw new Error('Failed to create conversation');
+        return res.json();
+    },
+
+    listConversations: async (sessionId: string, limit: number = 50): Promise<ResearchConversation[]> => {
+        const res = await fetch(`${API_URL}/research/conversations?session_id=${sessionId}&limit=${limit}`);
+        if (!res.ok) throw new Error('Failed to list conversations');
+        const data = await res.json();
+        return data.conversations;
+    },
+
+    deleteConversation: async (conversationId: string): Promise<void> => {
+        const res = await fetch(`${API_URL}/research/conversations/${conversationId}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) throw new Error('Failed to delete conversation');
+    },
+
+    uploadFiles: async (conversationId: string, files: File[]): Promise<any[]> => {
+        const formData = new FormData();
+        formData.append('conversation_id', conversationId);
+        files.forEach(file => formData.append('files', file));
+
+        const res = await fetch(`${API_URL}/research/upload`, {
+            method: 'POST',
+            body: formData,
+        });
+        if (!res.ok) throw new Error('Failed to upload files');
+        const data = await res.json();
+        return data.uploaded;
+    },
+
+    downloadReport: async (conversationId: string, format: 'md' | 'html' | 'pdf' | 'csv'): Promise<Blob> => {
+        const res = await fetch(`${API_URL}/research/reports/${conversationId}?format=${format}`);
+        if (!res.ok) throw new Error('Failed to download report');
+        return res.blob();
+    },
+
+    connectWebSocket: (): WebSocket => {
+        const wsUrl = API_URL.replace(/^http/, 'ws') + '/research/stream';
+        return new WebSocket(wsUrl);
+    }
+};

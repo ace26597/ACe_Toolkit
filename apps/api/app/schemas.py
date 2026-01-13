@@ -229,3 +229,60 @@ class SessionNoteProjectResponse(BaseModel):
 class NoteBulkSyncRequest(BaseModel):
     projects: List[SessionNoteProjectCreate]
 
+
+# Scientific Chat Schemas
+class ToolCallSchema(BaseModel):
+    id: str
+    name: str
+    input: dict
+
+
+class ToolResultSchema(BaseModel):
+    tool_call_id: str
+    success: bool
+    output: Optional[str] = None
+    error: Optional[str] = None
+    execution_time_ms: int
+
+
+class ChatMessageCreate(BaseModel):
+    content: str
+    conversation_id: Optional[str] = None
+    session_id: str
+
+
+class ChatMessageResponse(BaseModel):
+    id: str
+    role: str
+    content: str
+    thinking: Optional[str] = None
+    tool_calls: Optional[List[ToolCallSchema]] = None
+    tool_results: Optional[List[ToolResultSchema]] = None
+    created_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class ChatConversationResponse(BaseModel):
+    id: str
+    session_id: str
+    title: str
+    message_count: int
+    sandbox_dir: str
+    model_name: str
+    total_tokens_used: int
+    created_at: str
+    last_message_at: str
+
+    class Config:
+        from_attributes = True
+
+
+class SandboxFileSchema(BaseModel):
+    name: str
+    path: str
+    size: int
+    is_dir: bool
+    modified_at: str
+

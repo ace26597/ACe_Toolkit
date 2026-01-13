@@ -17,14 +17,27 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     
-    # CORS
-    ALLOWED_ORIGINS: List[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # CORS - Support localhost, network IPs, and Cloudflare domains
+    ALLOWED_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "https://ai.ultronsolar.in",
+        "https://api.ultronsolar.in",
+        "*"  # Allow all origins for development (required for WebSocket)
+    ]
 
     # Export
     PLAYWRIGHT_BROWSERS_PATH: Optional[str] = None
 
+    # AI - OpenAI GPT-4o API
+    OPENAI_API_KEY: Optional[str] = None
+
     # AI - Anthropic Claude API
     ANTHROPIC_API_KEY: Optional[str] = None
+
+    # AI - Tavily Search API (for web search in Research Assistant)
+    TAVILY_API_KEY: Optional[str] = None
 
     class Config:
         env_file = ".env"

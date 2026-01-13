@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from anthropic import AsyncAnthropic
+from openai import AsyncOpenAI, APIError, APIStatusError, RateLimitError, APIConnectionError
 from app.core.config import settings
 from app.schemas import AiRequest
 import json
@@ -14,11 +14,11 @@ router = APIRouter()
 
 # Lazy initialization - only create client when API key is available
 client = None
-if settings.ANTHROPIC_API_KEY:
-    client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+if settings.OPENAI_API_KEY:
+    client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
 
-# Model to use - Claude Sonnet for fast, high-quality responses
-CLAUDE_MODEL = "claude-sonnet-4-20250514"
+# Model to use - GPT-4o for fast, high-quality responses
+OPENAI_MODEL = "gpt-4o"
 
 # Step 1: Context Analysis Prompt
 ANALYSIS_PROMPT = """You are a Mermaid.js expert and diagram analyst. Your task is to analyze the current diagram and understand the user's request.
@@ -90,20 +90,23 @@ USER REQUEST: {user_prompt}
 
 Provide your analysis as a JSON object."""
 
-    logger.info(f"Sending analysis request to Claude {CLAUDE_MODEL}...")
+    logger.info(f"Sending analysis request to OpenAI {OPENAI_MODEL}...")
     start_time = datetime.now()
 
-    response = await client.messages.create(
-        model=CLAUDE_MODEL,
+    response = await client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": ANALYSIS_PROMPT},
+            {"role": "user", "content": user_message}
+        ],
         max_tokens=2048,
-        system=ANALYSIS_PROMPT,
-        messages=[{"role": "user", "content": user_message}]
+        temperature=0.7
     )
 
     elapsed = (datetime.now() - start_time).total_seconds()
     logger.info(f"Analysis completed in {elapsed:.2f}s")
 
-    raw_content = response.content[0].text
+    raw_content = response.choices[0].message.content
     logger.info(f"Raw Analysis Response:\n{raw_content}")
 
     try:
@@ -145,20 +148,23 @@ USER REQUEST: {user_prompt}
 
 Generate the Mermaid diagram code now."""
 
-    logger.info(f"Sending generation request to Claude {CLAUDE_MODEL}...")
+    logger.info(f"Sending generation request to OpenAI {OPENAI_MODEL}...")
     start_time = datetime.now()
 
-    response = await client.messages.create(
-        model=CLAUDE_MODEL,
+    response = await client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": GENERATION_PROMPT},
+            {"role": "user", "content": user_message}
+        ],
         max_tokens=4096,
-        system=GENERATION_PROMPT,
-        messages=[{"role": "user", "content": user_message}]
+        temperature=0.7
     )
 
     elapsed = (datetime.now() - start_time).total_seconds()
     logger.info(f"Generation completed in {elapsed:.2f}s")
 
-    generated_code = response.content[0].text.strip()
+    generated_code = response.choices[0].message.content.strip()
     logger.info(f"Generated Code:\n{generated_code[:500]}{'...' if len(generated_code) > 500 else ''}")
 
     return generated_code
@@ -180,20 +186,23 @@ USER REQUEST: {user_prompt}
 
 Provide a summary of the changes as a JSON object."""
 
-    logger.info(f"Sending summary request to Claude {CLAUDE_MODEL}...")
+    logger.info(f"Sending summary request to OpenAI {OPENAI_MODEL}...")
     start_time = datetime.now()
 
-    response = await client.messages.create(
-        model=CLAUDE_MODEL,
+    response = await client.chat.completions.create(
+        model=OPENAI_MODEL,
+        messages=[
+            {"role": "system", "content": SUMMARY_PROMPT},
+            {"role": "user", "content": user_message}
+        ],
         max_tokens=1024,
-        system=SUMMARY_PROMPT,
-        messages=[{"role": "user", "content": user_message}]
+        temperature=0.7
     )
 
     elapsed = (datetime.now() - start_time).total_seconds()
     logger.info(f"Summary completed in {elapsed:.2f}s")
 
-    raw_content = response.content[0].text
+    raw_content = response.choices[0].message.content
     logger.info(f"Raw Summary Response:\n{raw_content}")
 
     try:
@@ -238,13 +247,13 @@ def clean_mermaid_code(code: str) -> str:
 @router.post("/generate")
 async def generate_diagram_endpoint(req: AiRequest):
     logger.info("=" * 80)
-    logger.info("AI DIAGRAM GENERATION PIPELINE STARTED (Claude)")
+    logger.info("AI DIAGRAM GENERATION PIPELINE STARTED (OpenAI GPT-4o)")
     logger.info(f"Timestamp: {datetime.now().isoformat()}")
     logger.info("=" * 80)
 
-    if not settings.ANTHROPIC_API_KEY:
-        logger.error("Anthropic API key not configured")
-        raise HTTPException(status_code=500, detail="Anthropic API key not configured")
+    if not settings.OPENAI_API_KEY:
+        logger.error("OpenAI API key not configured")
+        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
 
     if not client:
         raise HTTPException(status_code=500, detail="AI client not initialized")
@@ -276,6 +285,47 @@ async def generate_diagram_endpoint(req: AiRequest):
             "thinking": analysis.get("thinking", "")
         }
 
+    except APIStatusError as e:
+        logger.error(f"OpenAI API Error: {e}")
+        # Check for specific error types
+        error_message = str(e)
+
+        if "insufficient_quota" in error_message.lower() or "quota" in error_message.lower():
+            raise HTTPException(
+                status_code=402,  # Payment Required
+                detail="AI feature requires API credits. Please contact the administrator to add credits to the OpenAI account."
+            )
+        elif "invalid" in error_message.lower() and "api" in error_message.lower() and "key" in error_message.lower():
+            raise HTTPException(
+                status_code=401,
+                detail="AI API key is invalid. Please contact the administrator."
+            )
+        elif "rate limit" in error_message.lower():
+            raise HTTPException(
+                status_code=429,
+                detail="AI service is temporarily rate-limited. Please try again in a few moments."
+            )
+        else:
+            raise HTTPException(status_code=500, detail=f"AI service error: {error_message}")
+
+    except RateLimitError as e:
+        logger.error(f"Rate Limit Error: {e}")
+        raise HTTPException(
+            status_code=429,
+            detail="Too many AI requests. Please wait a moment and try again."
+        )
+
+    except APIConnectionError as e:
+        logger.error(f"API Connection Error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Cannot connect to AI service. Please check your internet connection and try again."
+        )
+
+    except APIError as e:
+        logger.error(f"General API Error: {e}")
+        raise HTTPException(status_code=500, detail=f"AI service error: {str(e)}")
+
     except Exception as e:
-        logger.error(f"AI Generation Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected Error: {e}")
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {str(e)}")

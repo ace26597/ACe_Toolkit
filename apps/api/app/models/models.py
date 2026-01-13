@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Uuid
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Uuid, Integer
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -114,3 +114,149 @@ class SessionNote(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     project = relationship("SessionNoteProject", back_populates="notes")
+
+
+class SkillSession(Base):
+    """Terminal session for scientific skills (session-based)"""
+    __tablename__ = "skill_sessions"
+
+    id = Column(String, primary_key=True)  # UUID from frontend
+    session_id = Column(String, nullable=False, index=True)  # Browser session ID
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    executions = relationship("SkillExecution", back_populates="session", cascade="all, delete-orphan")
+
+
+class SkillExecution(Base):
+    """Track individual skill executions for history/debugging"""
+    __tablename__ = "skill_executions"
+
+    id = Column(String, primary_key=True)  # UUID
+    session_id = Column(String, ForeignKey("skill_sessions.id"), nullable=False)
+    skill_name = Column(String, nullable=False)
+    command = Column(Text, nullable=False)
+    input_params = Column(Text, nullable=True)  # JSON
+    output = Column(Text, nullable=True)
+    error = Column(Text, nullable=True)
+    status = Column(String, nullable=False)  # "running", "success", "failed"
+    execution_time_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    session = relationship("SkillSession", back_populates="executions")
+
+
+class ChatConversation(Base):
+    """Scientific chat conversation with Claude AI"""
+    __tablename__ = "chat_conversations"
+
+    id = Column(String, primary_key=True)  # UUID
+    session_id = Column(String, nullable=False, index=True)  # Browser session
+    title = Column(String, nullable=False)  # Auto-generated from first message
+    sandbox_dir = Column(String, nullable=False)  # /tmp/ace_sessions/{id}/
+    model_name = Column(String, nullable=False, default="claude-sonnet-4-20250514")
+    message_count = Column(Integer, default=0)
+    total_tokens_used = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_message_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    messages = relationship("ChatMessage", back_populates="conversation", cascade="all, delete-orphan")
+
+
+class ChatMessage(Base):
+    """Individual message in a chat conversation"""
+    __tablename__ = "chat_messages"
+
+    id = Column(String, primary_key=True)
+    conversation_id = Column(String, ForeignKey("chat_conversations.id"), nullable=False)
+    role = Column(String, nullable=False)  # "user" | "assistant"
+    content = Column(Text, nullable=False)
+    thinking = Column(Text, nullable=True)  # Claude's thinking process
+    tool_calls_json = Column(Text, nullable=True)  # JSON array
+    tool_results_json = Column(Text, nullable=True)  # JSON array
+    streaming_complete = Column(Integer, default=1)  # 0=interrupted, 1=complete
+    tokens_used = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    conversation = relationship("ChatConversation", back_populates="messages")
+
+
+# Research Assistant models with multi-model support
+class ResearchConversation(Base):
+    """Research assistant conversation with multi-model support (OpenAI + Anthropic)"""
+    __tablename__ = "research_conversations"
+
+    id = Column(String, primary_key=True)  # UUID
+    session_id = Column(String, nullable=False, index=True)  # Browser session
+    title = Column(String, nullable=False)  # Auto-generated from first message
+    sandbox_dir = Column(String, nullable=False)  # /tmp/ace_sessions/{id}/
+
+    # Multi-model configuration
+    provider = Column(String, nullable=False, default="openai")  # openai | anthropic
+    model_name = Column(String, nullable=False, default="gpt-4o")
+
+    # Workflow metadata
+    workflow_type = Column(String, nullable=True)  # "search" | "analysis" | "direct"
+
+    # Usage tracking
+    message_count = Column(Integer, default=0)
+    total_tokens_used = Column(Integer, default=0)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_message_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    messages = relationship("ResearchMessage", back_populates="conversation", cascade="all, delete-orphan")
+    files = relationship("UploadedFile", back_populates="conversation", cascade="all, delete-orphan")
+
+
+class ResearchMessage(Base):
+    """Individual message in research conversation with LangGraph workflow state"""
+    __tablename__ = "research_messages"
+
+    id = Column(String, primary_key=True)
+    conversation_id = Column(String, ForeignKey("research_conversations.id"), nullable=False)
+    role = Column(String, nullable=False)  # "user" | "assistant"
+    content = Column(Text, nullable=False)
+
+    # Workflow state snapshots
+    workflow_steps = Column(Text, nullable=True)  # JSON: [{step, status, timestamp}]
+    search_results = Column(Text, nullable=True)  # JSON: Tavily results
+    synthesis = Column(Text, nullable=True)  # Final synthesis text
+    report = Column(Text, nullable=True)  # Generated report (Markdown)
+
+    # Tool execution
+    tool_calls_json = Column(Text, nullable=True)  # MCP tool calls
+    tool_results_json = Column(Text, nullable=True)  # MCP tool results
+
+    # Metadata
+    streaming_complete = Column(Integer, default=1)  # 0=interrupted, 1=complete
+    tokens_used = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    conversation = relationship("ResearchConversation", back_populates="messages")
+
+
+class UploadedFile(Base):
+    """Files uploaded to research conversation for multi-modal processing"""
+    __tablename__ = "uploaded_files"
+
+    id = Column(String, primary_key=True)
+    conversation_id = Column(String, ForeignKey("research_conversations.id"), nullable=False)
+
+    # File metadata
+    original_filename = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)  # Path in sandbox
+    file_type = Column(String, nullable=False)  # image | pdf | csv | excel | text
+    file_size_bytes = Column(Integer, nullable=False)
+    mime_type = Column(String, nullable=False)
+
+    # Extracted content
+    extracted_content = Column(Text, nullable=True)  # Parsed text/data
+    extraction_method = Column(String, nullable=True)  # vision | pypdf | pandas
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    conversation = relationship("ResearchConversation", back_populates="files")

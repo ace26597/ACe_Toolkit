@@ -69,3 +69,31 @@ export interface ExtractedChart {
     metadata?: ChartMetadata;
 }
 
+// Scientific Skills types
+export interface Skill {
+    name: string;
+    category: string;
+    description: string;
+    parameters: Record<string, string>;
+}
+
+export interface SkillExecution {
+    id: string;
+    skill_name: string;
+    command: string;
+    output: string | null;
+    error: string | null;
+    status: 'running' | 'success' | 'failed';
+    execution_time_ms: number | null;
+    created_at: string;
+}
+
+export interface MCPStatus {
+    running: boolean;
+    pid: number | null;
+    uptime_seconds: number;
+    skills_count: number;
+    execution_count: number;
+    memory_mb: number;
+}
+

@@ -3,7 +3,7 @@
 **Last Updated:** January 13, 2026
 **Repository:** ACe_Toolkit
 **Status:** Active Development
-**Deployment:** Raspberry Pi (Local Network + Cloudflare Domain In Progress)
+**Deployment:** Raspberry Pi (Local Network + Cloudflare Tunnel Active)
 
 ---
 
@@ -37,6 +37,8 @@
 - **Multi-Project Hierarchy**: Organize charts within documents or as standalone diagrams
 - **Diagram Editions**: Version control for diagram changes with descriptions
 - **AI-Powered Generation**: Create, repair, and enhance diagrams using Claude (Anthropic)
+- **Research Assistant** (NEW): Multi-model AI research with GPT-4o/GPT-5.1/Claude, file upload, web search, LangGraph workflows, and report generation
+- **Scientific Skills Terminal** (NEW): Browser-based access to 140+ scientific tools (PubMed, UniProt, RDKit, PyTorch) via MCP
 - **Session-Based Storage**: No authentication required for basic usage
 - **User Authentication**: Optional register/login for persistent storage
 - **Notes Application**: Markdown-enabled note-taking with auto-sync
@@ -47,8 +49,10 @@
 
 | Route | Description |
 |-------|-------------|
-| `/` | Home page with navigation to Mermaid Editor and Notes |
+| `/` | Home page with navigation to all apps |
 | `/mermaid` | Full-featured diagram editor with live preview, Monaco editor, AI assistance |
+| `/research` | Research Assistant with multi-model AI, file upload, web search, LangGraph workflows, and report generation |
+| `/scientific` | Scientific Skills Terminal with 140+ tools (PubMed, UniProt, RDKit, PyTorch) |
 | `/notes` | Session-based note-taking with project organization |
 
 ### Repository Information
@@ -90,14 +94,23 @@
 | Auth | python-jose (JWT), passlib (Argon2) | - |
 | Browser Automation | Playwright | >=1.50.0 |
 | AI Integration | Anthropic SDK (Claude) | >=0.40.0 |
+| AI Integration | OpenAI SDK | latest |
+| AI Workflows | LangGraph | >=0.2.0 |
+| AI Framework | LangChain | >=0.1.0 |
+| Web Search | Tavily API | >=0.5.0 |
+| MCP Tools | Scientific Skills MCP | 140+ tools |
+| File Processing | pypdf, openpyxl, pandas, pillow | latest |
+| Report Generation | reportlab, markdown | latest |
 
 ### Infrastructure
 
 - **Containerization:** Docker (optional)
-- **Deployment:** Raspberry Pi (local network + future Cloudflare Tunnel)
-- **Auto-Start:** Crontab-based service startup on reboot
+- **Deployment:** Raspberry Pi (local network + Cloudflare Tunnel)
+- **Auto-Start:** systemd service with auto-restart on reboot
 - **Networking:** UFW firewall, local network access
-- **Future:** Cloudflare Tunnel for external access (in progress)
+- **Cloudflare Tunnel:** Active (ai.ultronsolar.in, api.ultronsolar.in)
+- **WebSocket:** Enabled with HTTP/1.1 for real-time streaming
+- **Production Scripts:** Automated startup, shutdown, restart, and log management
 
 ---
 
@@ -265,6 +278,36 @@ AI generation uses a 3-step process:
 |--------|----------|-------------|
 | POST | `/` | Export diagram to image/PDF (uses Playwright) |
 
+### Research Assistant (`/research`) - NEW!
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| WebSocket | `/stream` | Real-time research chat with LangGraph workflows |
+| POST | `/upload` | Upload files (images, PDFs, CSV, Excel) to conversation |
+| GET | `/reports/{conversation_id}` | Download report (MD, HTML, PDF, CSV) |
+| GET | `/conversations` | List research conversations for session |
+| POST | `/conversations` | Create new research conversation |
+| DELETE | `/conversations/{id}` | Delete conversation and sandbox |
+
+**Features:**
+- Multi-model support: OpenAI (gpt-4o, gpt-5.1, gpt-5.2) + Anthropic (claude-sonnet-4, claude-opus-4.5)
+- WebSocket streaming for real-time responses
+- LangGraph workflows: Router → Search → File Processing → Analysis → Synthesis → Report
+- Tavily web search integration
+- Multi-modal file processing (AI vision, pypdf, pandas)
+- Report generation in multiple formats
+
+### Scientific Skills (`/skills`) - NEW!
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/status` | MCP server status and metrics |
+| GET | `/list` | List all available scientific skills |
+| POST | `/execute` | Execute a skill with parameters |
+| GET | `/history/{session_id}` | Get execution history |
+
+**Available Tools:** 140+ scientific computing tools including PubMed, UniProt, RDKit, PyTorch, and more via MCP
+
 ---
 
 ## Database Schema
@@ -343,6 +386,45 @@ SessionNote
 ├── pinned: Boolean
 ├── created_at: DateTime
 └── updated_at: DateTime
+
+ResearchConversation (NEW)
+├── id: String (PK, UUID)
+├── session_id: String
+├── title: String
+├── sandbox_dir: String
+├── provider: String (openai | anthropic)
+├── model_name: String
+├── workflow_type: String (search | analysis | direct)
+├── message_count: Integer
+├── total_tokens_used: Integer
+├── created_at: DateTime
+└── last_message_at: DateTime
+
+ResearchMessage (NEW)
+├── id: String (PK, UUID)
+├── conversation_id: String (FK -> ResearchConversation)
+├── role: String (user | assistant)
+├── content: Text
+├── workflow_steps: JSON
+├── search_results: JSON
+├── synthesis: Text
+├── report: Text
+├── tool_calls_json: JSON
+├── tool_results_json: JSON
+├── tokens_used: Integer
+└── created_at: DateTime
+
+UploadedFile (NEW)
+├── id: String (PK, UUID)
+├── conversation_id: String (FK -> ResearchConversation)
+├── original_filename: String
+├── file_path: String
+├── file_type: String (image | pdf | csv | excel | text)
+├── file_size_bytes: Integer
+├── mime_type: String
+├── extracted_content: Text
+├── extraction_method: String (vision | pypdf | pandas | text)
+└── created_at: DateTime
 ```
 
 ---

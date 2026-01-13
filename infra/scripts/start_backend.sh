@@ -31,6 +31,9 @@ fi
 # Activate virtual environment
 source "$VENV_PATH/bin/activate"
 
+# Add uv/uvx to PATH for scientific skills MCP server
+export PATH="$HOME/.local/bin:$PATH"
+
 # Start uvicorn in production mode (no --reload)
 echo "$(date): Starting uvicorn on port 8000..." | tee -a "$LOG_FILE"
 uvicorn app.main:app --host 0.0.0.0 --port 8000 >> "$LOG_FILE" 2>&1 &
