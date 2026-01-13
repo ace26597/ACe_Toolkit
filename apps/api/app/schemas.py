@@ -92,9 +92,18 @@ class ChartMetadataSchema(BaseModel):
     sourceFile: Optional[str] = None
 
 
+class DocumentSchema(BaseModel):
+    id: str
+    name: str
+    sourceMarkdown: Optional[str] = None
+    chartIds: List[str] = []
+    createdAt: str
+
+
 class SessionChartCreate(BaseModel):
     id: str
     projectId: str
+    documentId: Optional[str] = None
     name: str
     code: str
     editions: List[EditionSchema] = []
@@ -105,6 +114,7 @@ class SessionChartCreate(BaseModel):
 class SessionChartUpdate(BaseModel):
     name: Optional[str] = None
     code: Optional[str] = None
+    documentId: Optional[str] = None
     editions: Optional[List[EditionSchema]] = None
     currentEditionId: Optional[str] = None
     metadata: Optional[ChartMetadataSchema] = None
@@ -113,6 +123,7 @@ class SessionChartUpdate(BaseModel):
 class SessionChartResponse(BaseModel):
     id: str
     projectId: str
+    documentId: Optional[str] = None
     name: str
     code: str
     editions: List[EditionSchema]
@@ -130,11 +141,13 @@ class SessionProjectCreate(BaseModel):
     name: str
     description: Optional[str] = None
     charts: List[SessionChartCreate] = []
+    documents: List[DocumentSchema] = []
 
 
 class SessionProjectUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    documents: Optional[List[DocumentSchema]] = None
 
 
 class SessionProjectResponse(BaseModel):
@@ -142,6 +155,7 @@ class SessionProjectResponse(BaseModel):
     name: str
     description: Optional[str]
     charts: List[SessionChartResponse]
+    documents: List[DocumentSchema]
     createdAt: str
     updatedAt: str
 
@@ -152,4 +166,66 @@ class SessionProjectResponse(BaseModel):
 # Bulk sync schema for frontend
 class BulkSyncRequest(BaseModel):
     projects: List[SessionProjectCreate]
+
+
+# Session-based Note Schemas
+class SessionNoteMetadataSchema(BaseModel):
+    tags: List[str] = []
+    pinned: bool = False
+    source: Optional[str] = None  # 'manual' | 'upload'
+
+
+class SessionNoteCreate(BaseModel):
+    id: str
+    projectId: str
+    title: str
+    content: str
+    metadata: Optional[SessionNoteMetadataSchema] = None
+
+
+class SessionNoteUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    metadata: Optional[SessionNoteMetadataSchema] = None
+
+
+class SessionNoteResponse(BaseModel):
+    id: str
+    projectId: str
+    title: str
+    content: str
+    metadata: Optional[SessionNoteMetadataSchema]
+    createdAt: str
+    updatedAt: str
+
+    class Config:
+        from_attributes = True
+
+
+class SessionNoteProjectCreate(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    notes: List[SessionNoteCreate] = []
+
+
+class SessionNoteProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class SessionNoteProjectResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str]
+    notes: List[SessionNoteResponse]
+    createdAt: str
+    updatedAt: str
+
+    class Config:
+        from_attributes = True
+
+
+class NoteBulkSyncRequest(BaseModel):
+    projects: List[SessionNoteProjectCreate]
 

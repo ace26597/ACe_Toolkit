@@ -1,8 +1,8 @@
 # CLAUDE.md - AI Assistant Guide for ACe_Toolkit
 
-**Last Updated:** January 9, 2026
+**Last Updated:** January 10, 2026
 **Repository:** ACe_Toolkit
-**Status:** Early Development
+**Status:** Active Development
 
 ---
 
@@ -22,7 +22,16 @@
 
 ### Project Description
 
-**ACe_Toolkit** is a toolkit repository currently in its early development phase. The project structure and purpose will evolve as development progresses.
+**ACe_Toolkit** is a toolkit> [!NOTE]
+> Docker is currently not required for local development and is intended for future production/Raspberry Pi deployment.
+
+## Features
+
+- **Document-Based Workflow**: Upload markdown files to automatically extract and organize Mermaid charts.
+- **Bidirectional Sync**: Edits to diagrams automatically update the source markdown file.
+- **Hierarchy**: Organize charts within documents or as standalone diagrams.
+- **AI-Powered**: Repair and generate diagrams using AI.
+d purpose will evolve as development progresses.
 
 ### Current State
 
@@ -45,7 +54,11 @@
 
 ```
 ACe_Toolkit/
-├── .git/               # Git version control
+├── apps/               # Application packages
+│   ├── web/            # Next.js Frontend
+│   └── api/            # FastAPI Backend
+├── infra/              # Infrastructure & Docker
+├── packages/           # Shared packages
 ├── README.md           # Project readme
 └── CLAUDE.md          # This file - AI assistant guide
 ```

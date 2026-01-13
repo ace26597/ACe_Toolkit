@@ -1,0 +1,215 @@
+2026-01-11 15:32:20,067 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:32:20,068 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:32:20,068 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:32:20,069 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:32:20,096 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:32:20,096 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:32:20,096 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:32:20,288 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:33:54,264 - INFO - app.routers.wiki - wiki.py:218 - Fetching model configurations
+2026-01-11 15:33:54,266 - INFO - app.routers.wiki - wiki.py:218 - Fetching model configurations
+2026-01-11 15:34:21,382 - INFO - app.routers.wiki - wiki.py:218 - Fetching model configurations
+2026-01-11 15:34:26,662 - ERROR - app.wiki.websocket_wiki - websocket_wiki.py:892 - Error in WebSocket handler: 1 validation error for ChatCompletionRequest
+messages
+  Field required [type=missing, input_value={'type': 'generate', 'rep...pt-5', 'language': 'en'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.12/v/missing
+2026-01-11 15:34:52,449 - INFO - app.routers.wiki - wiki.py:218 - Fetching model configurations
+2026-01-11 15:35:35,747 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:35:35,749 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:35:35,749 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:35:35,750 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:35:35,766 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:35:35,768 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:35:35,768 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:35:35,787 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:35:36,867 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:35:36,868 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:35:36,869 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:35:36,869 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:35:36,898 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:35:36,899 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:35:36,900 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:35:36,938 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:35:40,174 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:35:40,174 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:35:40,174 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:35:40,176 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:35:40,187 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:35:40,187 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:35:40,187 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:35:40,203 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:36:51,196 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:36:51,196 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:36:51,197 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:36:51,197 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:36:51,197 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:36:51,198 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:36:51,198 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:36:51,199 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:36:51,215 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:36:51,215 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:36:51,215 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:36:51,217 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:36:51,217 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:36:51,217 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:36:51,236 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:36:51,238 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:36:55,370 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:36:55,371 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:36:55,371 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:36:55,372 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:36:55,372 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:36:55,372 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:36:55,372 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:36:55,393 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:36:55,393 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:36:55,393 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:36:55,393 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:36:55,394 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:36:55,394 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:36:55,419 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:36:55,420 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:46:55,877 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:46:55,878 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:46:55,879 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:46:55,879 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:46:55,879 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:46:55,879 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:46:55,880 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:46:55,880 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:46:55,896 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:46:55,896 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:46:55,896 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:46:55,896 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:46:55,898 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:46:55,898 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:46:55,913 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:46:55,913 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:46:59,600 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:46:59,600 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:46:59,600 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:46:59,602 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:46:59,602 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:46:59,603 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:46:59,603 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:46:59,603 - INFO - app.wiki.config - config.py:109 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:46:59,618 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:46:59,618 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:46:59,618 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:46:59,618 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:46:59,619 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:46:59,634 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:46:59,636 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:50:20,942 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:50:20,942 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:50:20,943 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:50:20,943 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:50:20,943 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:50:20,943 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:50:20,943 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:50:20,943 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:50:20,943 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:50:20,943 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:50:20,962 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:50:20,962 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:50:20,962 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:50:20,963 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:50:20,963 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:50:20,963 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:50:20,963 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:50:20,963 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:50:20,964 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:50:20,979 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:50:20,979 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:50:29,052 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:50:29,053 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:50:29,053 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:50:29,053 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:50:29,066 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:50:29,067 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:50:29,067 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:50:29,082 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:50:50,751 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:50:50,753 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:50:50,753 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:50:50,753 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:50:50,753 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:50:50,753 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:50:50,754 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:50:50,754 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:50:50,754 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:50:50,754 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:50:50,755 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:50:50,755 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:50:50,755 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:50:50,755 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:50:50,756 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:50:50,756 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:50:50,773 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:50:50,773 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:50:50,773 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:50:50,773 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:50:50,774 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:50:50,774 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:50:50,775 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:50:50,774 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:50:50,775 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:50:50,775 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:50:50,775 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:50:50,776 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:50:50,796 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:50:50,796 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:50:50,798 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:50:50,798 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:50:59,416 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:50:59,416 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:50:59,417 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:50:59,418 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:50:59,431 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:50:59,431 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:50:59,431 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:50:59,446 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.
+2026-01-11 15:53:11,112 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:53:11,113 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\generator.json
+2026-01-11 15:53:11,114 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:53:11,114 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:53:11,114 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\embedder.json
+2026-01-11 15:53:11,114 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:53:11,114 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:53:11,115 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:53:11,115 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\repo.json
+2026-01-11 15:53:11,115 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:53:11,115 - INFO - app.wiki.config - config.py:106 - Loading configuration from C:\Users\chank\OneDrive\Documents\ACe_Toolkit\apps\api\app\wiki\config\lang.json
+2026-01-11 15:53:11,129 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:53:11,129 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:53:11,129 - INFO - faiss.loader - loader.py:120 - Loading faiss with AVX512 support.
+2026-01-11 15:53:11,129 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:53:11,129 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:53:11,129 - INFO - faiss.loader - loader.py:125 - Could not load library with AVX512 support due to:
+ModuleNotFoundError("No module named 'faiss.swigfaiss_avx512'")
+2026-01-11 15:53:11,131 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:53:11,131 - INFO - faiss.loader - loader.py:132 - Loading faiss with AVX2 support.
+2026-01-11 15:53:11,146 - INFO - faiss.loader - loader.py:134 - Successfully loaded faiss with AVX2 support.

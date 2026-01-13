@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
-from app.routers import auth, diagrams, export, notes, ai, projects, charts
+from app.routers import auth, diagrams, export, notes, ai, projects, charts, session_notes
 from app.core.database import engine
 from app.models.models import Base
 
@@ -35,6 +35,7 @@ app.include_router(notes.router, prefix="/notes", tags=["notes"])
 app.include_router(ai.router, prefix="/ai", tags=["ai"])
 app.include_router(projects.router, prefix="/projects", tags=["projects"])
 app.include_router(charts.router, prefix="/charts", tags=["charts"])
+app.include_router(session_notes.router, prefix="/session-notes", tags=["session-notes"])
 
 @app.get("/")
 def read_root():

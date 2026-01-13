@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { AlertTriangle, Sparkles, Code2, Edit3, Plus, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { AlertTriangle, Sparkles, Code2, Edit3, Plus, Loader2, CheckCircle, XCircle, Download, Palette, ChevronDown, FileText } from 'lucide-react';
 
 interface DiagramSegment {
     type: 'mermaid';
@@ -22,9 +22,18 @@ interface DiagramState {
     error?: string;
 }
 
+interface ThemeOption {
+    id: string;
+    name: string;
+    bg: string;
+}
+
 interface MarkdownDocumentViewProps {
     markdown: string;
+    documentName?: string;
     theme: string;
+    themes: ThemeOption[];
+    onThemeChange: (themeId: string) => void;
     onEditDiagram: (code: string, name: string) => void;
     onAddChart: (name: string, code: string) => void;
     onAddAllCharts: (charts: { name: string; code: string }[]) => void;
@@ -90,14 +99,66 @@ function parseMarkdown(markdown: string): { segments: Segment[]; charts: { name:
     return { segments, charts };
 }
 
-// Simple markdown text renderer
+// Simple markdown text renderer with table support
 function renderMarkdownText(text: string): React.ReactNode {
     const lines = text.split('\n');
     const elements: React.ReactNode[] = [];
+    let i = 0;
 
-    lines.forEach((line, i) => {
+    while (i < lines.length) {
+        const line = lines[i];
         const trimmed = line.trim();
 
+        // Check if this is the start of a table (line with | characters)
+        if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+            // Collect all table lines
+            const tableLines: string[] = [];
+            while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
+                tableLines.push(lines[i].trim());
+                i++;
+            }
+
+            // Parse the table
+            if (tableLines.length >= 2) {
+                const parseRow = (row: string): string[] => {
+                    return row.split('|').slice(1, -1).map(cell => cell.trim());
+                };
+
+                const headers = parseRow(tableLines[0]);
+                // Skip separator line (index 1)
+                const dataRows = tableLines.slice(2).map(parseRow);
+
+                elements.push(
+                    <div key={`table-${elements.length}`} className="overflow-x-auto my-4">
+                        <table className="min-w-full border border-slate-600 rounded-lg overflow-hidden">
+                            <thead className="bg-slate-700">
+                                <tr>
+                                    {headers.map((h, hi) => (
+                                        <th key={hi} className="px-4 py-2 text-left text-sm font-semibold text-slate-200 border-b border-slate-600">
+                                            {h}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {dataRows.map((row, ri) => (
+                                    <tr key={ri} className={ri % 2 === 0 ? 'bg-slate-800/50' : 'bg-slate-800/30'}>
+                                        {row.map((cell, ci) => (
+                                            <td key={ci} className="px-4 py-2 text-sm text-slate-300 border-b border-slate-700">
+                                                {cell}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                );
+            }
+            continue;
+        }
+
+        // Regular line processing
         if (trimmed.startsWith('# ')) {
             elements.push(<h1 key={i} className="text-2xl font-bold text-white mt-6 mb-3">{trimmed.slice(2)}</h1>);
         } else if (trimmed.startsWith('## ')) {
@@ -119,7 +180,8 @@ function renderMarkdownText(text: string): React.ReactNode {
         } else {
             elements.push(<div key={i} className="h-2" />);
         }
-    });
+        i++;
+    }
 
     return <>{elements}</>;
 }
@@ -150,7 +212,8 @@ function DiagramRenderer({
     theme,
     onEdit,
     onAdd,
-    onRepair
+    onRepair,
+    onExport
 }: {
     code: string;
     name: string;
@@ -158,6 +221,7 @@ function DiagramRenderer({
     onEdit: () => void;
     onAdd: () => void;
     onRepair: () => void;
+    onExport?: () => void;
 }) {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const [state, setState] = useState<DiagramState>({ status: 'loading' });
@@ -184,25 +248,216 @@ function DiagramRenderer({
             height: 100%; 
             overflow: hidden; 
             background: ${bgColor};
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
+        
+        #canvas {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            cursor: grab;
+            overflow: hidden;
+        }
+        
+        #canvas:active {
+            cursor: grabbing;
+        }
+        
+        #diagram-container {
+            position: absolute;
+            transform-origin: 0 0;
+            will-change: transform;
+            opacity: 0;
+            transition: opacity 0.2s ease-out;
+        }
+        
         #output { 
+            display: inline-block;
             padding: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
-        #output svg { max-width: 100%; height: auto; }
-        .error { color: #ef4444; font-family: monospace; font-size: 12px; white-space: pre-wrap; }
+        
+        #output svg { 
+            max-width: none !important; 
+            height: auto; 
+            display: block;
+        }
+        
+        .error { 
+            color: #ef4444; 
+            font-family: monospace; 
+            font-size: 12px; 
+            white-space: pre-wrap;
+            padding: 20px;
+        }
+        
+        #zoom-indicator {
+            position: fixed;
+            bottom: 8px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 100;
+        }
+        
+        #zoom-indicator.visible {
+            opacity: 1;
+        }
+        
+        #help-tooltip {
+            position: fixed;
+            bottom: 8px;
+            left: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            color: rgba(255, 255, 255, 0.7);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            pointer-events: none;
+            z-index: 100;
+        }
     </style>
 </head>
 <body>
-    <div id="output">Loading...</div>
+    <div id="canvas">
+        <div id="loading-placeholder" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #64748b; font-size: 12px;">
+            Rendering...
+        </div>
+        <div id="diagram-container">
+            <div id="output"></div>
+        </div>
+    </div>
+    
+    <div id="zoom-indicator">100%</div>
+    <div id="help-tooltip">Scroll to zoom • Drag to pan • Double-click to reset</div>
+    
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
         
+        const canvas = document.getElementById('canvas');
+        const container = document.getElementById('diagram-container');
+        const output = document.getElementById('output');
+        const zoomIndicator = document.getElementById('zoom-indicator');
+        const loadingPlaceholder = document.getElementById('loading-placeholder');
+        
+        // Transform state
+        let state = {
+            scale: 1,
+            panX: 0,
+            panY: 0,
+            minScale: 0.1,
+            maxScale: 5
+        };
+        
+        // Drag state
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+        let lastPan = { x: 0, y: 0 };
+        
+        // Update transform
+        const updateTransform = () => {
+            container.style.transform = \`translate(\${state.panX}px, \${state.panY}px) scale(\${state.scale})\`;
+        };
+        
+        // Show zoom indicator
+        let zoomTimeout;
+        const showZoom = () => {
+            zoomIndicator.textContent = Math.round(state.scale * 100) + '%';
+            zoomIndicator.classList.add('visible');
+            clearTimeout(zoomTimeout);
+            zoomTimeout = setTimeout(() => zoomIndicator.classList.remove('visible'), 1000);
+        };
+        
+        // Center and fit diagram
+        const centerDiagram = () => {
+            const svg = output.querySelector('svg');
+            if (!svg) return;
+            
+            const canvasRect = canvas.getBoundingClientRect();
+            let svgWidth = svg.viewBox?.baseVal?.width || svg.getBBox?.()?.width || svg.clientWidth;
+            let svgHeight = svg.viewBox?.baseVal?.height || svg.getBBox?.()?.height || svg.clientHeight;
+            
+            if (!svgWidth || !svgHeight) {
+                const svgRect = svg.getBoundingClientRect();
+                svgWidth = svgRect.width / state.scale;
+                svgHeight = svgRect.height / state.scale;
+            }
+            
+            const padding = 40;
+            const availableWidth = canvasRect.width - padding;
+            const availableHeight = canvasRect.height - padding;
+            
+            const scaleX = availableWidth / svgWidth;
+            const scaleY = availableHeight / svgHeight;
+            
+            state.scale = Math.min(scaleX, scaleY, 1.5);
+            state.scale = Math.max(state.scale, 0.1);
+            
+            const scaledWidth = svgWidth * state.scale;
+            const scaledHeight = svgHeight * state.scale;
+            
+            state.panX = (canvasRect.width - scaledWidth) / 2;
+            state.panY = (canvasRect.height - scaledHeight) / 2;
+            
+            updateTransform();
+            container.style.opacity = '1';
+        };
+        
+        // Mouse wheel zoom
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            
+            const delta = e.deltaY > 0 ? 0.9 : 1.1;
+            const newScale = Math.min(Math.max(state.scale * delta, state.minScale), state.maxScale);
+            
+            const scaleChange = newScale / state.scale;
+            state.panX = mouseX - (mouseX - state.panX) * scaleChange;
+            state.panY = mouseY - (mouseY - state.panY) * scaleChange;
+            state.scale = newScale;
+            
+            updateTransform();
+            showZoom();
+        }, { passive: false });
+        
+        // Mouse drag
+        canvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            dragStart = { x: e.clientX, y: e.clientY };
+            lastPan = { x: state.panX, y: state.panY };
+            canvas.style.cursor = 'grabbing';
+        });
+        
+        window.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            e.preventDefault();
+            
+            state.panX = lastPan.x + (e.clientX - dragStart.x);
+            state.panY = lastPan.y + (e.clientY - dragStart.y);
+            updateTransform();
+        });
+        
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+            canvas.style.cursor = 'grab';
+        });
+        
+        // Double-click to reset
+        canvas.addEventListener('dblclick', () => {
+            setTimeout(centerDiagram, 50);
+            showZoom();
+        });
+        
+        // Render diagram
         const code = \`${code.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`;
         
         try {
@@ -210,14 +465,18 @@ function DiagramRenderer({
                 startOnLoad: false,
                 theme: '${theme}',
                 securityLevel: 'loose',
-                flowchart: { useMaxWidth: true, htmlLabels: true }
+                flowchart: { useMaxWidth: false, htmlLabels: true }
             });
             
             const { svg } = await mermaid.render('diagram-${Date.now()}', code);
-            document.getElementById('output').innerHTML = svg;
+            output.innerHTML = svg;
+            loadingPlaceholder.style.display = 'none';
+            setTimeout(centerDiagram, 50);
             window.parent.postMessage({ type: 'DIAGRAM_SUCCESS' }, '*');
         } catch (e) {
-            document.getElementById('output').innerHTML = '<div class="error">' + e.message + '</div>';
+            loadingPlaceholder.style.display = 'none';
+            container.style.opacity = '1';
+            output.innerHTML = '<div class="error">' + e.message + '</div>';
             window.parent.postMessage({ type: 'DIAGRAM_ERROR', error: e.message }, '*');
         }
     </script>
@@ -274,6 +533,15 @@ function DiagramRenderer({
                     >
                         <Plus size={14} />
                     </button>
+                    {onExport && (
+                        <button
+                            onClick={onExport}
+                            className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded"
+                            title="Export as .mmd"
+                        >
+                            <Download size={14} />
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -310,7 +578,7 @@ function DiagramRenderer({
                 <iframe
                     ref={iframeRef}
                     className="w-full border-0"
-                    style={{ height: '250px' }}
+                    style={{ height: '400px' }}
                     sandbox="allow-scripts allow-same-origin"
                     title={`Diagram: ${name}`}
                 />
@@ -321,7 +589,10 @@ function DiagramRenderer({
 
 export default function MarkdownDocumentView({
     markdown,
+    documentName,
     theme,
+    themes,
+    onThemeChange,
     onEditDiagram,
     onAddChart,
     onAddAllCharts,
@@ -330,6 +601,7 @@ export default function MarkdownDocumentView({
 }: MarkdownDocumentViewProps) {
     const { segments, charts } = parseMarkdown(markdown);
     const [repairedCode, setRepairedCode] = useState<Record<number, string>>({});
+    const [showThemeDropdown, setShowThemeDropdown] = useState(false);
 
     const handleRepair = async (index: number, code: string, error: string) => {
         const fixed = await onRepairWithAI(code, error);
@@ -337,6 +609,37 @@ export default function MarkdownDocumentView({
             setRepairedCode(prev => ({ ...prev, [index]: fixed }));
         }
     };
+
+    // Export a single chart as .mmd file
+    const exportChart = (name: string, code: string) => {
+        const blob = new Blob([code], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${name.replace(/[^a-z0-9]/gi, '_')}.mmd`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
+    // Export all charts as individual files (zip would be nicer but this works)
+    const exportAllCharts = () => {
+        charts.forEach((chart, i) => {
+            setTimeout(() => exportChart(chart.name, chart.code), i * 100);
+        });
+    };
+
+    // Export the entire markdown document
+    const exportMarkdown = () => {
+        const blob = new Blob([markdown], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${documentName || 'document'}.md`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const currentTheme = themes.find(t => t.id === theme);
 
     return (
         <div className="h-full flex flex-col bg-slate-900">
@@ -349,12 +652,65 @@ export default function MarkdownDocumentView({
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => onAddAllCharts(charts)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 rounded text-sm text-white"
-                    >
-                        <Plus size={14} /> Add All Charts
-                    </button>
+                    {/* Theme Selector */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowThemeDropdown(!showThemeDropdown)}
+                            className="flex items-center gap-1.5 px-2 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded text-slate-300"
+                        >
+                            <Palette size={14} />
+                            <span>{currentTheme?.name || 'Theme'}</span>
+                            <ChevronDown size={12} />
+                        </button>
+                        {showThemeDropdown && (
+                            <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 min-w-[120px]">
+                                {themes.map(t => (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => {
+                                            onThemeChange(t.id);
+                                            setShowThemeDropdown(false);
+                                        }}
+                                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-slate-700 ${theme === t.id ? 'text-indigo-400' : 'text-slate-300'}`}
+                                    >
+                                        <div
+                                            className="w-3 h-3 rounded border border-slate-600"
+                                            style={{ background: t.bg }}
+                                        />
+                                        {t.name}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Export Dropdown */}
+                    <div className="relative group">
+                        <button
+                            className="flex items-center gap-1.5 px-2 py-1.5 text-xs bg-slate-700 hover:bg-slate-600 rounded text-slate-300"
+                        >
+                            <Download size={14} />
+                            Export
+                            <ChevronDown size={12} />
+                        </button>
+                        <div className="absolute right-0 top-full mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 min-w-[160px] hidden group-hover:block">
+                            <button
+                                onClick={exportMarkdown}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-slate-700"
+                            >
+                                <FileText size={14} />
+                                Export Markdown
+                            </button>
+                            <button
+                                onClick={exportAllCharts}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-slate-700"
+                            >
+                                <Download size={14} />
+                                Export All Charts (.mmd)
+                            </button>
+                        </div>
+                    </div>
+
                     <button
                         onClick={onClose}
                         className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded"
@@ -385,6 +741,7 @@ export default function MarkdownDocumentView({
                                     onEdit={() => onEditDiagram(currentCode, segment.name)}
                                     onAdd={() => onAddChart(segment.name, currentCode)}
                                     onRepair={() => handleRepair(segment.index, currentCode, 'Diagram has syntax errors')}
+                                    onExport={() => exportChart(segment.name, currentCode)}
                                 />
                             );
                         }

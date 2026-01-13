@@ -30,6 +30,7 @@ def chart_to_response(chart: SessionChart) -> SessionChartResponse:
     return SessionChartResponse(
         id=chart.id,
         projectId=chart.project_id,
+        documentId=chart.document_id,
         name=chart.name,
         code=chart.code,
         editions=[EditionSchema(**e) for e in editions],
@@ -75,6 +76,7 @@ async def create_chart(
     new_chart = SessionChart(
         id=chart_in.id,
         project_id=chart_in.projectId,
+        document_id=chart_in.documentId,
         name=chart_in.name,
         code=chart_in.code,
         editions=json.dumps([e.model_dump() for e in chart_in.editions]),
@@ -122,6 +124,8 @@ async def update_chart(
         chart.editions = json.dumps([e.model_dump() for e in chart_in.editions])
     if chart_in.currentEditionId is not None:
         chart.current_edition_id = chart_in.currentEditionId
+    if chart_in.documentId is not None:
+        chart.document_id = chart_in.documentId
     if chart_in.metadata is not None:
         chart.metadata_json = json.dumps(chart_in.metadata.model_dump())
     

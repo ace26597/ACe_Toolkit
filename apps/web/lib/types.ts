@@ -22,6 +22,7 @@ export interface ChartMetadata {
 export interface Chart {
     id: string;
     projectId: string;
+    documentId?: string; // Optional - charts can be standalone or in a document
     name: string;
     code: string;
     editions: Edition[];
@@ -33,11 +34,23 @@ export interface Chart {
     updatedAt: string;
 }
 
+export interface Document {
+    id: string;
+    projectId: string;
+    name: string;
+    description?: string;
+    sourceMarkdown?: string; // Original markdown content
+    charts: Chart[];
+    createdAt: string;
+    updatedAt: string;
+}
+
 export interface Project {
     id: string;
     name: string;
     description?: string;
-    charts: Chart[];
+    documents: Document[];
+    standaloneCharts: Chart[]; // Charts not in any document
     createdAt: string;
     updatedAt: string;
 }
@@ -48,3 +61,4 @@ export interface ExtractedChart {
     lineNumber?: number;
     metadata?: ChartMetadata;
 }
+

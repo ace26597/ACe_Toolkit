@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Sun, Moon, Download, Save, Plus, Trash2, Upload, ChevronRight, ChevronDown, FolderOpen, FileCode2, Sparkles, Send, Loader2, Layout, Palette, RefreshCw, PanelLeftClose, PanelLeft, Zap, Search, Settings, Check, Cloud, CloudOff, RefreshCcw, FileText } from 'lucide-react';
+import { Sun, Moon, Download, Save, Plus, Trash2, Upload, ChevronRight, ChevronDown, FolderOpen, Folder, FileCode2, Sparkles, Send, Loader2, Layout, Palette, RefreshCw, PanelLeftClose, PanelLeft, Zap, Search, Settings, Check, Cloud, CloudOff, RefreshCcw, FileText, File } from 'lucide-react';
 import Editor from '@monaco-editor/react';
 import { aiApi, projectsApi, chartsApi, Project as ApiProject, Chart as ApiChart, Edition as ApiEdition } from '@/lib/api';
 import MarkdownDocumentView from '@/components/mermaid/MarkdownDocumentView';
+import { useToast } from '@/components/ui/ToastProvider';
 
 // Types
 interface Edition {
@@ -17,6 +18,7 @@ interface Edition {
 interface Chart {
     id: string;
     projectId: string;
+    documentId?: string; // Optional reference to parent document
     name: string;
     code: string;
     editions: Edition[];
@@ -25,10 +27,20 @@ interface Chart {
     updatedAt: string;
 }
 
+// Document groups charts from the same markdown file
+interface Document {
+    id: string;
+    name: string;
+    sourceMarkdown?: string;
+    chartIds: string[]; // References to charts
+    createdAt: string;
+}
+
 interface Project {
     id: string;
     name: string;
-    charts: Chart[];
+    charts: Chart[]; // All charts (maintains backward compatibility)
+    documents: Document[]; // Optional document groupings
     createdAt: string;
     updatedAt: string;
 }
@@ -62,6 +74,7 @@ const LAYOUTS = [
 ];
 
 export default function MermaidPage() {
+    const { showToast, dismissToast, updateToast } = useToast();
     const [projects, setProjects] = useState<Project[]>([]);
     const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
     const [currentChartId, setCurrentChartId] = useState<string | null>(null);
@@ -69,6 +82,7 @@ export default function MermaidPage() {
     const [theme, setTheme] = useState('dark');
     const [showSidebar, setShowSidebar] = useState(true);
     const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+    const [expandedDocuments, setExpandedDocuments] = useState<Set<string>>(new Set());
     const [aiPrompt, setAiPrompt] = useState('');
     const [isAiLoading, setIsAiLoading] = useState(false);
     const [aiError, setAiError] = useState<string | null>(null);
@@ -83,6 +97,8 @@ export default function MermaidPage() {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const previewRef = useRef<HTMLDivElement>(null);
     const [showDocumentView, setShowDocumentView] = useState(false);
+    const [sidebarWidth, setSidebarWidth] = useState(380);
+    const [isResizing, setIsResizing] = useState(false);
 
     const currentProject = projects.find(p => p.id === currentProjectId);
     const currentChart = currentProject?.charts.find(c => c.id === currentChartId);
@@ -166,7 +182,8 @@ export default function MermaidPage() {
                     // Convert API format to local format
                     const loaded: Project[] = apiProjects.map(p => ({
                         ...p,
-                        charts: p.charts.map(c => ({
+                        documents: p.documents || [],
+                        charts: p.charts.map((c: any) => ({
                             ...c,
                             editions: c.editions || [],
                             currentEditionId: c.currentEditionId || ''
@@ -231,25 +248,61 @@ export default function MermaidPage() {
     }, []);
 
     // Debounced auto-save to API on changes
+    const syncToApi = useCallback(async (projectsToSync: Project[], immediate = false) => {
+        // Always save to localStorage as backup first
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(projectsToSync));
+
+        // Skip API sync if already in offline mode (to avoid repeated errors)
+        if (syncStatus === 'offline' && !immediate) return;
+
+        try {
+            setSyncStatus('syncing');
+            await projectsApi.sync(projectsToSync);
+            setSyncStatus('synced');
+        } catch (error: any) {
+            // Differentiate between network errors and API errors
+            const isNetworkError = error?.message?.includes('Failed to fetch') ||
+                error?.message?.includes('NetworkError') ||
+                error?.name === 'TypeError';
+
+            if (isNetworkError) {
+                console.warn('Backend offline, using localStorage:', error);
+                setSyncStatus('offline');
+            } else {
+                console.error('API sync error:', error);
+                setSyncStatus('error');
+            }
+        }
+    }, [syncStatus]);
+
+    // Immediate sync function (bypasses debounce)
+    const triggerImmediateSync = useCallback(() => {
+        if (saveTimeoutRef.current) {
+            clearTimeout(saveTimeoutRef.current);
+        }
+        // Use a short delay to ensure state updates have completed
+        setTimeout(() => {
+            setProjects(current => {
+                syncToApi(current, true);
+                return current;
+            });
+        }, 100);
+    }, [syncToApi]);
+
     useEffect(() => {
         if (projects.length > 0 && !isLoading) {
-            // Always save to localStorage as backup
+            // Always save to localStorage
             localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
 
-            // Debounced API sync
-            if (saveTimeoutRef.current) {
-                clearTimeout(saveTimeoutRef.current);
-            }
-            saveTimeoutRef.current = setTimeout(async () => {
-                try {
-                    setSyncStatus('syncing');
-                    await projectsApi.sync(projects);
-                    setSyncStatus('synced');
-                } catch (error) {
-                    console.error('Failed to sync to API:', error);
-                    setSyncStatus('error');
+            // Debounced API sync (skip if offline to avoid repeated errors)
+            if (syncStatus !== 'offline') {
+                if (saveTimeoutRef.current) {
+                    clearTimeout(saveTimeoutRef.current);
                 }
-            }, 1500); // 1.5 second debounce
+                saveTimeoutRef.current = setTimeout(() => {
+                    syncToApi(projects);
+                }, 1500);
+            }
         }
 
         return () => {
@@ -257,7 +310,58 @@ export default function MermaidPage() {
                 clearTimeout(saveTimeoutRef.current);
             }
         };
-    }, [projects, isLoading]);
+    }, [projects, isLoading, syncToApi, syncStatus]);
+
+    // Auto-retry sync when coming back online or tab becomes visible
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && syncStatus === 'offline') {
+                // Try to sync again when user returns to tab
+                triggerImmediateSync();
+            }
+        };
+
+        const handleOnline = () => {
+            if (syncStatus === 'offline') {
+                triggerImmediateSync();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('online', handleOnline);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('online', handleOnline);
+        };
+    }, [syncStatus, triggerImmediateSync]);
+
+    // Sidebar resize handling
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isResizing) return;
+            const newWidth = Math.min(Math.max(e.clientX, 200), 600);
+            setSidebarWidth(newWidth);
+        };
+
+        const handleMouseUp = () => {
+            setIsResizing(false);
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        };
+
+        if (isResizing) {
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isResizing]);
 
     // Render mermaid in iframe with full pan/zoom/drag functionality
     useEffect(() => {
@@ -673,6 +777,7 @@ export default function MermaidPage() {
             id: Date.now().toString(),
             name: 'New Project',
             charts: [],
+            documents: [],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
@@ -688,6 +793,7 @@ export default function MermaidPage() {
             id: Date.now().toString(),
             name: 'New Project',
             charts: [],
+            documents: [],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
@@ -707,19 +813,24 @@ export default function MermaidPage() {
         }
     };
 
-    const createNewChart = (projectId: string, name?: string, chartCode?: string) => {
+    const createNewChart = (projectId: string, name?: string, initialCode?: string, documentId?: string) => {
+        const timestamp = Date.now().toString();
+        const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        const uniqueId = `${timestamp}-${randomSuffix}`;
+
         const newChart: Chart = {
-            id: Date.now().toString(),
+            id: uniqueId,
             projectId,
+            documentId, // Optional reference to parent document
             name: name || 'New Chart',
-            code: chartCode || DEFAULT_CODE,
+            code: initialCode || DEFAULT_CODE,
             editions: [{
-                id: Date.now().toString() + '-e1',
-                code: chartCode || DEFAULT_CODE,
+                id: `${uniqueId}-e1`,
+                code: initialCode || DEFAULT_CODE,
                 description: 'Initial Version',
                 updatedAt: new Date().toISOString()
             }],
-            currentEditionId: Date.now().toString() + '-e1',
+            currentEditionId: `${uniqueId}-e1`,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
@@ -732,9 +843,15 @@ export default function MermaidPage() {
         setCurrentProjectId(projectId);
         setCurrentChartId(newChart.id);
         setCode(newChart.code);
+
+        // Show toast only if it's not an automated batch operation
+        if (!documentId) {
+            showToast({ type: 'success', message: `Created "${name || 'New Chart'}"` });
+        }
     };
 
     const deleteProject = (projectId: string) => {
+        const projectName = projects.find(p => p.id === projectId)?.name || 'Project';
         setProjects(prev => prev.filter(p => p.id !== projectId));
         if (currentProjectId === projectId) {
             const remaining = projects.filter(p => p.id !== projectId);
@@ -742,37 +859,82 @@ export default function MermaidPage() {
             setCurrentChartId(remaining[0]?.charts[0]?.id || null);
             setCode(remaining[0]?.charts[0]?.code || '');
         }
+        showToast({ type: 'info', message: `Deleted "${projectName}"` });
     };
 
     const deleteChart = (projectId: string, chartId: string) => {
+        const project = projects.find(p => p.id === projectId);
+        const chartName = project?.charts.find(c => c.id === chartId)?.name || 'Chart';
         setProjects(prev => prev.map(p =>
-            p.id === projectId ? { ...p, charts: p.charts.filter(c => c.id !== chartId) } : p
+            p.id === projectId ? { ...p, charts: p.charts.filter((c: Chart) => c.id !== chartId) } : p
         ));
         if (currentChartId === chartId) {
-            const project = projects.find(p => p.id === projectId);
-            const remaining = project?.charts.filter(c => c.id !== chartId) || [];
+            const remaining = project?.charts.filter((c: Chart) => c.id !== chartId) || [];
             setCurrentChartId(remaining[0]?.id || null);
             setCode(remaining[0]?.code || '');
         }
+        showToast({ type: 'info', message: `Deleted "${chartName}"` });
     };
 
-    const updateChartCode = useCallback((newCode: string) => {
-        setCode(newCode);
-        if (currentProjectId && currentChartId) {
-            setProjects(prev => prev.map(p =>
-                p.id === currentProjectId
-                    ? {
-                        ...p,
-                        charts: p.charts.map(c =>
-                            c.id === currentChartId
-                                ? { ...c, code: newCode, updatedAt: new Date().toISOString() }
-                                : c
-                        )
-                    }
-                    : p
-            ));
+    // Helper to update markdown content
+    const updateDocumentMarkdown = (originalMarkdown: string, chartIndex: number, newCode: string): string => {
+        const mermaidBlockRegex = /```mermaid\s*([\s\S]*?)```/gi;
+        const matches = [...originalMarkdown.matchAll(mermaidBlockRegex)];
+
+        if (chartIndex >= 0 && chartIndex < matches.length) {
+            const match = matches[chartIndex];
+            const before = originalMarkdown.substring(0, match.index!);
+            const after = originalMarkdown.substring(match.index! + match[0].length);
+            return `${before}\`\`\`mermaid\n${newCode}\n\`\`\`${after}`;
         }
-    }, [currentProjectId, currentChartId]);
+        return originalMarkdown;
+    };
+
+    const updateChartCode = (newCode: string) => {
+        if (!currentProjectId || !currentChartId) return;
+
+        setProjects(prev => prev.map(p => {
+            if (p.id !== currentProjectId) return p;
+
+            // Find the chart to check if it has a documentId
+            const targetChart = p.charts.find(c => c.id === currentChartId);
+            let updatedDocuments = p.documents;
+
+            if (targetChart && targetChart.documentId) {
+                updatedDocuments = p.documents.map(doc => {
+                    if (doc.id === targetChart.documentId && doc.sourceMarkdown) {
+                        // Find index of this chart in the document's chart list
+                        // This relies on the fact that charts are added in order
+                        // We need to match the chartId to find its index
+                        const chartIndex = p.charts
+                            .filter(c => c.documentId === doc.id)
+                            .findIndex(c => c.id === currentChartId);
+
+                        if (chartIndex !== -1) {
+                            return {
+                                ...doc,
+                                sourceMarkdown: updateDocumentMarkdown(doc.sourceMarkdown, chartIndex, newCode)
+                            };
+                        }
+                    }
+                    return doc;
+                });
+            }
+
+            return {
+                ...p,
+                documents: updatedDocuments,
+                charts: p.charts.map(c =>
+                    c.id === currentChartId
+                        ? { ...c, code: newCode, updatedAt: new Date().toISOString() }
+                        : c
+                ),
+                updatedAt: new Date().toISOString()
+            };
+        }));
+
+        setCode(newCode);
+    };
 
     const handleAddDetectedCharts = () => {
         if (!detectedContent || !currentProjectId) return;
@@ -788,13 +950,104 @@ export default function MermaidPage() {
         const file = e.target.files?.[0];
         if (!file) return;
         const content = await file.text();
-        setCode(content);
+        const fileName = file.name.replace(/\.(md|mmd|txt)$/i, '');
         if (fileInputRef.current) fileInputRef.current.value = '';
 
-        // Auto-show document view if markdown with multiple mermaid blocks
+        // Extract mermaid blocks from content
         const mermaidBlocks = [...content.matchAll(/```mermaid\s*([\s\S]*?)```/gi)];
+
+        // Helper to extract chart name from context
+        const extractChartName = (fullText: string, matchIndex: number, chartCode: string, chartNumber: number): string => {
+            const beforeMatch = fullText.substring(0, matchIndex);
+            const lines = beforeMatch.split('\n');
+            for (let j = lines.length - 1; j >= Math.max(0, lines.length - 10); j--) {
+                const line = lines[j].trim();
+                if (line.startsWith('#')) return line.replace(/^#+\s*/, '').trim();
+            }
+            const firstLine = chartCode.split('\n')[0].trim().toLowerCase();
+            if (firstLine.startsWith('flowchart') || firstLine.startsWith('graph')) return `Flowchart ${chartNumber}`;
+            if (firstLine.startsWith('sequencediagram')) return `Sequence ${chartNumber}`;
+            return `Chart ${chartNumber}`;
+        };
+
+        // Ensure we have a project
+        let projectId = currentProjectId;
+        if (!projectId) {
+            const newProject: Project = {
+                id: Date.now().toString(),
+                name: 'New Project',
+                charts: [],
+                documents: [],
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            };
+            setProjects(prev => [...prev, newProject]);
+            setCurrentProjectId(newProject.id);
+            setExpandedProjects(prev => new Set([...prev, newProject.id]));
+            projectId = newProject.id;
+        }
+
         if (mermaidBlocks.length > 0) {
+            // Multiple mermaid blocks - create a document
+            const toastId = showToast({ type: 'loading', message: `Processing ${mermaidBlocks.length} diagrams...` });
+
+            const charts = mermaidBlocks.map((match, i) => ({
+                name: extractChartName(content, match.index!, match[1].trim(), i + 1),
+                code: match[1].trim()
+            }));
+
+            // Create document
+            const docId = `doc-${Date.now()}`;
+            const newDocument: Document = {
+                id: docId,
+                name: fileName || `Document ${new Date().toLocaleDateString()}`,
+                sourceMarkdown: content,
+                chartIds: [],
+                createdAt: new Date().toISOString()
+            };
+
+            // Add charts
+            charts.forEach((chart, idx) => {
+                setTimeout(() => createNewChart(projectId!, chart.name, chart.code, docId), idx * 30);
+            });
+
+            // Add document to project
+            setProjects(prev => prev.map(p =>
+                p.id === projectId
+                    ? { ...p, documents: [...p.documents, newDocument], updatedAt: new Date().toISOString() }
+                    : p
+            ));
+
+            // Also keep the markdown content in editor for reference
+            setCode(content);
             setShowDocumentView(true);
+
+            setTimeout(() => {
+                updateToast(toastId, {
+                    type: 'success',
+                    message: `Added "${fileName}" with ${charts.length} charts`
+                });
+                // Trigger immediate sync after all charts are added
+                triggerImmediateSync();
+            }, charts.length * 30 + 100);
+
+        } else {
+            // Check if it's raw mermaid code (no markdown blocks)
+            const trimmed = content.trim();
+            const MERMAID_STARTERS = ['graph ', 'flowchart ', 'sequencediagram', 'classdiagram', 'statediagram', 'erdiagram', 'gantt', 'pie ', 'journey', 'gitgraph', 'mindmap'];
+            const isMermaid = MERMAID_STARTERS.some(kw => trimmed.toLowerCase().startsWith(kw));
+
+            if (isMermaid) {
+                // Single mermaid code - add as chart directly
+                createNewChart(projectId, fileName || 'Uploaded Chart', trimmed);
+                showToast({ type: 'success', message: `Added "${fileName || 'Uploaded Chart'}"` });
+                // Trigger immediate sync
+                setTimeout(() => triggerImmediateSync(), 100);
+            } else {
+                // Just text/markdown without mermaid - put in editor
+                setCode(content);
+                showToast({ type: 'info', message: 'No mermaid diagrams found in file' });
+            }
         }
     };
 
@@ -814,12 +1067,50 @@ export default function MermaidPage() {
         }
     };
 
-    const handleAddAllChartsFromDoc = (charts: { name: string; code: string }[]) => {
-        if (!currentProjectId) return;
+    const handleAddAllChartsFromDoc = (charts: { name: string; code: string }[], documentName?: string) => {
+        if (!currentProjectId) {
+            showToast({ type: 'error', message: 'Please select a project first' });
+            return;
+        }
+
+        const toastId = showToast({ type: 'loading', message: `Adding ${charts.length} charts...` });
+
+        // Create a new document to group these charts
+        const docId = `doc-${Date.now()}`;
+        const newDocument: Document = {
+            id: docId,
+            name: documentName || `Document ${new Date().toLocaleDateString()}`,
+            sourceMarkdown: code,
+            chartIds: [],
+            createdAt: new Date().toISOString()
+        };
+
+        // Create charts and track their IDs
+        const chartIds: string[] = [];
         charts.forEach((chart, idx) => {
-            setTimeout(() => createNewChart(currentProjectId, chart.name, chart.code), idx * 100);
+            const chartId = Date.now().toString() + '-' + idx;
+            chartIds.push(chartId);
+            setTimeout(() => createNewChart(currentProjectId, chart.name, chart.code, docId), idx * 50);
         });
+
+        newDocument.chartIds = chartIds;
+
+        // Add document to project
+        setProjects(prev => prev.map(p =>
+            p.id === currentProjectId
+                ? { ...p, documents: [...p.documents, newDocument] }
+                : p
+        ));
+
         setShowDocumentView(false);
+
+        // Update toast to success
+        setTimeout(() => {
+            updateToast(toastId, {
+                type: 'success',
+                message: `Added ${charts.length} charts to "${newDocument.name}"`
+            });
+        }, charts.length * 50 + 100);
     };
 
     const handleRepairWithAI = async (brokenCode: string, error: string): Promise<string | null> => {
@@ -916,17 +1207,25 @@ export default function MermaidPage() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
         localStorage.setItem(SETTINGS_KEY, JSON.stringify({ theme }));
 
-        // Sync to API
+        // Sync to API with toast feedback
+        const toastId = showToast({ type: 'loading', message: 'Syncing changes...' });
+
         try {
             setSyncStatus('syncing');
             setSaveMessage('Syncing...');
             await projectsApi.sync(projects);
             setSyncStatus('synced');
             setSaveMessage('Synced!');
+            updateToast(toastId, { type: 'success', message: 'All changes synced!' });
         } catch (error) {
             console.error('Failed to sync:', error);
             setSyncStatus('error');
             setSaveMessage('Saved locally');
+            updateToast(toastId, {
+                type: 'warning',
+                message: 'Saved locally - sync failed',
+                action: { label: 'Retry', onClick: saveAll }
+            });
         }
         setTimeout(() => setSaveMessage(null), 2000);
     };
@@ -1053,116 +1352,200 @@ export default function MermaidPage() {
             <div className="flex-1 flex overflow-hidden">
                 {/* Sidebar */}
                 {showSidebar && (
-                    <div className="w-[380px] flex flex-col border-r border-slate-800 bg-slate-900">
-                        {/* Projects Section */}
-                        <div className="h-[160px] border-b border-slate-700 overflow-y-auto">
-                            <div className="p-2 flex items-center justify-between border-b border-slate-800">
-                                <span className="text-xs font-bold text-slate-400 uppercase">Projects</span>
-                                <button onClick={createNewProject} className="p-1 hover:bg-slate-700 rounded" title="New Project"><Plus size={14} /></button>
-                            </div>
-                            <div className="p-1">
-                                {projects.map(project => (
-                                    <div key={project.id}>
-                                        <div
-                                            className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer group ${currentProjectId === project.id ? 'bg-indigo-900/40' : 'hover:bg-slate-800'}`}
-                                            onClick={() => {
-                                                setCurrentProjectId(project.id);
-                                                setExpandedProjects(prev => {
-                                                    const next = new Set(prev);
-                                                    next.has(project.id) ? next.delete(project.id) : next.add(project.id);
-                                                    return next;
-                                                });
-                                            }}
-                                        >
-                                            {expandedProjects.has(project.id) ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                                            <FolderOpen size={13} className="text-yellow-500" />
-                                            {editingId === project.id ? (
-                                                <input className="flex-1 text-xs bg-slate-800 px-1 rounded" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={() => finishRename('project', project.id)} onKeyDown={e => e.key === 'Enter' && finishRename('project', project.id)} autoFocus onClick={e => e.stopPropagation()} />
-                                            ) : (
-                                                <span className="flex-1 text-xs truncate" onDoubleClick={() => startRename(project.id, project.name)}>{project.name}</span>
-                                            )}
-                                            <span className="text-[10px] text-slate-500">{project.charts.length}</span>
-                                            <div className="opacity-0 group-hover:opacity-100 flex gap-0.5">
-                                                <button onClick={e => { e.stopPropagation(); createNewChart(project.id); }} className="p-0.5 hover:bg-slate-600 rounded" title="Add Chart"><Plus size={10} /></button>
-                                                <button onClick={e => { e.stopPropagation(); deleteProject(project.id); }} className="p-0.5 hover:bg-red-900 rounded text-red-400"><Trash2 size={10} /></button>
-                                            </div>
-                                        </div>
-                                        {expandedProjects.has(project.id) && project.charts.map(chart => (
-                                            <div key={chart.id} className={`flex items-center gap-2 px-5 py-1 rounded cursor-pointer group ${currentChartId === chart.id ? 'bg-indigo-800/50' : 'hover:bg-slate-800/50'}`} onClick={() => { setCurrentProjectId(project.id); setCurrentChartId(chart.id); setCode(chart.code); }}>
-                                                <FileCode2 size={11} className="text-blue-400" />
-                                                {editingId === chart.id ? (
-                                                    <input className="flex-1 text-xs bg-slate-800 px-1 rounded" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={() => finishRename('chart', project.id, chart.id)} onKeyDown={e => e.key === 'Enter' && finishRename('chart', project.id, chart.id)} autoFocus onClick={e => e.stopPropagation()} />
-                                                ) : (
-                                                    <span className="flex-1 text-xs truncate" onDoubleClick={() => startRename(chart.id, chart.name)}>{chart.name}</span>
-                                                )}
-                                                <span className="text-[10px] text-slate-600">{chart.editions.length}v</span>
-                                                <button onClick={e => { e.stopPropagation(); deleteChart(project.id, chart.id); }} className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-900 rounded text-red-400"><Trash2 size={10} /></button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Detected Content Banner */}
-                        {detectedContent && !currentChartId && (
-                            <div className={`p-2 border-b border-slate-700 ${detectedContent.type === 'markdown' ? 'bg-blue-900/30' : 'bg-emerald-900/30'}`}>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        {detectedContent.type === 'markdown' ? <Search size={14} className="text-blue-400" /> : <Zap size={14} className="text-emerald-400" />}
-                                        <span className="text-xs font-medium">{detectedContent.charts.length} diagram{detectedContent.charts.length > 1 ? 's' : ''} found</span>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        {detectedContent.type === 'markdown' && (
-                                            <button
-                                                onClick={() => setShowDocumentView(!showDocumentView)}
-                                                className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded ${showDocumentView ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                    <div className="relative flex" style={{ width: sidebarWidth }}>
+                        <div className="flex-1 flex flex-col border-r border-slate-800 bg-slate-900 overflow-hidden">
+                            {/* Projects Section */}
+                            <div className="h-[160px] border-b border-slate-700 overflow-y-auto">
+                                <div className="p-2 flex items-center justify-between border-b border-slate-800">
+                                    <span className="text-xs font-bold text-slate-400 uppercase">Projects</span>
+                                    <button onClick={createNewProject} className="p-1 hover:bg-slate-700 rounded" title="New Project"><Plus size={14} /></button>
+                                </div>
+                                <div className="p-1">
+                                    {projects.map(project => (
+                                        <div key={project.id}>
+                                            <div
+                                                className={`flex items-center gap-1 px-2 py-1 rounded cursor-pointer group ${currentProjectId === project.id ? 'bg-indigo-900/40' : 'hover:bg-slate-800'}`}
+                                                onClick={() => {
+                                                    setCurrentProjectId(project.id);
+                                                    setExpandedProjects(prev => {
+                                                        const next = new Set(prev);
+                                                        next.has(project.id) ? next.delete(project.id) : next.add(project.id);
+                                                        return next;
+                                                    });
+                                                }}
                                             >
-                                                <FileText size={12} /> Doc View
+                                                {expandedProjects.has(project.id) ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                                <FolderOpen size={13} className="text-yellow-500" />
+                                                {editingId === project.id ? (
+                                                    <input className="flex-1 text-xs bg-slate-800 px-1 rounded" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={() => finishRename('project', project.id)} onKeyDown={e => e.key === 'Enter' && finishRename('project', project.id)} autoFocus onClick={e => e.stopPropagation()} />
+                                                ) : (
+                                                    <span className="flex-1 text-xs truncate" onDoubleClick={() => startRename(project.id, project.name)}>{project.name}</span>
+                                                )}
+                                                <span className="text-[10px] text-slate-500">{project.charts.length}</span>
+                                                <div className="opacity-0 group-hover:opacity-100 flex gap-0.5">
+                                                    <button onClick={e => { e.stopPropagation(); createNewChart(project.id); }} className="p-0.5 hover:bg-slate-600 rounded" title="Add Chart"><Plus size={10} /></button>
+                                                    <button onClick={e => { e.stopPropagation(); deleteProject(project.id); }} className="p-0.5 hover:bg-red-900 rounded text-red-400"><Trash2 size={10} /></button>
+                                                </div>
+                                            </div>
+                                            {expandedProjects.has(project.id) && (
+                                                <div className="ml-2 border-l border-slate-800">
+                                                    {/* Documents (Folders) */}
+                                                    {project.documents.map(doc => (
+                                                        <div key={doc.id}>
+                                                            <div
+                                                                className="flex items-center gap-1 px-3 py-1 rounded cursor-pointer hover:bg-slate-800/50 group"
+                                                                onClick={() => {
+                                                                    if (doc.sourceMarkdown) {
+                                                                        setCode(doc.sourceMarkdown);
+                                                                        setShowDocumentView(true);
+                                                                        setCurrentChartId(null);
+                                                                        setCurrentProjectId(project.id);
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <div
+                                                                    className="p-0.5 hover:bg-slate-700 rounded cursor-pointer transition-colors"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        setExpandedDocuments(prev => {
+                                                                            const next = new Set(prev);
+                                                                            next.has(doc.id) ? next.delete(doc.id) : next.add(doc.id);
+                                                                            return next;
+                                                                        });
+                                                                    }}
+                                                                >
+                                                                    {expandedDocuments.has(doc.id) ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
+                                                                </div>
+                                                                <Folder size={11} className="text-blue-400" />
+                                                                <span className="flex-1 text-[11px] truncate text-slate-300">{doc.name}</span>
+                                                                <span className="text-[9px] text-slate-600">{project.charts.filter(c => c.documentId === doc.id).length}</span>
+                                                            </div>
+                                                            {expandedDocuments.has(doc.id) && project.charts.filter(c => c.documentId === doc.id).map(chart => (
+                                                                <div key={chart.id} className={`flex items-center gap-2 px-6 py-1 rounded cursor-pointer group ${currentChartId === chart.id ? 'bg-indigo-800/50' : 'hover:bg-slate-800/50'}`} onClick={() => { setCurrentProjectId(project.id); setCurrentChartId(chart.id); setCode(chart.code); setShowDocumentView(false); }}>
+                                                                    <FileCode2 size={11} className="text-blue-400/70" />
+                                                                    {editingId === chart.id ? (
+                                                                        <input className="flex-1 text-[11px] bg-slate-800 px-1 rounded" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={() => finishRename('chart', project.id, chart.id)} onKeyDown={e => e.key === 'Enter' && finishRename('chart', project.id, chart.id)} autoFocus onClick={e => e.stopPropagation()} />
+                                                                    ) : (
+                                                                        <span className="flex-1 text-[11px] truncate text-slate-400" onDoubleClick={() => startRename(chart.id, chart.name)}>{chart.name}</span>
+                                                                    )}
+                                                                    <span className="text-[9px] text-slate-600">{chart.editions.length}v</span>
+                                                                    <button onClick={e => { e.stopPropagation(); deleteChart(project.id, chart.id); }} className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-900 rounded text-red-400"><Trash2 size={10} /></button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ))}
+
+                                                    {/* Standalone Charts */}
+                                                    {project.charts.filter(c => !c.documentId).map(chart => (
+                                                        <div key={chart.id} className={`flex items-center gap-2 px-5 py-1 rounded cursor-pointer group ${currentChartId === chart.id ? 'bg-indigo-800/50' : 'hover:bg-slate-800/50'}`} onClick={() => { setCurrentProjectId(project.id); setCurrentChartId(chart.id); setCode(chart.code); setShowDocumentView(false); }}>
+                                                            <FileCode2 size={11} className="text-blue-400" />
+                                                            {editingId === chart.id ? (
+                                                                <input className="flex-1 text-xs bg-slate-800 px-1 rounded" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={() => finishRename('chart', project.id, chart.id)} onKeyDown={e => e.key === 'Enter' && finishRename('chart', project.id, chart.id)} autoFocus onClick={e => e.stopPropagation()} />
+                                                            ) : (
+                                                                <span className="flex-1 text-xs truncate" onDoubleClick={() => startRename(chart.id, chart.name)}>{chart.name}</span>
+                                                            )}
+                                                            <span className="text-[10px] text-slate-600">{chart.editions.length}v</span>
+                                                            <button onClick={e => { e.stopPropagation(); deleteChart(project.id, chart.id); }} className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-900 rounded text-red-400"><Trash2 size={10} /></button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Detected Content Banner */}
+                            {detectedContent && !currentChartId && (
+                                <div className={`p-2 border-b border-slate-700 ${detectedContent.type === 'markdown' ? 'bg-blue-900/30' : 'bg-emerald-900/30'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            {detectedContent.type === 'markdown' ? <Search size={14} className="text-blue-400" /> : <Zap size={14} className="text-emerald-400" />}
+                                            <span className="text-xs font-medium">{detectedContent.charts.length} diagram{detectedContent.charts.length > 1 ? 's' : ''} found</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            {detectedContent.type === 'markdown' && (
+                                                <button
+                                                    onClick={() => setShowDocumentView(!showDocumentView)}
+                                                    className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded ${showDocumentView ? 'bg-indigo-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}
+                                                >
+                                                    <FileText size={12} /> Doc View
+                                                </button>
+                                            )}
+                                            <button onClick={handleAddDetectedCharts} className={`flex items-center gap-1 px-2 py-1 text-xs font-medium text-white rounded ${detectedContent.type === 'markdown' ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
+                                                <Plus size={12} /> Add All
                                             </button>
-                                        )}
-                                        <button onClick={handleAddDetectedCharts} className={`flex items-center gap-1 px-2 py-1 text-xs font-medium text-white rounded ${detectedContent.type === 'markdown' ? 'bg-blue-600 hover:bg-blue-500' : 'bg-emerald-600 hover:bg-emerald-500'}`}>
-                                            <Plus size={12} /> Add All
-                                        </button>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* Code Editor */}
-                        <div className="flex-1 min-h-0">
-                            <Editor height="100%" defaultLanguage="markdown" theme="vs-dark" value={code} onChange={(value) => currentChartId ? updateChartCode(value || '') : setCode(value || '')} options={{ minimap: { enabled: false }, fontSize: 12, scrollBeyondLastLine: false, wordWrap: 'on', padding: { top: 8 }, lineNumbers: 'off', renderLineHighlight: 'none' }} />
-                        </div>
-
-                        {/* AI Section */}
-                        <div className="border-t border-slate-700 p-2 space-y-2 bg-slate-900/80">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-1">
-                                    <Sparkles size={12} className="text-purple-400" />
-                                    <span className="text-[10px] font-semibold text-slate-400 uppercase">AI</span>
+                            {/* Editor Toolbar */}
+                            <div className="flex items-center justify-between p-2 border-b border-slate-700 bg-slate-800/50">
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        onClick={() => currentProjectId && createNewChart(currentProjectId)}
+                                        disabled={!currentProjectId}
+                                        className="flex items-center gap-1 px-2 py-1 text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white"
+                                        title="Add new chart"
+                                    >
+                                        <Plus size={12} /> Chart
+                                    </button>
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="flex items-center gap-1 px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded"
+                                        title="Upload markdown or mermaid file"
+                                    >
+                                        <Upload size={12} /> Upload
+                                    </button>
                                 </div>
+                                {currentChart && (
+                                    <span className="text-xs text-slate-400 truncate max-w-[150px]" title={currentChart.name}>
+                                        Editing: {currentChart.name}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Code Editor */}
+                            <div className="flex-1 min-h-0">
+                                <Editor height="100%" defaultLanguage="markdown" theme="vs-dark" value={code} onChange={(value) => currentChartId ? updateChartCode(value || '') : setCode(value || '')} options={{ minimap: { enabled: false }, fontSize: 12, scrollBeyondLastLine: false, wordWrap: 'on', padding: { top: 8 }, lineNumbers: 'off', renderLineHighlight: 'none' }} />
+                            </div>
+
+                            {/* AI Section */}
+                            <div className="border-t border-slate-700 p-2 space-y-2 bg-slate-900/80">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-1">
+                                        <Sparkles size={12} className="text-purple-400" />
+                                        <span className="text-[10px] font-semibold text-slate-400 uppercase">AI</span>
+                                    </div>
+                                    <div className="flex gap-1">
+                                        <input ref={fileInputRef} type="file" accept=".md,.mmd,.txt" onChange={handleFileUpload} className="hidden" />
+                                        <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1 px-2 py-1 text-[10px] bg-slate-800 hover:bg-slate-700 rounded"><Upload size={10} /> Upload</button>
+                                        {currentProjectId && <button onClick={() => createNewChart(currentProjectId)} className="flex items-center gap-1 px-2 py-1 text-[10px] bg-indigo-600 hover:bg-indigo-500 rounded"><Plus size={10} /> Chart</button>}
+                                    </div>
+                                </div>
+
                                 <div className="flex gap-1">
-                                    <input ref={fileInputRef} type="file" accept=".md,.mmd,.txt" onChange={handleFileUpload} className="hidden" />
-                                    <button onClick={() => fileInputRef.current?.click()} className="flex items-center gap-1 px-2 py-1 text-[10px] bg-slate-800 hover:bg-slate-700 rounded"><Upload size={10} /> Upload</button>
-                                    {currentProjectId && <button onClick={() => createNewChart(currentProjectId)} className="flex items-center gap-1 px-2 py-1 text-[10px] bg-indigo-600 hover:bg-indigo-500 rounded"><Plus size={10} /> Chart</button>}
+                                    <button onClick={() => handleAiGenerate('Re-imagine with better layout')} disabled={isAiLoading} className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] bg-slate-800 hover:bg-indigo-600 disabled:opacity-50 rounded"><Layout size={10} /> Layout</button>
+                                    <button onClick={() => handleAiGenerate('Add colorful styling')} disabled={isAiLoading} className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] bg-slate-800 hover:bg-purple-600 disabled:opacity-50 rounded"><Palette size={10} /> Style</button>
+                                    <button onClick={() => handleAiGenerate('Fix syntax errors')} disabled={isAiLoading} className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] bg-slate-800 hover:bg-emerald-600 disabled:opacity-50 rounded"><RefreshCw size={10} /> Fix</button>
+                                </div>
+
+                                {aiError && <div className="text-[10px] text-red-400 bg-red-900/20 px-2 py-1 rounded">{aiError}</div>}
+
+                                <div className="relative">
+                                    <input type="text" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAiGenerate()} placeholder="Describe what you want..." className="w-full px-2 py-1.5 pr-8 text-xs bg-slate-800 border border-slate-700 rounded focus:ring-1 focus:ring-purple-500" />
+                                    <button onClick={() => handleAiGenerate()} disabled={isAiLoading || !aiPrompt.trim()} className="absolute right-1 top-1/2 -translate-y-1/2 p-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 rounded">
+                                        {isAiLoading ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                                    </button>
                                 </div>
                             </div>
-
-                            <div className="flex gap-1">
-                                <button onClick={() => handleAiGenerate('Re-imagine with better layout')} disabled={isAiLoading} className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] bg-slate-800 hover:bg-indigo-600 disabled:opacity-50 rounded"><Layout size={10} /> Layout</button>
-                                <button onClick={() => handleAiGenerate('Add colorful styling')} disabled={isAiLoading} className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] bg-slate-800 hover:bg-purple-600 disabled:opacity-50 rounded"><Palette size={10} /> Style</button>
-                                <button onClick={() => handleAiGenerate('Fix syntax errors')} disabled={isAiLoading} className="flex-1 flex items-center justify-center gap-1 px-2 py-1 text-[10px] bg-slate-800 hover:bg-emerald-600 disabled:opacity-50 rounded"><RefreshCw size={10} /> Fix</button>
-                            </div>
-
-                            {aiError && <div className="text-[10px] text-red-400 bg-red-900/20 px-2 py-1 rounded">{aiError}</div>}
-
-                            <div className="relative">
-                                <input type="text" value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAiGenerate()} placeholder="Describe what you want..." className="w-full px-2 py-1.5 pr-8 text-xs bg-slate-800 border border-slate-700 rounded focus:ring-1 focus:ring-purple-500" />
-                                <button onClick={() => handleAiGenerate()} disabled={isAiLoading || !aiPrompt.trim()} className="absolute right-1 top-1/2 -translate-y-1/2 p-1 bg-purple-600 hover:bg-purple-700 disabled:bg-slate-600 rounded">
-                                    {isAiLoading ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
-                                </button>
-                            </div>
                         </div>
+                        {/* Resize Handle */}
+                        <div
+                            className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-indigo-500 transition-colors z-10"
+                            onMouseDown={() => setIsResizing(true)}
+                        />
                     </div>
                 )}
 
@@ -1171,7 +1554,10 @@ export default function MermaidPage() {
                     {showDocumentView && detectedContent?.type === 'markdown' ? (
                         <MarkdownDocumentView
                             markdown={code}
+                            documentName={currentProject?.documents?.find(d => d.sourceMarkdown === code)?.name}
                             theme={theme}
+                            themes={THEMES}
+                            onThemeChange={setTheme}
                             onEditDiagram={handleEditDiagramFromDoc}
                             onAddChart={handleAddChartFromDoc}
                             onAddAllCharts={handleAddAllChartsFromDoc}

@@ -17,6 +17,13 @@ npm run dev:web
 > [!NOTE]
 > Docker is currently not required for local development and is intended for future production/Raspberry Pi deployment.
 
+## Features
+
+- **Document-Based Workflow**: Upload markdown files to automatically extract and organize Mermaid charts.
+- **Bidirectional Sync**: Edits to diagrams automatically update the source markdown file.
+- **Hierarchy**: Organize charts within documents or as standalone diagrams.
+- **AI-Powered**: Repair and generate diagrams using AI.
+
 
 ---
 
@@ -44,9 +51,12 @@ npm run dev:web
 2.  Create and activate a virtual environment:
     ```bash
     # Windows
+    cd apps/api
     python -m venv .venv
     .venv\Scripts\activate
+    uvicorn app.main:app --reload
 
+    
     # macOS/Linux
     python3 -m venv .venv
     source .venv/bin/activate
@@ -66,13 +76,7 @@ npm run dev:web
 1.  Navigate to the web directory:
     ```bash
     cd apps/web
-    ```
-2.  Install dependencies:
-    ```bash
     npm install
-    ```
-3.  Run the dev server:
-    ```bash
     npm run dev
     ```
     Frontend will be at `http://localhost:3000`.

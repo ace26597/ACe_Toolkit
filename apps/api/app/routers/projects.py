@@ -19,6 +19,7 @@ from app.schemas import (
     SessionChartResponse,
     EditionSchema,
     ChartMetadataSchema,
+    DocumentSchema,
     BulkSyncRequest
 )
 
@@ -33,6 +34,7 @@ def chart_to_response(chart: SessionChart) -> SessionChartResponse:
     return SessionChartResponse(
         id=chart.id,
         projectId=chart.project_id,
+        documentId=chart.document_id,
         name=chart.name,
         code=chart.code,
         editions=[EditionSchema(**e) for e in editions],
@@ -45,11 +47,14 @@ def chart_to_response(chart: SessionChart) -> SessionChartResponse:
 
 def project_to_response(project: SessionProject) -> SessionProjectResponse:
     """Convert a SessionProject model to SessionProjectResponse schema"""
+    documents = json.loads(project.documents_json) if project.documents_json else []
+    
     return SessionProjectResponse(
         id=project.id,
         name=project.name,
         description=project.description,
         charts=[chart_to_response(c) for c in project.charts],
+        documents=[DocumentSchema(**d) for d in documents],
         createdAt=project.created_at.isoformat() if project.created_at else "",
         updatedAt=project.updated_at.isoformat() if project.updated_at else ""
     )
@@ -83,7 +88,8 @@ async def create_project(
     new_project = SessionProject(
         id=project_in.id,
         name=project_in.name,
-        description=project_in.description
+        description=project_in.description,
+        documents_json=json.dumps([d.model_dump() for d in project_in.documents])
     )
     db.add(new_project)
     
@@ -92,6 +98,7 @@ async def create_project(
         new_chart = SessionChart(
             id=chart_in.id,
             project_id=project_in.id,
+            document_id=chart_in.documentId,
             name=chart_in.name,
             code=chart_in.code,
             editions=json.dumps([e.model_dump() for e in chart_in.editions]),
@@ -146,6 +153,8 @@ async def update_project(
         project.name = project_in.name
     if project_in.description is not None:
         project.description = project_in.description
+    if project_in.documents is not None:
+        project.documents_json = json.dumps([d.model_dump() for d in project_in.documents])
     project.updated_at = datetime.utcnow()
     
     await db.commit()
@@ -197,7 +206,8 @@ async def sync_projects(
         new_project = SessionProject(
             id=project_in.id,
             name=project_in.name,
-            description=project_in.description
+            description=project_in.description,
+            documents_json=json.dumps([d.model_dump() for d in project_in.documents])
         )
         db.add(new_project)
         
@@ -205,6 +215,7 @@ async def sync_projects(
             new_chart = SessionChart(
                 id=chart_in.id,
                 project_id=project_in.id,
+                document_id=chart_in.documentId,
                 name=chart_in.name,
                 code=chart_in.code,
                 editions=json.dumps([e.model_dump() for e in chart_in.editions]),

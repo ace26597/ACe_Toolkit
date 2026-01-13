@@ -63,6 +63,7 @@ class SessionProject(Base):
     id = Column(String, primary_key=True)  # Using client-generated string IDs
     name = Column(String, nullable=False)
     description = Column(Text, nullable=True)
+    documents_json = Column(Text, nullable=False, default="[]")  # JSON array of documents
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -75,6 +76,7 @@ class SessionChart(Base):
 
     id = Column(String, primary_key=True)  # Using client-generated string IDs
     project_id = Column(String, ForeignKey("session_projects.id"), nullable=False)
+    document_id = Column(String, nullable=True)  # Reference to parent document
     name = Column(String, nullable=False)
     code = Column(Text, nullable=False)
     editions = Column(Text, nullable=False, default="[]")  # JSON array of editions
@@ -84,3 +86,31 @@ class SessionChart(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     project = relationship("SessionProject", back_populates="charts")
+
+
+class SessionNoteProject(Base):
+    """Note Project model for session-based storage"""
+    __tablename__ = "session_note_projects"
+
+    id = Column(String, primary_key=True)  # Using client-generated string IDs
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    notes = relationship("SessionNote", back_populates="project", cascade="all, delete-orphan")
+
+
+class SessionNote(Base):
+    """Note model for session-based storage"""
+    __tablename__ = "session_notes"
+
+    id = Column(String, primary_key=True)  # Using client-generated string IDs
+    project_id = Column(String, ForeignKey("session_note_projects.id"), nullable=False)
+    title = Column(String, nullable=False)
+    content = Column(Text, nullable=False)
+    metadata_json = Column(Text, nullable=True)  # JSON for note metadata (e.g. pinned, tags)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    project = relationship("SessionNoteProject", back_populates="notes")
