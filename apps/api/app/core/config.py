@@ -5,14 +5,14 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Mermaid Monorepo API"
     API_V1_STR: str = "/api/v1"
     
-    # Database
-    POSTGRES_USER: str
-    POSTGRES_PASSWORD: str
-    POSTGRES_DB: str
-    DATABASE_URL: str
+    # Database (PostgreSQL for production, SQLite for development)
+    POSTGRES_USER: str = "user"
+    POSTGRES_PASSWORD: str = "password"
+    POSTGRES_DB: str = "mermaid_db"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./app.db"
     
     # Security
-    SECRET_KEY: str
+    SECRET_KEY: str = "dev-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     # Export
     PLAYWRIGHT_BROWSERS_PATH: Optional[str] = None
 
-    # AI
-    OPENAI_API_KEY: Optional[str] = None
+    # AI - Anthropic Claude API
+    ANTHROPIC_API_KEY: Optional[str] = None
 
     class Config:
         env_file = ".env"

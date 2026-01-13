@@ -11,4 +11,4 @@ dist
 *.sqlite
 *.db
 chroma/
-qdrant/
+qdrant/.env.local

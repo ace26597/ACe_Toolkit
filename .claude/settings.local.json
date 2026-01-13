@@ -6,7 +6,28 @@
       "Bash(findstr:*)",
       "Bash(taskkill:*)",
       "Bash(.venv/Scripts/python:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(source:*)",
+      "Bash(pip show:*)",
+      "Bash(chmod:*)",
+      "Bash(npm install)",
+      "Bash(npm view:*)",
+      "Bash(timeout 10 npm run dev:web:*)",
+      "Bash(timeout 15 npm run dev:web)",
+      "Bash(pip install:*)",
+      "Bash(pip index:*)",
+      "Bash(pip download:*)",
+      "Bash(unzip:*)",
+      "Bash(timeout 10 uvicorn:*)",
+      "Bash(timeout 10 npm run dev:api:*)",
+      "Bash(pip uninstall:*)",
+      "Bash(timeout:*)",
+      "Bash(curl:*)",
+      "Bash(sudo ufw status:*)",
+      "Bash(sudo dpkg:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)"
     ]
   }
 }

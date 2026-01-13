@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from openai import AsyncOpenAI
+from anthropic import AsyncAnthropic
 from app.core.config import settings
 from app.schemas import AiRequest
 import json
@@ -12,7 +12,13 @@ logger = logging.getLogger("ai_agent")
 
 router = APIRouter()
 
-client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+# Lazy initialization - only create client when API key is available
+client = None
+if settings.ANTHROPIC_API_KEY:
+    client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+
+# Model to use - Claude Sonnet for fast, high-quality responses
+CLAUDE_MODEL = "claude-sonnet-4-20250514"
 
 # Step 1: Context Analysis Prompt
 ANALYSIS_PROMPT = """You are a Mermaid.js expert and diagram analyst. Your task is to analyze the current diagram and understand the user's request.
@@ -66,63 +72,70 @@ Return a JSON object with:
 
 Be concise and specific."""
 
+
 async def analyze_context(current_code: str, user_prompt: str) -> dict:
     """Step 1: Analyze the current diagram and user intent."""
     logger.info("=" * 60)
-    logger.info("🔍 STEP 1: CONTEXT ANALYSIS")
+    logger.info("STEP 1: CONTEXT ANALYSIS")
     logger.info("=" * 60)
-    logger.info(f"📝 User Prompt: {user_prompt}")
-    logger.info(f"📄 Current Code Length: {len(current_code)} chars")
-    
-    messages = [
-        {"role": "system", "content": ANALYSIS_PROMPT},
-        {"role": "user", "content": f"""CURRENT DIAGRAM CODE:
+    logger.info(f"User Prompt: {user_prompt}")
+    logger.info(f"Current Code Length: {len(current_code)} chars")
+
+    user_message = f"""CURRENT DIAGRAM CODE:
 ```
 {current_code if current_code else "No existing diagram - this is a new diagram request."}
 ```
 
 USER REQUEST: {user_prompt}
 
-Provide your analysis as a JSON object."""}
-    ]
-    
-    logger.info("🚀 Sending analysis request to GPT-5.2...")
+Provide your analysis as a JSON object."""
+
+    logger.info(f"Sending analysis request to Claude {CLAUDE_MODEL}...")
     start_time = datetime.now()
-    
-    response = await client.chat.completions.create(
-        model="gpt-5.2",
-        messages=messages,
-        temperature=0.3,
-        response_format={"type": "json_object"}
+
+    response = await client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=2048,
+        system=ANALYSIS_PROMPT,
+        messages=[{"role": "user", "content": user_message}]
     )
-    
+
     elapsed = (datetime.now() - start_time).total_seconds()
-    logger.info(f"⏱️ Analysis completed in {elapsed:.2f}s")
-    
-    raw_content = response.choices[0].message.content
-    logger.info(f"📤 Raw Analysis Response:\n{raw_content}")
-    
+    logger.info(f"Analysis completed in {elapsed:.2f}s")
+
+    raw_content = response.content[0].text
+    logger.info(f"Raw Analysis Response:\n{raw_content}")
+
     try:
-        analysis = json.loads(raw_content)
-        logger.info(f"✅ Parsed Analysis:")
+        # Extract JSON from response (handle potential markdown wrapping)
+        json_str = raw_content.strip()
+        if json_str.startswith("```"):
+            lines = json_str.split("\n")
+            if lines[0].startswith("```"):
+                lines.pop(0)
+            if lines and lines[-1].startswith("```"):
+                lines.pop()
+            json_str = "\n".join(lines).strip()
+
+        analysis = json.loads(json_str)
+        logger.info(f"Parsed Analysis:")
         logger.info(f"   - Diagram Type: {analysis.get('diagram_type', 'unknown')}")
         logger.info(f"   - Context: {analysis.get('diagram_context', 'N/A')}")
         logger.info(f"   - User Intent: {analysis.get('user_intent', 'N/A')}")
         logger.info(f"   - Thinking: {analysis.get('thinking', 'N/A')}")
         return analysis
     except json.JSONDecodeError:
-        logger.error(f"❌ Failed to parse analysis JSON")
+        logger.error(f"Failed to parse analysis JSON")
         return {"error": "Failed to parse analysis", "raw": raw_content}
+
 
 async def generate_diagram(analysis: dict, current_code: str, user_prompt: str) -> str:
     """Step 2: Generate the diagram using the analysis context."""
     logger.info("=" * 60)
-    logger.info("🎨 STEP 2: DIAGRAM GENERATION")
+    logger.info("STEP 2: DIAGRAM GENERATION")
     logger.info("=" * 60)
-    
-    messages = [
-        {"role": "system", "content": GENERATION_PROMPT},
-        {"role": "user", "content": f"""CONTEXT ANALYSIS:
+
+    user_message = f"""CONTEXT ANALYSIS:
 {json.dumps(analysis, indent=2)}
 
 CURRENT CODE (if any):
@@ -130,35 +143,34 @@ CURRENT CODE (if any):
 
 USER REQUEST: {user_prompt}
 
-Generate the Mermaid diagram code now."""}
-    ]
-    
-    logger.info("🚀 Sending generation request to GPT-5.2...")
+Generate the Mermaid diagram code now."""
+
+    logger.info(f"Sending generation request to Claude {CLAUDE_MODEL}...")
     start_time = datetime.now()
-    
-    response = await client.chat.completions.create(
-        model="gpt-5.2",
-        messages=messages,
-        temperature=0.2,
+
+    response = await client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=4096,
+        system=GENERATION_PROMPT,
+        messages=[{"role": "user", "content": user_message}]
     )
-    
+
     elapsed = (datetime.now() - start_time).total_seconds()
-    logger.info(f"⏱️ Generation completed in {elapsed:.2f}s")
-    
-    generated_code = response.choices[0].message.content.strip()
-    logger.info(f"📤 Generated Code:\n{generated_code[:500]}{'...' if len(generated_code) > 500 else ''}")
-    
+    logger.info(f"Generation completed in {elapsed:.2f}s")
+
+    generated_code = response.content[0].text.strip()
+    logger.info(f"Generated Code:\n{generated_code[:500]}{'...' if len(generated_code) > 500 else ''}")
+
     return generated_code
+
 
 async def generate_summary(current_code: str, new_code: str, user_prompt: str) -> dict:
     """Step 3: Generate a summary of changes for the edition."""
     logger.info("=" * 60)
-    logger.info("📋 STEP 3: CHANGE SUMMARY")
+    logger.info("STEP 3: CHANGE SUMMARY")
     logger.info("=" * 60)
-    
-    messages = [
-        {"role": "system", "content": SUMMARY_PROMPT},
-        {"role": "user", "content": f"""ORIGINAL CODE:
+
+    user_message = f"""ORIGINAL CODE:
 {current_code if current_code else "No original diagram"}
 
 NEW CODE:
@@ -166,37 +178,47 @@ NEW CODE:
 
 USER REQUEST: {user_prompt}
 
-Provide a summary of the changes."""}
-    ]
-    
-    logger.info("🚀 Sending summary request to GPT-5.2...")
+Provide a summary of the changes as a JSON object."""
+
+    logger.info(f"Sending summary request to Claude {CLAUDE_MODEL}...")
     start_time = datetime.now()
-    
-    response = await client.chat.completions.create(
-        model="gpt-5.2",
-        messages=messages,
-        temperature=0.3,
-        response_format={"type": "json_object"}
+
+    response = await client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=1024,
+        system=SUMMARY_PROMPT,
+        messages=[{"role": "user", "content": user_message}]
     )
-    
+
     elapsed = (datetime.now() - start_time).total_seconds()
-    logger.info(f"⏱️ Summary completed in {elapsed:.2f}s")
-    
-    raw_content = response.choices[0].message.content
-    logger.info(f"📤 Raw Summary Response:\n{raw_content}")
-    
+    logger.info(f"Summary completed in {elapsed:.2f}s")
+
+    raw_content = response.content[0].text
+    logger.info(f"Raw Summary Response:\n{raw_content}")
+
     try:
-        summary = json.loads(raw_content)
-        logger.info(f"✅ Edition Title: {summary.get('edition_title', 'AI Update')}")
+        # Extract JSON from response (handle potential markdown wrapping)
+        json_str = raw_content.strip()
+        if json_str.startswith("```"):
+            lines = json_str.split("\n")
+            if lines[0].startswith("```"):
+                lines.pop(0)
+            if lines and lines[-1].startswith("```"):
+                lines.pop()
+            json_str = "\n".join(lines).strip()
+
+        summary = json.loads(json_str)
+        logger.info(f"Edition Title: {summary.get('edition_title', 'AI Update')}")
         return summary
     except json.JSONDecodeError:
-        logger.error(f"❌ Failed to parse summary JSON")
+        logger.error(f"Failed to parse summary JSON")
         return {"edition_title": "AI Update", "changes_made": [], "diagram_description": ""}
+
 
 def clean_mermaid_code(code: str) -> str:
     """Clean any markdown formatting from the generated code."""
     cleaned = code.strip()
-    
+
     # Remove markdown code blocks if present
     if cleaned.startswith("```"):
         lines = cleaned.split("\n")
@@ -205,39 +227,43 @@ def clean_mermaid_code(code: str) -> str:
         if lines and lines[-1].startswith("```"):
             lines.pop()
         cleaned = "\n".join(lines).strip()
-    
+
     # Remove 'mermaid' language identifier if it remained at the start
     if cleaned.lower().startswith("mermaid"):
         cleaned = cleaned[7:].strip()
-    
+
     return cleaned
+
 
 @router.post("/generate")
 async def generate_diagram_endpoint(req: AiRequest):
     logger.info("=" * 80)
-    logger.info("🤖 AI DIAGRAM GENERATION PIPELINE STARTED")
-    logger.info(f"⏰ Timestamp: {datetime.now().isoformat()}")
+    logger.info("AI DIAGRAM GENERATION PIPELINE STARTED (Claude)")
+    logger.info(f"Timestamp: {datetime.now().isoformat()}")
     logger.info("=" * 80)
-    
-    if not settings.OPENAI_API_KEY:
-        logger.error("❌ OpenAI API key not configured")
-        raise HTTPException(status_code=500, detail="OpenAI API key not configured")
+
+    if not settings.ANTHROPIC_API_KEY:
+        logger.error("Anthropic API key not configured")
+        raise HTTPException(status_code=500, detail="Anthropic API key not configured")
+
+    if not client:
+        raise HTTPException(status_code=500, detail="AI client not initialized")
 
     try:
         # Step 1: Analyze context
         analysis = await analyze_context(req.current_code or "", req.prompt)
-        
+
         # Step 2: Generate diagram with context
         mermaid_code = await generate_diagram(analysis, req.current_code or "", req.prompt)
-        
+
         # Clean up any markdown formatting
         mermaid_code = clean_mermaid_code(mermaid_code)
-        
+
         # Step 3: Generate summary for edition
         summary = await generate_summary(req.current_code or "", mermaid_code, req.prompt)
-        
+
         logger.info("=" * 80)
-        logger.info("✅ AI PIPELINE COMPLETED SUCCESSFULLY")
+        logger.info("AI PIPELINE COMPLETED SUCCESSFULLY")
         logger.info("=" * 80)
 
         return {
@@ -249,7 +275,7 @@ async def generate_diagram_endpoint(req: AiRequest):
             "diagram_description": summary.get("diagram_description", analysis.get("diagram_context", "")),
             "thinking": analysis.get("thinking", "")
         }
-        
+
     except Exception as e:
-        logger.error(f"❌ AI Generation Error: {e}")
+        logger.error(f"AI Generation Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
