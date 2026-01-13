@@ -47,3 +47,25 @@
     sudo cloudflared service install
     sudo systemctl start cloudflared
     ```
+
+7.  **Enable Auto-Start on Reboot**:
+    ```bash
+    # Enable service to start on boot
+    sudo systemctl enable cloudflared
+
+    # Verify it's enabled
+    sudo systemctl is-enabled cloudflared
+    # Should output: enabled
+
+    # Check status
+    sudo systemctl status cloudflared
+    ```
+
+8.  **Verify After Reboot**:
+    ```bash
+    # After Pi reboots, check tunnel is running
+    sudo systemctl status cloudflared
+
+    # View logs
+    sudo journalctl -u cloudflared -f
+    ```
