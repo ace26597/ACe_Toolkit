@@ -1,8 +1,9 @@
 # CLAUDE.md - AI Assistant Guide for ACe_Toolkit
 
-**Last Updated:** January 12, 2026
+**Last Updated:** January 13, 2026
 **Repository:** ACe_Toolkit
 **Status:** Active Development
+**Deployment:** Raspberry Pi (Local Network + Cloudflare Domain In Progress)
 
 ---
 
@@ -92,9 +93,11 @@
 
 ### Infrastructure
 
-- **Containerization:** Docker
-- **Deployment:** Raspberry Pi with Cloudflare Tunnel
-- **Networking:** UFW firewall, Cloudflare Tunnel for secure ingress
+- **Containerization:** Docker (optional)
+- **Deployment:** Raspberry Pi (local network + future Cloudflare Tunnel)
+- **Auto-Start:** Crontab-based service startup on reboot
+- **Networking:** UFW firewall, local network access
+- **Future:** Cloudflare Tunnel for external access (in progress)
 
 ---
 
@@ -570,19 +573,65 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 ## Deployment
 
-### Raspberry Pi Deployment
+### Current Setup (Raspberry Pi - Local Network)
 
-1. Copy `infra`, `apps/api` to the Pi
-2. Run `infra/scripts/pi_setup.sh`
-3. Run `docker-compose up -d --build` in `infra`
-4. Setup Cloudflare Tunnel using `infra/scripts/run_tunnel.md`
+**Status:** ✅ Backend & Frontend auto-start configured
+
+**Auto-Start Configuration:**
+```bash
+# Setup crontab
+crontab -e
+
+# Add this line:
+@reboot sleep 30 && /home/ace/dev/ACe_Toolkit/infra/scripts/start_all.sh
+```
+
+**Services:**
+- Backend (FastAPI): Port 8000
+- Frontend (Next.js): Port 3000
+- Auto-starts on Pi reboot
+- Logs to `/home/ace/dev/ACe_Toolkit/logs/`
+
+**Access:**
+- Local: `http://localhost:3000`
+- Network: `http://<PI_IP>:3000`
+
+**Management:**
+```bash
+# Check status
+./infra/scripts/status.sh
+
+# Start/stop manually
+./infra/scripts/start_all.sh
+./infra/scripts/stop_all.sh
+
+# View logs
+tail -f logs/backend-*.log
+tail -f logs/frontend-*.log
+```
+
+**See:** [CURRENT_SETUP.md](infra/scripts/CURRENT_SETUP.md) for detailed instructions
+
+### Future: Cloudflare Tunnel (In Progress)
+
+**Status:** 🔜 Waiting for free Cloudflare domain
+
+**Once configured:**
+1. Create tunnel: `cloudflared tunnel create acetoolkit`
+2. Configure ingress rules in `~/.cloudflared/config.yml`
+3. Route DNS: `cloudflared tunnel route dns acetoolkit yourdomain.com`
+4. Enable service: `sudo systemctl enable cloudflared`
+5. Access from anywhere via `https://yourdomain.com`
+
+**See:** [CLOUDFLARE_GUIDE.md](infra/scripts/CLOUDFLARE_GUIDE.md) for complete setup
 
 ### Security Configuration
 
 - **JWT:** Tokens stored in HTTPOnly SameSite=Lax cookies
-- **CORS:** Restricted to frontend domain only
-- **Network:** Pi exposes no ports locally; use Cloudflare Tunnel
-- **Firewall:** UFW configured to allow only SSH locally
+- **CORS:** Restricted to frontend domain only (update when Cloudflare added)
+- **Network:** Local network access only (no exposed ports)
+- **Firewall:** UFW configured to allow only SSH
+- **Future:** Cloudflare Tunnel for secure external access (no port forwarding needed)
 
 ### Vercel Frontend Deployment
 
@@ -597,6 +646,7 @@ Frontend can be deployed to Vercel with:
 
 | Date | Change | Author |
 |------|--------|--------|
+| 2026-01-13 | Update deployment section: crontab auto-start, Cloudflare in progress | Claude |
 | 2026-01-12 | Complete rewrite with accurate codebase documentation | Claude |
 | 2026-01-09 | Initial CLAUDE.md creation | Claude |
 
