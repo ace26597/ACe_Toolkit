@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
-from app.routers import auth, diagrams, export, notes, ai, projects, charts, skills, scientific_chat, research_chat
+from app.routers import auth, diagrams, export, notes, ai, projects, charts, skills, scientific_chat, research_chat, logs
 from app.core.database import engine
 from app.models.models import Base
 
@@ -87,6 +87,7 @@ app.include_router(charts.router, prefix="/charts", tags=["charts"])
 app.include_router(skills.router, prefix="/skills", tags=["skills"])
 app.include_router(scientific_chat.router, prefix="/scientific-chat", tags=["Scientific Chat"])
 app.include_router(research_chat.router, prefix="/research", tags=["Research Assistant"])
+app.include_router(logs.router, prefix="/logs", tags=["Logs"])
 
 @app.get("/")
 def read_root():

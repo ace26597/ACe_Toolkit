@@ -30,7 +30,7 @@ out/
 .turbo/
 
 # Logs
-logs/
+/logs/
 *.log
 *.pid
 npm-debug.log*
