@@ -34,13 +34,20 @@ export interface Chart {
     updatedAt: string;
 }
 
+export interface DocumentMetadata {
+    tags?: string[];
+    pinned?: boolean;
+    source?: 'manual' | 'upload';
+}
+
 export interface Document {
     id: string;
     projectId: string;
     name: string;
     description?: string;
-    sourceMarkdown?: string; // Original markdown content
-    charts: Chart[];
+    sourceMarkdown?: string; // Full markdown content (the "note" content)
+    charts: Chart[]; // Extracted mermaid charts from the markdown
+    metadata?: DocumentMetadata;
     createdAt: string;
     updatedAt: string;
 }

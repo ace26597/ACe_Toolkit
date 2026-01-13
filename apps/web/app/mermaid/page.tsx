@@ -97,6 +97,8 @@ export default function MermaidPage() {
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const previewRef = useRef<HTMLDivElement>(null);
     const [showDocumentView, setShowDocumentView] = useState(false);
+    const [currentDocumentId, setCurrentDocumentId] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<'diagram' | 'markdown'>('diagram');
     const [sidebarWidth, setSidebarWidth] = useState(380);
     const [isResizing, setIsResizing] = useState(false);
 
@@ -850,6 +852,80 @@ export default function MermaidPage() {
         }
     };
 
+    // Create a new document (note) in a project
+    const createNewDocument = (projectId: string, name?: string, content?: string) => {
+        const timestamp = Date.now().toString();
+        const randomSuffix = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+        const docId = `doc-${timestamp}-${randomSuffix}`;
+
+        const newDocument: Document = {
+            id: docId,
+            name: name || 'New Note',
+            sourceMarkdown: content || '# New Note\n\nStart writing here...\n\n```mermaid\ngraph TD\n    A[Start] --> B[End]\n```\n',
+            chartIds: [],
+            createdAt: new Date().toISOString()
+        };
+
+        setProjects(prev => prev.map(p =>
+            p.id === projectId
+                ? { ...p, documents: [...p.documents, newDocument], updatedAt: new Date().toISOString() }
+                : p
+        ));
+
+        // Select the new document for editing
+        setCurrentProjectId(projectId);
+        setCurrentDocumentId(docId);
+        setCurrentChartId(null);
+        setCode(newDocument.sourceMarkdown || '');
+        setViewMode('markdown');
+        setShowDocumentView(true);
+
+        showToast({ type: 'success', message: `Created "${name || 'New Note'}"` });
+    };
+
+    // Update document content (when editing markdown)
+    const updateDocumentContent = (newContent: string) => {
+        if (!currentDocumentId || !currentProjectId) return;
+
+        setProjects(prev => prev.map(p => {
+            if (p.id !== currentProjectId) return p;
+            return {
+                ...p,
+                documents: p.documents.map(d =>
+                    d.id === currentDocumentId
+                        ? { ...d, sourceMarkdown: newContent }
+                        : d
+                ),
+                updatedAt: new Date().toISOString()
+            };
+        }));
+        setCode(newContent);
+    };
+
+    // Delete a document
+    const deleteDocument = (projectId: string, documentId: string) => {
+        const project = projects.find(p => p.id === projectId);
+        const docName = project?.documents.find(d => d.id === documentId)?.name || 'Document';
+
+        setProjects(prev => prev.map(p => {
+            if (p.id !== projectId) return p;
+            return {
+                ...p,
+                documents: p.documents.filter(d => d.id !== documentId),
+                // Also remove charts that belong to this document
+                charts: p.charts.filter(c => c.documentId !== documentId),
+                updatedAt: new Date().toISOString()
+            };
+        }));
+
+        if (currentDocumentId === documentId) {
+            setCurrentDocumentId(null);
+            setViewMode('diagram');
+        }
+
+        showToast({ type: 'info', message: `Deleted "${docName}"` });
+    };
+
     const deleteProject = (projectId: string) => {
         const projectName = projects.find(p => p.id === projectId)?.name || 'Project';
         setProjects(prev => prev.filter(p => p.id !== projectId));
@@ -1393,14 +1469,14 @@ export default function MermaidPage() {
                                                     {project.documents.map(doc => (
                                                         <div key={doc.id}>
                                                             <div
-                                                                className="flex items-center gap-1 px-3 py-1 rounded cursor-pointer hover:bg-slate-800/50 group"
+                                                                className={`flex items-center gap-1 px-3 py-1 rounded cursor-pointer group ${currentDocumentId === doc.id ? 'bg-blue-800/50' : 'hover:bg-slate-800/50'}`}
                                                                 onClick={() => {
-                                                                    if (doc.sourceMarkdown) {
-                                                                        setCode(doc.sourceMarkdown);
-                                                                        setShowDocumentView(true);
-                                                                        setCurrentChartId(null);
-                                                                        setCurrentProjectId(project.id);
-                                                                    }
+                                                                    setCurrentProjectId(project.id);
+                                                                    setCurrentDocumentId(doc.id);
+                                                                    setCurrentChartId(null);
+                                                                    setCode(doc.sourceMarkdown || '');
+                                                                    setViewMode('markdown');
+                                                                    setShowDocumentView(true);
                                                                 }}
                                                             >
                                                                 <div
@@ -1416,12 +1492,13 @@ export default function MermaidPage() {
                                                                 >
                                                                     {expandedDocuments.has(doc.id) ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
                                                                 </div>
-                                                                <Folder size={11} className="text-blue-400" />
+                                                                <FileText size={11} className="text-blue-400" />
                                                                 <span className="flex-1 text-[11px] truncate text-slate-300">{doc.name}</span>
                                                                 <span className="text-[9px] text-slate-600">{project.charts.filter(c => c.documentId === doc.id).length}</span>
+                                                                <button onClick={e => { e.stopPropagation(); deleteDocument(project.id, doc.id); }} className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-red-900 rounded text-red-400"><Trash2 size={10} /></button>
                                                             </div>
                                                             {expandedDocuments.has(doc.id) && project.charts.filter(c => c.documentId === doc.id).map(chart => (
-                                                                <div key={chart.id} className={`flex items-center gap-2 px-6 py-1 rounded cursor-pointer group ${currentChartId === chart.id ? 'bg-indigo-800/50' : 'hover:bg-slate-800/50'}`} onClick={() => { setCurrentProjectId(project.id); setCurrentChartId(chart.id); setCode(chart.code); setShowDocumentView(false); }}>
+                                                                <div key={chart.id} className={`flex items-center gap-2 px-6 py-1 rounded cursor-pointer group ${currentChartId === chart.id ? 'bg-indigo-800/50' : 'hover:bg-slate-800/50'}`} onClick={() => { setCurrentProjectId(project.id); setCurrentChartId(chart.id); setCurrentDocumentId(null); setCode(chart.code); setViewMode('diagram'); setShowDocumentView(false); }}>
                                                                     <FileCode2 size={11} className="text-blue-400/70" />
                                                                     {editingId === chart.id ? (
                                                                         <input className="flex-1 text-[11px] bg-slate-800 px-1 rounded" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={() => finishRename('chart', project.id, chart.id)} onKeyDown={e => e.key === 'Enter' && finishRename('chart', project.id, chart.id)} autoFocus onClick={e => e.stopPropagation()} />
@@ -1437,7 +1514,7 @@ export default function MermaidPage() {
 
                                                     {/* Standalone Charts */}
                                                     {project.charts.filter(c => !c.documentId).map(chart => (
-                                                        <div key={chart.id} className={`flex items-center gap-2 px-5 py-1 rounded cursor-pointer group ${currentChartId === chart.id ? 'bg-indigo-800/50' : 'hover:bg-slate-800/50'}`} onClick={() => { setCurrentProjectId(project.id); setCurrentChartId(chart.id); setCode(chart.code); setShowDocumentView(false); }}>
+                                                        <div key={chart.id} className={`flex items-center gap-2 px-5 py-1 rounded cursor-pointer group ${currentChartId === chart.id ? 'bg-indigo-800/50' : 'hover:bg-slate-800/50'}`} onClick={() => { setCurrentProjectId(project.id); setCurrentChartId(chart.id); setCurrentDocumentId(null); setCode(chart.code); setViewMode('diagram'); setShowDocumentView(false); }}>
                                                             <FileCode2 size={11} className="text-blue-400" />
                                                             {editingId === chart.id ? (
                                                                 <input className="flex-1 text-xs bg-slate-800 px-1 rounded" value={editValue} onChange={e => setEditValue(e.target.value)} onBlur={() => finishRename('chart', project.id, chart.id)} onKeyDown={e => e.key === 'Enter' && finishRename('chart', project.id, chart.id)} autoFocus onClick={e => e.stopPropagation()} />
@@ -1492,23 +1569,80 @@ export default function MermaidPage() {
                                         <Plus size={12} /> Chart
                                     </button>
                                     <button
+                                        onClick={() => currentProjectId && createNewDocument(currentProjectId)}
+                                        disabled={!currentProjectId}
+                                        className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed rounded text-white"
+                                        title="Add new note/document"
+                                    >
+                                        <FileText size={12} /> Note
+                                    </button>
+                                    <button
                                         onClick={() => fileInputRef.current?.click()}
                                         className="flex items-center gap-1 px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 rounded"
                                         title="Upload markdown or mermaid file"
                                     >
                                         <Upload size={12} /> Upload
                                     </button>
+                                    {/* View Mode Toggle */}
+                                    {currentDocumentId && (
+                                        <div className="flex items-center gap-1 ml-2 bg-slate-800 rounded p-0.5">
+                                            <button
+                                                onClick={() => setViewMode('markdown')}
+                                                className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${viewMode === 'markdown' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                                            >
+                                                <FileText size={12} /> Markdown
+                                            </button>
+                                            <button
+                                                onClick={() => setViewMode('diagram')}
+                                                className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${viewMode === 'diagram' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                                            >
+                                                <FileCode2 size={12} /> Diagram
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                                 {currentChart && (
                                     <span className="text-xs text-slate-400 truncate max-w-[150px]" title={currentChart.name}>
                                         Editing: {currentChart.name}
                                     </span>
                                 )}
+                                {currentDocumentId && !currentChart && (
+                                    <span className="text-xs text-blue-400 truncate max-w-[150px]" title={currentProject?.documents.find(d => d.id === currentDocumentId)?.name}>
+                                        Editing: {currentProject?.documents.find(d => d.id === currentDocumentId)?.name}
+                                    </span>
+                                )}
                             </div>
 
                             {/* Code Editor */}
                             <div className="flex-1 min-h-0">
-                                <Editor height="100%" defaultLanguage="markdown" theme="vs-dark" value={code} onChange={(value) => currentChartId ? updateChartCode(value || '') : setCode(value || '')} options={{ minimap: { enabled: false }, fontSize: 12, scrollBeyondLastLine: false, wordWrap: 'on', padding: { top: 8 }, lineNumbers: 'off', renderLineHighlight: 'none' }} />
+                                <Editor
+                                    height="100%"
+                                    defaultLanguage="markdown"
+                                    theme="vs-dark"
+                                    value={code}
+                                    onChange={(value) => {
+                                        const newValue = value || '';
+                                        if (currentDocumentId && viewMode === 'markdown') {
+                                            // Editing document markdown
+                                            updateDocumentContent(newValue);
+                                        } else if (currentChartId) {
+                                            // Editing chart code
+                                            updateChartCode(newValue);
+                                        } else {
+                                            // Just updating local state (pasted content, etc.)
+                                            setCode(newValue);
+                                        }
+                                    }}
+                                    options={{
+                                        minimap: { enabled: false },
+                                        fontSize: 12,
+                                        scrollBeyondLastLine: false,
+                                        wordWrap: 'on',
+                                        padding: { top: 8 },
+                                        lineNumbers: viewMode === 'markdown' ? 'on' : 'off',
+                                        renderLineHighlight: 'none'
+                                    }}
+                                />
                             </div>
 
                             {/* AI Section */}
@@ -1551,10 +1685,12 @@ export default function MermaidPage() {
 
                 {/* Preview Panel */}
                 <div ref={previewRef} className="flex-1 min-w-0 bg-slate-950 relative overflow-hidden">
-                    {showDocumentView && detectedContent?.type === 'markdown' ? (
+                    {(showDocumentView && detectedContent?.type === 'markdown') || (currentDocumentId && viewMode === 'markdown') ? (
                         <MarkdownDocumentView
                             markdown={code}
-                            documentName={currentProject?.documents?.find(d => d.sourceMarkdown === code)?.name}
+                            documentName={currentDocumentId
+                                ? currentProject?.documents?.find(d => d.id === currentDocumentId)?.name
+                                : currentProject?.documents?.find(d => d.sourceMarkdown === code)?.name}
                             theme={theme}
                             themes={THEMES}
                             onThemeChange={setTheme}
@@ -1562,7 +1698,12 @@ export default function MermaidPage() {
                             onAddChart={handleAddChartFromDoc}
                             onAddAllCharts={handleAddAllChartsFromDoc}
                             onRepairWithAI={handleRepairWithAI}
-                            onClose={() => setShowDocumentView(false)}
+                            onClose={() => {
+                                setShowDocumentView(false);
+                                if (currentDocumentId) {
+                                    setViewMode('diagram');
+                                }
+                            }}
                         />
                     ) : (
                         <iframe ref={iframeRef} className="w-full h-full border-0" sandbox="allow-scripts allow-same-origin" title="Mermaid Preview" />

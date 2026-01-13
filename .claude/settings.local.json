@@ -27,7 +27,32 @@
       "Bash(sudo dpkg:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git config:*)"
+      "Bash(git config:*)",
+      "Bash(git push:*)",
+      "Bash(command -v gh:*)",
+      "Bash(gh auth status:*)",
+      "Bash(sudo dd:*)",
+      "Bash(sudo chmod:*)",
+      "Bash(sudo tee:*)",
+      "Bash(sudo apt update:*)",
+      "Bash(sudo apt install:*)",
+      "Bash(npm run build)",
+      "Bash(ls:*)",
+      "Bash(crontab:*)",
+      "Bash(/home/ace/dev/ACe_Toolkit/infra/scripts/start_all.sh:*)",
+      "Bash(cloudflared tunnel list:*)",
+      "Bash(systemctl status:*)",
+      "Bash(python3:*)",
+      "Bash(cloudflared:*)",
+      "Bash(sudo cloudflared service:*)",
+      "Bash(sudo systemctl enable:*)",
+      "Bash(sudo systemctl start:*)",
+      "Bash(sudo mkdir:*)",
+      "Bash(sudo cp:*)",
+      "Bash(sudo systemctl status:*)",
+      "Bash(/home/ace/dev/ACe_Toolkit/infra/scripts/status.sh:*)",
+      "Bash(dig:*)",
+      "Bash(/home/ace/dev/ACe_Toolkit/infra/scripts/stop_all.sh:*)"
     ]
   }
 }
