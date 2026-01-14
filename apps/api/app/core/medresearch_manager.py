@@ -173,7 +173,17 @@ class MedResearchManager:
 
     def create_workspace(self, medresearch_id: str) -> Path:
         """
-        Create workspace directory with CLAUDE.md and .claude/settings.local.json
+        Create workspace directory with isolated Claude config.
+
+        Creates:
+        - CLAUDE.md with session instructions
+        - .claude/ directory with:
+          - settings.json (copied from global ~/.claude/)
+          - settings.local.json (session-specific permissions)
+          - plugins/ (symlinked to global ~/.claude/plugins/)
+
+        This isolation allows multiple Claude Code instances to run
+        simultaneously without conflicts.
 
         Args:
             medresearch_id: UUID for the session
@@ -193,15 +203,39 @@ class MedResearchManager:
         )
         claude_md_path.write_text(claude_md_content)
 
-        # Create .claude directory with settings for scientific-skills plugin
+        # Create isolated .claude directory for this session
         claude_dir = workspace / ".claude"
         claude_dir.mkdir(parents=True, exist_ok=True)
 
-        # Write settings.local.json with scientific-skills enabled
-        settings_path = claude_dir / "settings.local.json"
-        settings_path.write_text(json.dumps(CLAUDE_SETTINGS_TEMPLATE, indent=2))
+        global_claude = Path.home() / ".claude"
 
-        logger.info(f"Created workspace with scientific-skills: {workspace}")
+        # 1. Copy settings.json from global (main config)
+        global_settings = global_claude / "settings.json"
+        if global_settings.exists():
+            shutil.copy(global_settings, claude_dir / "settings.json")
+            logger.debug(f"Copied global settings.json to {claude_dir}")
+
+        # 2. Symlink plugins directory (shared across sessions)
+        global_plugins = global_claude / "plugins"
+        session_plugins = claude_dir / "plugins"
+        if global_plugins.exists() and not session_plugins.exists():
+            try:
+                session_plugins.symlink_to(global_plugins)
+                logger.debug(f"Symlinked plugins: {session_plugins} -> {global_plugins}")
+            except OSError as e:
+                logger.warning(f"Failed to symlink plugins: {e}")
+
+        # 3. Copy credentials.json if it exists (for API keys)
+        global_credentials = global_claude / "credentials.json"
+        if global_credentials.exists():
+            shutil.copy(global_credentials, claude_dir / "credentials.json")
+            logger.debug(f"Copied credentials.json to {claude_dir}")
+
+        # 4. Write settings.local.json with session-specific permissions
+        settings_local_path = claude_dir / "settings.local.json"
+        settings_local_path.write_text(json.dumps(CLAUDE_SETTINGS_TEMPLATE, indent=2))
+
+        logger.info(f"Created isolated workspace: {workspace}")
         return workspace
 
     async def spawn_claude(
@@ -245,12 +279,17 @@ class MedResearchManager:
             env['COLORTERM'] = 'truecolor'
             # Ensure Claude Code uses the workspace directory
             env['PWD'] = str(workspace_dir)
-            # DO NOT override CLAUDE_CONFIG_DIR - let Claude use global ~/.claude
-            # for plugins. Project-specific settings.local.json in workspace/.claude
-            # will still be read automatically by Claude Code.
+
+            # IMPORTANT: Set CLAUDE_CONFIG_DIR to session-specific .claude directory
+            # This isolates each session's config, state, and locks, allowing
+            # multiple Claude Code instances to run simultaneously without conflicts.
+            # Plugins are symlinked from global ~/.claude/plugins/ so they still work.
+            session_claude_dir = workspace_dir / ".claude"
+            env['CLAUDE_CONFIG_DIR'] = str(session_claude_dir)
+
+            logger.info(f"Using isolated config: CLAUDE_CONFIG_DIR={session_claude_dir}")
 
             # Spawn Claude Code - user will interact with permission prompts
-            # Scientific-skills plugin is enabled globally in ~/.claude/settings.json
             process = pexpect.spawn(
                 'claude',
                 args=[],  # No args - let user interact with prompts
