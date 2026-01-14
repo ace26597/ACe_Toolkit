@@ -156,7 +156,7 @@ class ChatConversation(Base):
     session_id = Column(String, nullable=False, index=True)  # Browser session
     title = Column(String, nullable=False)  # Auto-generated from first message
     sandbox_dir = Column(String, nullable=False)  # /tmp/ace_sessions/{id}/
-    model_name = Column(String, nullable=False, default="claude-sonnet-4-20250514")
+    model_name = Column(String, nullable=False, default="gpt-5.2")
     message_count = Column(Integer, default=0)
     total_tokens_used = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -194,8 +194,8 @@ class ResearchConversation(Base):
     sandbox_dir = Column(String, nullable=False)  # /tmp/ace_sessions/{id}/
 
     # Multi-model configuration
-    provider = Column(String, nullable=False, default="openai")  # openai | anthropic
-    model_name = Column(String, nullable=False, default="gpt-4o")
+    provider = Column(String, nullable=False, default="openai")  # openai only
+    model_name = Column(String, nullable=False, default="gpt-5.2")
 
     # Workflow metadata
     workflow_type = Column(String, nullable=True)  # "search" | "analysis" | "direct"

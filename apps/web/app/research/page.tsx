@@ -15,7 +15,7 @@ export default function ResearchPage() {
   // Model configuration
   const [modelConfig, setModelConfig] = useState({
     provider: 'openai',
-    model: 'gpt-4o'
+    model: 'gpt-5.2'
   });
 
   // File management

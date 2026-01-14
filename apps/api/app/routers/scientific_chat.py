@@ -1,10 +1,10 @@
 """
 Scientific Chat Router
 
-WebSocket and REST API for Claude-powered scientific chatbot with MCP tool integration.
+WebSocket and REST API for GPT-powered scientific chatbot with MCP tool integration.
 
 Features:
-- Real-time streaming responses from Claude
+- Real-time streaming responses from OpenAI GPT-5.2
 - Tool calling with MCP scientific skills (140+ tools)
 - Session-based conversations with sandboxed file storage
 - Conversation history and persistence
@@ -24,7 +24,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, De
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
-from anthropic import AsyncAnthropic
+from openai import AsyncOpenAI
 
 from app.core.database import get_db
 from app.core.config import settings
@@ -35,8 +35,9 @@ from app.models.models import ChatConversation, ChatMessage
 logger = logging.getLogger("scientific_chat")
 router = APIRouter()
 
-# Initialize Anthropic client
-anthropic_client = AsyncAnthropic(api_key=settings.ANTHROPIC_API_KEY)
+# Initialize OpenAI client
+openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
+DEFAULT_MODEL = "gpt-5.2"
 
 # Rate limiting (30 messages per minute per session)
 rate_limit_tracker: Dict[str, List[float]] = {}

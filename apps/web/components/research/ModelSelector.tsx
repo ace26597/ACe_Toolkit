@@ -35,21 +35,7 @@ const models = {
     {
       id: 'gpt-5.2',
       name: 'GPT-5.2',
-      description: 'Next generation model',
-      cost: '$$$$'
-    }
-  ],
-  anthropic: [
-    {
-      id: 'claude-sonnet-4-20250514',
-      name: 'Claude Sonnet 4',
-      description: 'Balanced speed and capability',
-      cost: '$$'
-    },
-    {
-      id: 'claude-opus-4-5-20251101',
-      name: 'Claude Opus 4.5',
-      description: 'Most capable, best for complex tasks',
+      description: 'Next generation model (Recommended)',
       cost: '$$$$'
     }
   ]
@@ -64,33 +50,6 @@ export default function ModelSelector({ value, onChange }: ModelSelectorProps) {
       <div className="flex items-center gap-2 mb-4">
         <Cpu className="w-5 h-5 text-blue-400" />
         <h3 className="text-lg font-semibold text-white">AI Model</h3>
-      </div>
-
-      {/* Provider Selection */}
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-300 mb-2">Provider</label>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => onChange({ provider: 'openai', model: 'gpt-4o' })}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
-              value.provider === 'openai'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-          >
-            OpenAI
-          </button>
-          <button
-            onClick={() => onChange({ provider: 'anthropic', model: 'claude-sonnet-4-20250514' })}
-            className={`px-4 py-2 rounded-lg font-medium transition-all ${
-              value.provider === 'anthropic'
-                ? 'bg-purple-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
-          >
-            Anthropic
-          </button>
-        </div>
       </div>
 
       {/* Model Selection */}
