@@ -457,3 +457,66 @@ export const researchApi = {
         return new WebSocket(wsUrl);
     }
 };
+
+// MedResearch API Types (Web-based Claude Code Terminal)
+export interface MedResearchSession {
+    id: string;
+    session_id: string;
+    title: string;
+    workspace_dir: string;
+    status: 'created' | 'active' | 'disconnected' | 'terminated' | 'error';
+    terminal_rows: number;
+    terminal_cols: number;
+    commands_executed: number;
+    created_at: string;
+    last_activity_at: string;
+    expires_at: string;
+}
+
+// MedResearch API
+export const medresearchApi = {
+    createSession: async (browserSessionId: string, title?: string): Promise<MedResearchSession> => {
+        const res = await fetch(`${API_URL}/medresearch/sessions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: browserSessionId, title }),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Failed to create session' }));
+            throw new Error(error.detail || 'Failed to create session');
+        }
+        return res.json();
+    },
+
+    listSessions: async (browserSessionId: string): Promise<MedResearchSession[]> => {
+        const res = await fetch(`${API_URL}/medresearch/sessions/${browserSessionId}`);
+        if (!res.ok) throw new Error('Failed to list sessions');
+        return res.json();
+    },
+
+    getSession: async (medresearchId: string): Promise<MedResearchSession> => {
+        const res = await fetch(`${API_URL}/medresearch/sessions/detail/${medresearchId}`);
+        if (!res.ok) throw new Error('Failed to get session');
+        return res.json();
+    },
+
+    deleteSession: async (medresearchId: string): Promise<void> => {
+        const res = await fetch(`${API_URL}/medresearch/sessions/${medresearchId}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) throw new Error('Failed to delete session');
+    },
+
+    resizeTerminal: async (medresearchId: string, rows: number, cols: number): Promise<void> => {
+        await fetch(`${API_URL}/medresearch/sessions/${medresearchId}/resize`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows, cols }),
+        });
+    },
+
+    connectTerminal: (medresearchId: string): WebSocket => {
+        const wsUrl = API_URL.replace(/^http/, 'ws') + `/medresearch/terminal/${medresearchId}`;
+        return new WebSocket(wsUrl);
+    }
+};

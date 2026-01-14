@@ -80,7 +80,22 @@
       "Bash(sqlite3:*)",
       "Bash(./infra/scripts/start_production.sh:*)",
       "Bash(python:*)",
-      "Bash(./infra/scripts/restart_cloudflare.sh:*)"
+      "Bash(./infra/scripts/restart_cloudflare.sh:*)",
+      "Bash(xargs:*)",
+      "Bash(find:*)",
+      "Bash(pip3 install:*)",
+      "Bash(grep:*)",
+      "Bash(claude --version:*)",
+      "Bash(npm run lint:*)",
+      "Bash(sudo systemctl restart:*)",
+      "Bash(pgrep:*)",
+      "Bash(tail:*)",
+      "Bash(__NEW_LINE_f85d32182264d91a__ echo \"Logs page:\")",
+      "Bash(__NEW_LINE_f85d32182264d91a__ echo \"MedResearch logs API:\")",
+      "Bash(__NEW_LINE_f85d32182264d91a__ echo \"Session creation API:\")",
+      "Bash(echo \"Searching in different location...\" ls -la /home/ace/dev/ACe_Toolkit/apps/web/.next/static/chunks/*.js)",
+      "Bash(fuser:*)",
+      "Bash(git reset:*)"
     ]
   }
 }

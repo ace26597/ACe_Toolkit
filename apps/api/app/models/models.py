@@ -260,3 +260,32 @@ class UploadedFile(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     conversation = relationship("ResearchConversation", back_populates="files")
+
+
+# MedResearch - Web-based Claude Code Terminal
+class MedResearchSession(Base):
+    """Claude Code terminal session for medical research QA"""
+    __tablename__ = "medresearch_sessions"
+
+    id = Column(String, primary_key=True)  # UUID
+    session_id = Column(String, nullable=False, index=True)  # Browser session
+    title = Column(String, nullable=False, default="New Research Session")
+
+    # Session workspace: /home/ace/medresearch_sessions/{id}/
+    workspace_dir = Column(String, nullable=False)
+
+    # Process state
+    pid = Column(Integer, nullable=True)  # pexpect process ID
+    status = Column(String, nullable=False, default="created")  # created|active|disconnected|terminated|error
+
+    # Terminal dimensions (for PTY)
+    terminal_rows = Column(Integer, default=24)
+    terminal_cols = Column(Integer, default=80)
+
+    # Usage tracking
+    commands_executed = Column(Integer, default=0)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_activity_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)  # 24 hours from creation

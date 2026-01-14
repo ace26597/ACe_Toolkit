@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { RefreshCw, Search, Download, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 
-type LogType = 'backend' | 'frontend' | 'cloudflare' | 'startup' | 'shutdown';
+type LogType = 'backend' | 'frontend' | 'cloudflare' | 'startup' | 'shutdown' | 'medresearch';
 
 interface LogFile {
   name: string;
@@ -191,6 +191,7 @@ export default function LogsPage() {
   const logTabs: { value: LogType; label: string; icon: string }[] = [
     { value: 'backend', label: 'Backend', icon: '🔧' },
     { value: 'frontend', label: 'Frontend', icon: '🎨' },
+    { value: 'medresearch', label: 'MedResearch', icon: '🔬' },
     { value: 'cloudflare', label: 'Cloudflare', icon: '☁️' },
     { value: 'startup', label: 'Startup', icon: '🚀' },
     { value: 'shutdown', label: 'Shutdown', icon: '⏹️' }

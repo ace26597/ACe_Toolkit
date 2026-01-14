@@ -45,16 +45,22 @@ export default function Home() {
           </Link>
 
           <Link
-            href="/scientific"
-            className="group rounded-lg border border-gray-200 dark:border-gray-700 px-6 py-5 transition-all hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:shadow-lg md:col-span-2"
+            href="/medresearch"
+            className="group rounded-lg border border-emerald-200 dark:border-emerald-700 px-6 py-5 transition-all hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:shadow-lg md:col-span-2 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10"
           >
-            <h2 className="mb-2 text-xl font-semibold text-gray-800 dark:text-white">
-              🧪 Scientific Skills Terminal
-              <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Access 140+ scientific computing tools: PubMed, UniProt, RDKit, PyTorch, and more.
-              Browser-based terminal with execution history and skills browser.
+            <div className="flex items-center gap-2 mb-2">
+              <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
+                🔬 MedResearch Terminal
+                <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
+              </h2>
+              <span className="text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full font-medium">NEW</span>
+            </div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+              Web-based Claude Code terminal for medical research QA.
+              Each session has isolated workspace with 140+ scientific skills via MCP.
+            </p>
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+              🖥️ Full PTY terminal • 🧬 Scientific MCP skills • 📁 Isolated workspaces • ⏱️ 24h sessions
             </p>
           </Link>
 
