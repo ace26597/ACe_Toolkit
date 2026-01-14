@@ -1,16 +1,14 @@
 """
-MCP Process Manager for Scientific Skills
+MCP Connection Manager for Scientific Skills
 
-Manages the lifecycle of the claude-skills-mcp subprocess, including:
-- Starting/stopping the MCP server
-- Executing skills via MCP protocol
-- Memory monitoring and auto-restart
-- Skill discovery
+Manages connection to K-Dense hosted MCP server, including:
+- Connecting/disconnecting from hosted MCP server
+- Executing skills via MCP protocol over SSE
+- Skill discovery from remote server
+- Session management
 """
 
 import asyncio
-import subprocess
-import psutil
 import logging
 import json
 import time
@@ -19,84 +17,69 @@ from typing import Optional, Dict, Any, List
 from pathlib import Path
 
 # MCP Protocol imports
-from mcp.client.stdio import StdioServerParameters, stdio_client
+from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
 from mcp import types as mcp_types
+import httpx
 
 logger = logging.getLogger("mcp_manager")
 
 
 class MCPManager:
-    """Manages claude-skills-mcp subprocess lifecycle and execution"""
+    """Manages connection to K-Dense hosted MCP server for scientific skills"""
 
     def __init__(self):
-        self.process: Optional[subprocess.Popen] = None
         self.session: Optional[ClientSession] = None
         self.available_skills: List[Dict[str, Any]] = []
         self.start_time: Optional[datetime] = None
         self.execution_count = 0
-        self.memory_limit_mb = 4000  # 4GB threshold for restart
         self._read_stream = None
         self._write_stream = None
-        self._stdio_context = None
+        self._sse_context = None
+        self.mcp_url = "https://mcp.k-dense.ai/claude-scientific-skills/mcp"  # K-Dense hosted endpoint
 
     async def start(self) -> bool:
-        """Start the MCP server subprocess using MCP protocol with stdio_client"""
+        """Connect to K-Dense hosted MCP server using SSE transport"""
         if self.is_running():
-            logger.info("MCP server is already running")
+            logger.info("MCP connection is already established")
             return True
 
         try:
-            logger.info("Starting MCP server with uvx claude-skills-mcp via stdio...")
+            logger.info(f"Connecting to K-Dense MCP server at {self.mcp_url}...")
 
-            # Configure MCP server parameters with full path to uvx
-            import os
-            uvx_path = os.path.expanduser("~/.local/bin/uvx")
-
-            # Add uvx to PATH if not already there
-            env = os.environ.copy()
-            if "/.local/bin" not in env.get("PATH", ""):
-                env["PATH"] = f"{os.path.expanduser('~/.local/bin')}:{env.get('PATH', '')}"
-
-            server_params = StdioServerParameters(
-                command=uvx_path,
-                args=["claude-skills-mcp"],
-                env=env
-            )
-
-            # Create stdio client streams using async context manager
+            # Create SSE client connection to hosted endpoint
             # Note: We store the context manager to keep streams alive
-            self._stdio_context = stdio_client(server_params)
-            self._read_stream, self._write_stream = await self._stdio_context.__aenter__()
+            self._sse_context = sse_client(self.mcp_url)
+            self._read_stream, self._write_stream = await self._sse_context.__aenter__()
 
             # Create MCP session
             self.session = ClientSession(self._read_stream, self._write_stream)
 
-            # Initialize session (performs handshake with MCP server) with timeout
-            logger.info("Initializing MCP session (this may take 30-60 seconds on first run)...")
+            # Initialize session (performs handshake with MCP server)
+            logger.info("Initializing MCP session with hosted server...")
             try:
                 await asyncio.wait_for(
                     self.session.initialize(),
-                    timeout=90  # 90 second timeout for initialization (allows for first-time download)
+                    timeout=30  # 30 second timeout for remote connection
                 )
             except asyncio.TimeoutError:
-                logger.error("MCP session initialization timed out after 90 seconds")
+                logger.error("MCP session initialization timed out after 30 seconds")
                 raise Exception("MCP session initialization timeout")
 
             # Set start time for uptime tracking
             self.start_time = datetime.now()
 
-            logger.info("MCP session initialized successfully")
+            logger.info("✅ MCP session connected successfully to K-Dense hosted server")
 
             # Discover available skills from MCP server
-            logger.info("Discovering skills...")
+            logger.info("Discovering skills from remote server...")
             await self._discover_skills()
 
-            logger.info(f"MCP server started with {len(self.available_skills)} skills")
+            logger.info(f"✅ MCP connected with {len(self.available_skills)} skills available")
             return True
 
         except Exception as e:
-            logger.error(f"Failed to start MCP server: {e}", exc_info=True)
+            logger.error(f"Failed to connect to K-Dense MCP server: {e}", exc_info=True)
             # Cleanup on failure
             if self.session:
                 try:
@@ -105,22 +88,23 @@ class MCPManager:
                     pass
                 self.session = None
 
-            if hasattr(self, '_stdio_context') and self._stdio_context:
+            if self._sse_context:
                 try:
-                    await self._stdio_context.__aexit__(None, None, None)
+                    await self._sse_context.__aexit__(None, None, None)
                 except:
                     pass
+                self._sse_context = None
 
             return False
 
     async def stop(self) -> bool:
-        """Stop the MCP server subprocess and close session"""
+        """Disconnect from K-Dense MCP server and close session"""
         if not self.is_running():
-            logger.info("MCP server is not running")
+            logger.info("MCP connection is not active")
             return True
 
         try:
-            logger.info("Stopping MCP server...")
+            logger.info("Disconnecting from K-Dense MCP server...")
 
             # Close MCP session gracefully
             if self.session:
@@ -129,20 +113,19 @@ class MCPManager:
                 except Exception as e:
                     logger.warning(f"Error closing MCP session: {e}")
 
-            # Exit stdio context manager
-            if self._stdio_context:
+            # Exit SSE context manager
+            if self._sse_context:
                 try:
-                    await self._stdio_context.__aexit__(None, None, None)
+                    await self._sse_context.__aexit__(None, None, None)
                 except Exception as e:
-                    logger.warning(f"Error closing stdio context: {e}")
+                    logger.warning(f"Error closing SSE context: {e}")
 
             # Cleanup references
             self.session = None
-            self.process = None
+            self._sse_context = None
             self.start_time = None
             self._read_stream = None
             self._write_stream = None
-            self._stdio_context = None
 
             logger.info("MCP server stopped successfully")
             return True
@@ -251,106 +234,37 @@ class MCPManager:
                 "execution_time_ms": execution_time
             }
 
-    def _find_mcp_process(self) -> Optional[psutil.Process]:
-        """
-        Find the claude-skills-mcp process
-
-        Returns:
-            psutil.Process if found, None otherwise
-        """
-        try:
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                try:
-                    cmdline = proc.info['cmdline']
-                    if cmdline and any('claude-skills-mcp' in str(arg) for arg in cmdline):
-                        return proc
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    continue
-        except Exception as e:
-            logger.error(f"Error finding MCP process: {e}")
-
-        return None
+    # Process monitoring methods not needed for hosted connection
+    # Memory management is handled by K-Dense infrastructure
 
     async def check_memory(self) -> Dict[str, Any]:
         """
-        Check memory usage and auto-restart if needed
+        Memory check not applicable for hosted server
 
         Returns:
-            Dict with memory info and restart status
+            Dict with connection status
         """
-        if not self.is_running():
-            return {
-                "running": False,
-                "memory_mb": 0,
-                "restart_triggered": False
-            }
-
-        try:
-            # Find the MCP process
-            mcp_proc = self._find_mcp_process()
-            if not mcp_proc:
-                return {
-                    "running": True,
-                    "memory_mb": 0,
-                    "restart_triggered": False
-                }
-
-            memory_info = mcp_proc.memory_info()
-            memory_mb = memory_info.rss / 1024 / 1024
-
-            if memory_mb > self.memory_limit_mb:
-                logger.warning(
-                    f"MCP server using {memory_mb:.1f}MB (limit: {self.memory_limit_mb}MB), "
-                    f"triggering restart..."
-                )
-                await self.restart()
-                return {
-                    "running": True,
-                    "memory_mb": memory_mb,
-                    "restart_triggered": True
-                }
-
-            return {
-                "running": True,
-                "memory_mb": memory_mb,
-                "restart_triggered": False
-            }
-
-        except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
-            logger.error(f"Failed to check memory: {e}")
-            return {
-                "running": False,
-                "memory_mb": 0,
-                "restart_triggered": False
-            }
+        return {
+            "running": self.is_running(),
+            "memory_mb": 0,  # N/A for hosted connection
+            "restart_triggered": False,
+            "hosted": True
+        }
 
     def get_status(self) -> Dict[str, Any]:
         """
-        Get current MCP server status
+        Get current MCP connection status
 
         Returns:
-            Dict with status information including pid, uptime, memory, skills count
+            Dict with status information including connection state, uptime, skills count
         """
-        pid = None
-        memory_mb = 0.0
-
-        # Try to find the MCP process
-        if self.is_running():
-            mcp_proc = self._find_mcp_process()
-            if mcp_proc:
-                try:
-                    pid = mcp_proc.pid
-                    memory_mb = round(mcp_proc.memory_info().rss / 1024 / 1024, 1)
-                except (psutil.NoSuchProcess, psutil.AccessDenied):
-                    pass
-
         status = {
             "running": self.is_running(),
-            "pid": pid,
+            "connection_type": "hosted",
+            "server_url": self.mcp_url,
             "uptime_seconds": 0,
             "skills_count": len(self.available_skills),
-            "execution_count": self.execution_count,
-            "memory_mb": memory_mb
+            "execution_count": self.execution_count
         }
 
         if self.is_running() and self.start_time:
