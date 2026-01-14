@@ -24,6 +24,7 @@ export default function LogsPage() {
   const [lines, setLines] = useState(100);
   const [searchQuery, setSearchQuery] = useState('');
   const [logFiles, setLogFiles] = useState<LogFile[]>([]);
+  const [autoScroll, setAutoScroll] = useState(true);
   const logContainerRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
 
@@ -45,11 +46,6 @@ export default function LogsPage() {
 
       const content = await response.text();
       setLogContent(content);
-
-      // Auto-scroll to bottom if enabled
-      if (autoScrollRef.current && logContainerRef.current) {
-        logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch logs');
       setLogContent('');
@@ -128,6 +124,40 @@ export default function LogsPage() {
 
     return () => clearInterval(interval);
   }, [autoRefresh, selectedLog, refreshInterval, lines]);
+
+  // Auto-scroll to bottom when log content changes
+  useEffect(() => {
+    if (autoScrollRef.current && logContainerRef.current && logContent) {
+      // Use setTimeout to ensure DOM has updated
+      setTimeout(() => {
+        if (logContainerRef.current) {
+          logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
+        }
+      }, 0);
+    }
+  }, [logContent]);
+
+  // Sync autoScrollRef with autoScroll state
+  useEffect(() => {
+    autoScrollRef.current = autoScroll;
+  }, [autoScroll]);
+
+  // Handle scroll event to detect manual scrolling
+  const handleScroll = () => {
+    if (!logContainerRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = logContainerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 10; // 10px threshold
+
+    // If user scrolled away from bottom, disable auto-scroll
+    if (!isAtBottom && autoScroll) {
+      setAutoScroll(false);
+    }
+    // If user scrolled back to bottom, enable auto-scroll
+    else if (isAtBottom && !autoScroll) {
+      setAutoScroll(true);
+    }
+  };
 
   // Format log lines with syntax highlighting
   const formatLogLine = (line: string, index: number) => {
@@ -306,8 +336,14 @@ export default function LogsPage() {
             )}
           </div>
 
-          <div className="text-sm text-gray-400">
+          <div className="flex items-center gap-4 text-sm text-gray-400">
             {autoRefresh && `Auto-refresh every ${refreshInterval / 1000}s`}
+            {autoScroll && (
+              <span className="text-blue-400">📍 Auto-scroll: ON</span>
+            )}
+            {!autoScroll && (
+              <span className="text-gray-500">📍 Auto-scroll: OFF (scroll to bottom to re-enable)</span>
+            )}
           </div>
         </div>
 
@@ -315,6 +351,7 @@ export default function LogsPage() {
         <div className="bg-gray-900 rounded-lg border border-gray-700 overflow-hidden">
           <div
             ref={logContainerRef}
+            onScroll={handleScroll}
             className="h-[calc(100vh-400px)] overflow-y-auto p-4 font-mono text-sm"
             style={{ scrollBehavior: 'smooth' }}
           >
