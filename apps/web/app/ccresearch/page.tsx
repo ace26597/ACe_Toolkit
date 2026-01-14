@@ -337,19 +337,24 @@ export default function CCResearchPage() {
         summary: { running: 9, available_local: 2, available_remote: 6 }
       },
       available_skills: {
+        source: "https://github.com/anthropics/skills",
         skills: [
-          { name: "docx", description: "Word documents", category: "document", status: "not_installed" },
-          { name: "pdf", description: "PDF generation", category: "document", status: "not_installed" },
-          { name: "pptx", description: "PowerPoint slides", category: "document", status: "not_installed" },
-          { name: "xlsx", description: "Excel spreadsheets", category: "document", status: "not_installed" },
-          { name: "mcp-builder", description: "Build MCP servers", category: "development", status: "not_installed" },
-          { name: "skill-creator", description: "Create custom skills", category: "development", status: "not_installed" },
-          { name: "webapp-testing", description: "Web app testing", category: "development", status: "not_installed" },
-          { name: "algorithmic-art", description: "Generative art", category: "creative", status: "not_installed" },
-          { name: "brand-guidelines", description: "Brand design", category: "creative", status: "not_installed" },
-          { name: "canvas-design", description: "Canvas animation", category: "creative", status: "not_installed" },
-          { name: "theme-factory", description: "UI themes", category: "creative", status: "not_installed" },
-          { name: "internal-comms", description: "Internal comms", category: "enterprise", status: "not_installed" }
+          { name: "algorithmic-art", description: "Create algorithmic and generative art", category: "creative", status: "available" },
+          { name: "brand-guidelines", description: "Brand identity and design guidelines", category: "enterprise", status: "available" },
+          { name: "canvas-design", description: "Canvas-based visual design", category: "creative", status: "available" },
+          { name: "doc-coauthoring", description: "Collaborative document authoring", category: "enterprise", status: "available" },
+          { name: "docx", description: "Word document generation", category: "documents", status: "available" },
+          { name: "frontend-design", description: "Frontend UI/UX design", category: "development", status: "installed" },
+          { name: "internal-comms", description: "Internal communications tools", category: "enterprise", status: "available" },
+          { name: "mcp-builder", description: "MCP server builder", category: "development", status: "available" },
+          { name: "pdf", description: "PDF generation and manipulation", category: "documents", status: "available" },
+          { name: "pptx", description: "PowerPoint presentation creation", category: "documents", status: "available" },
+          { name: "skill-creator", description: "Create and test new skills", category: "development", status: "available" },
+          { name: "slack-gif-creator", description: "GIF creation for Slack", category: "creative", status: "available" },
+          { name: "theme-factory", description: "Theme generation and customization", category: "creative", status: "available" },
+          { name: "web-artifacts-builder", description: "Web artifact creation", category: "development", status: "available" },
+          { name: "webapp-testing", description: "Web application testing", category: "development", status: "available" },
+          { name: "xlsx", description: "Excel spreadsheet creation", category: "documents", status: "available" }
         ],
         summary: { total: 16, installed: 1 }
       },
@@ -1224,7 +1229,10 @@ export default function CCResearchPage() {
                           </span>
                         ))}
                       </div>
-                      <p className="text-[10px] text-gray-500 mt-2">Install: /plugin install document-skills@anthropic-agent-skills</p>
+                      <p className="text-[10px] text-gray-500 mt-2">
+                        Source: <a href="https://github.com/anthropics/skills" target="_blank" rel="noopener" className="text-cyan-400 hover:underline">github.com/anthropics/skills</a>
+                        {' | Install: '}<code className="text-cyan-300">/install skill-name</code>
+                      </p>
                     </div>
                   )}
                 </div>

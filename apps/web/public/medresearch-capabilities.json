@@ -1,7 +1,117 @@
 {
-  "generated_at": "2026-01-14T21:00:00Z",
-  "version": "2.19.0",
-  "platform": "ACe_Toolkit MedResearch Terminal",
+  "generated_at": "2026-01-14T22:00:00Z",
+  "version": "2.20.0",
+  "platform": "ACe_Toolkit CCResearch Terminal",
+
+  "anthropic_skills": {
+    "source": "https://github.com/anthropics/skills",
+    "total": 16,
+    "description": "Official Anthropic skills from the Skills repository",
+    "skills": [
+      {
+        "name": "algorithmic-art",
+        "description": "Create algorithmic and generative art",
+        "category": "creative",
+        "status": "available"
+      },
+      {
+        "name": "brand-guidelines",
+        "description": "Brand identity and design guidelines management",
+        "category": "enterprise",
+        "status": "available"
+      },
+      {
+        "name": "canvas-design",
+        "description": "Canvas-based visual design capabilities",
+        "category": "creative",
+        "status": "available"
+      },
+      {
+        "name": "doc-coauthoring",
+        "description": "Collaborative document authoring and editing",
+        "category": "enterprise",
+        "status": "available"
+      },
+      {
+        "name": "docx",
+        "description": "Microsoft Word document generation and manipulation",
+        "category": "documents",
+        "status": "available"
+      },
+      {
+        "name": "frontend-design",
+        "description": "Frontend UI/UX design and code generation",
+        "category": "development",
+        "status": "installed"
+      },
+      {
+        "name": "internal-comms",
+        "description": "Internal communications and messaging tools",
+        "category": "enterprise",
+        "status": "available"
+      },
+      {
+        "name": "mcp-builder",
+        "description": "Model Context Protocol server builder",
+        "category": "development",
+        "status": "available"
+      },
+      {
+        "name": "pdf",
+        "description": "PDF generation, manipulation, and form extraction",
+        "category": "documents",
+        "status": "available"
+      },
+      {
+        "name": "pptx",
+        "description": "PowerPoint presentation generation and editing",
+        "category": "documents",
+        "status": "available"
+      },
+      {
+        "name": "skill-creator",
+        "description": "Tools for creating and testing new skills",
+        "category": "development",
+        "status": "available"
+      },
+      {
+        "name": "slack-gif-creator",
+        "description": "GIF creation optimized for Slack",
+        "category": "creative",
+        "status": "available"
+      },
+      {
+        "name": "theme-factory",
+        "description": "Theme generation and customization",
+        "category": "creative",
+        "status": "available"
+      },
+      {
+        "name": "web-artifacts-builder",
+        "description": "Web artifact and component creation",
+        "category": "development",
+        "status": "available"
+      },
+      {
+        "name": "webapp-testing",
+        "description": "Web application testing and QA automation",
+        "category": "development",
+        "status": "available"
+      },
+      {
+        "name": "xlsx",
+        "description": "Excel spreadsheet generation and editing",
+        "category": "documents",
+        "status": "available"
+      }
+    ],
+    "categories": {
+      "creative": ["algorithmic-art", "canvas-design", "slack-gif-creator", "theme-factory"],
+      "development": ["frontend-design", "mcp-builder", "skill-creator", "web-artifacts-builder", "webapp-testing"],
+      "documents": ["docx", "pdf", "pptx", "xlsx"],
+      "enterprise": ["brand-guidelines", "doc-coauthoring", "internal-comms"]
+    }
+  },
 
   "plugins": {
     "installed": [
@@ -379,7 +489,7 @@
   "session_config": {
     "max_duration_hours": 24,
     "workspace_location": "/data/claude-workspaces",
-    "logs_location": "/data/medresearch-logs",
-    "saved_projects_location": "/data/medresearch-projects"
+    "logs_location": "/data/ccresearch-logs",
+    "saved_projects_location": "/data/ccresearch-projects"
   }
 }
