@@ -3,7 +3,7 @@ MCP Connection Manager for Scientific Skills
 
 Manages connection to K-Dense hosted MCP server, including:
 - Connecting/disconnecting from hosted MCP server
-- Executing skills via MCP protocol over SSE
+- Executing skills via MCP protocol over stdio with remote backend
 - Skill discovery from remote server
 - Session management
 """
@@ -17,10 +17,9 @@ from typing import Optional, Dict, Any, List
 from pathlib import Path
 
 # MCP Protocol imports
-from mcp.client.sse import sse_client
+from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.session import ClientSession
 from mcp import types as mcp_types
-import httpx
 
 logger = logging.getLogger("mcp_manager")
 
@@ -35,22 +34,29 @@ class MCPManager:
         self.execution_count = 0
         self._read_stream = None
         self._write_stream = None
-        self._sse_context = None
-        self.mcp_url = "https://mcp.k-dense.ai/claude-scientific-skills/mcp"  # K-Dense hosted endpoint
+        self._stdio_context = None
+        self.remote_backend_url = "https://skills.k-dense.ai/mcp"  # K-Dense hosted backend
 
     async def start(self) -> bool:
-        """Connect to K-Dense hosted MCP server using SSE transport"""
+        """Connect to K-Dense hosted MCP server using stdio with remote backend"""
         if self.is_running():
             logger.info("MCP connection is already established")
             return True
 
         try:
-            logger.info(f"Connecting to K-Dense MCP server at {self.mcp_url}...")
+            logger.info(f"Connecting to K-Dense MCP server at {self.remote_backend_url}...")
 
-            # Create SSE client connection to hosted endpoint
+            # Create stdio server parameters with uvx command pointing to remote backend
+            server_params = StdioServerParameters(
+                command="uvx",
+                args=["claude-skills-mcp", "--remote", self.remote_backend_url],
+                env=None
+            )
+
+            # Create stdio client connection
             # Note: We store the context manager to keep streams alive
-            self._sse_context = sse_client(self.mcp_url)
-            self._read_stream, self._write_stream = await self._sse_context.__aenter__()
+            self._stdio_context = stdio_client(server_params)
+            self._read_stream, self._write_stream = await self._stdio_context.__aenter__()
 
             # Create MCP session
             self.session = ClientSession(self._read_stream, self._write_stream)
@@ -88,12 +94,12 @@ class MCPManager:
                     pass
                 self.session = None
 
-            if self._sse_context:
+            if self._stdio_context:
                 try:
-                    await self._sse_context.__aexit__(None, None, None)
+                    await self._stdio_context.__aexit__(None, None, None)
                 except:
                     pass
-                self._sse_context = None
+                self._stdio_context = None
 
             return False
 
@@ -113,16 +119,16 @@ class MCPManager:
                 except Exception as e:
                     logger.warning(f"Error closing MCP session: {e}")
 
-            # Exit SSE context manager
-            if self._sse_context:
+            # Exit stdio context manager
+            if self._stdio_context:
                 try:
-                    await self._sse_context.__aexit__(None, None, None)
+                    await self._stdio_context.__aexit__(None, None, None)
                 except Exception as e:
-                    logger.warning(f"Error closing SSE context: {e}")
+                    logger.warning(f"Error closing stdio context: {e}")
 
             # Cleanup references
             self.session = None
-            self._sse_context = None
+            self._stdio_context = None
             self.start_time = None
             self._read_stream = None
             self._write_stream = None
@@ -261,7 +267,7 @@ class MCPManager:
         status = {
             "running": self.is_running(),
             "connection_type": "hosted",
-            "server_url": self.mcp_url,
+            "server_url": self.remote_backend_url,
             "uptime_seconds": 0,
             "skills_count": len(self.available_skills),
             "execution_count": self.execution_count
