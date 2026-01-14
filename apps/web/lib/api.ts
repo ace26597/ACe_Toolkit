@@ -518,5 +518,111 @@ export const medresearchApi = {
     connectTerminal: (medresearchId: string): WebSocket => {
         const wsUrl = API_URL.replace(/^http/, 'ws') + `/medresearch/terminal/${medresearchId}`;
         return new WebSocket(wsUrl);
+    },
+
+    // Project save/restore (SSD storage)
+    saveProject: async (medresearchId: string, projectName: string, description?: string): Promise<{
+        name: string;
+        path: string;
+        saved_at: string;
+    }> => {
+        const res = await fetch(`${API_URL}/medresearch/sessions/${medresearchId}/save-project`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ project_name: projectName, description }),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Failed to save project' }));
+            throw new Error(error.detail || 'Failed to save project');
+        }
+        return res.json();
+    },
+
+    listProjects: async (): Promise<{
+        name: string;
+        path: string;
+        description?: string;
+        saved_at: string;
+        files?: string[];
+    }[]> => {
+        const res = await fetch(`${API_URL}/medresearch/projects`);
+        if (!res.ok) throw new Error('Failed to list projects');
+        return res.json();
+    },
+
+    createFromProject: async (browserSessionId: string, projectName: string, title?: string): Promise<MedResearchSession> => {
+        const res = await fetch(`${API_URL}/medresearch/sessions/from-project`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ session_id: browserSessionId, project_name: projectName, title }),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Failed to restore project' }));
+            throw new Error(error.detail || 'Failed to restore project');
+        }
+        return res.json();
+    },
+
+    deleteProject: async (projectName: string): Promise<void> => {
+        const res = await fetch(`${API_URL}/medresearch/projects/${encodeURIComponent(projectName)}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) throw new Error('Failed to delete project');
+    }
+};
+
+// Mermaid Disk Storage API (SSD export/import)
+export interface DiskProject {
+    name: string;
+    path: string;
+    chart_count: number;
+    document_count: number;
+    exported_at: string;
+}
+
+export interface ExportResult {
+    name: string;
+    path: string;
+    chart_files: string[];
+    document_files: string[];
+    exported_at: string;
+}
+
+export const mermaidDiskApi = {
+    exportToDisk: async (projectId: string, folderName?: string): Promise<ExportResult> => {
+        const res = await fetch(`${API_URL}/projects/${projectId}/export-to-disk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ folder_name: folderName }),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Failed to export project' }));
+            throw new Error(error.detail || 'Failed to export project');
+        }
+        return res.json();
+    },
+
+    listDiskProjects: async (): Promise<DiskProject[]> => {
+        const res = await fetch(`${API_URL}/projects/disk-projects`);
+        if (!res.ok) throw new Error('Failed to list disk projects');
+        return res.json();
+    },
+
+    importFromDisk: async (folderName: string): Promise<Project> => {
+        const res = await fetch(`${API_URL}/projects/import-from-disk/${encodeURIComponent(folderName)}`, {
+            method: 'POST',
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Failed to import project' }));
+            throw new Error(error.detail || 'Failed to import project');
+        }
+        return res.json();
+    },
+
+    deleteDiskProject: async (folderName: string): Promise<void> => {
+        const res = await fetch(`${API_URL}/projects/disk-projects/${encodeURIComponent(folderName)}`, {
+            method: 'DELETE',
+        });
+        if (!res.ok) throw new Error('Failed to delete disk project');
     }
 };

@@ -28,6 +28,8 @@ try:
 except ImportError:
     pexpect = None  # Will be caught at runtime
 
+from app.core.config import settings
+
 logger = logging.getLogger("medresearch_manager")
 
 # Claude settings for scientific-skills MCP plugin
@@ -163,13 +165,15 @@ class ClaudeProcess:
 class MedResearchManager:
     """Manages Claude Code CLI processes for medical research sessions"""
 
-    BASE_DIR = Path("/home/ace/medresearch_sessions")
-
     def __init__(self):
         self.processes: Dict[str, ClaudeProcess] = {}
-        # Ensure base directory exists
+        # Use config paths for SSD storage
+        self.BASE_DIR = Path(settings.CLAUDE_WORKSPACES_DIR)
+        self.PROJECTS_DIR = Path(settings.MEDRESEARCH_DATA_DIR)
+        # Ensure directories exist
         self.BASE_DIR.mkdir(parents=True, exist_ok=True)
-        logger.info(f"MedResearchManager initialized. Base dir: {self.BASE_DIR}")
+        self.PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
+        logger.info(f"MedResearchManager initialized. Workspaces: {self.BASE_DIR}, Projects: {self.PROJECTS_DIR}")
 
     def create_workspace(self, medresearch_id: str) -> Path:
         """
@@ -544,6 +548,204 @@ class MedResearchManager:
         for session_id in list(self.processes.keys()):
             await self.terminate_session(session_id)
         logger.info("MedResearchManager shutdown complete")
+
+    def save_project(
+        self,
+        workspace_dir: Path,
+        project_name: str,
+        description: str = ""
+    ) -> Optional[Path]:
+        """
+        Save workspace as a persistent project on SSD.
+
+        Copies workspace contents to projects directory, excluding
+        temporary files and .claude config directory.
+
+        Args:
+            workspace_dir: Source workspace path
+            project_name: Name for the saved project (sanitized)
+            description: Optional description
+
+        Returns:
+            Path to saved project, or None on failure
+        """
+        # Sanitize project name
+        safe_name = "".join(c for c in project_name if c.isalnum() or c in "-_ ").strip()
+        if not safe_name:
+            safe_name = f"project_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+
+        project_path = self.PROJECTS_DIR / safe_name
+
+        try:
+            # Copy workspace to project directory
+            if project_path.exists():
+                # Overwrite existing project
+                shutil.rmtree(project_path)
+
+            shutil.copytree(
+                workspace_dir,
+                project_path,
+                ignore=shutil.ignore_patterns('.claude', '__pycache__', '*.pyc', '.git')
+            )
+
+            # Write metadata file
+            metadata = {
+                "name": safe_name,
+                "description": description,
+                "source_workspace": str(workspace_dir),
+                "saved_at": datetime.utcnow().isoformat(),
+                "files": [str(f.relative_to(project_path)) for f in project_path.rglob("*") if f.is_file()]
+            }
+            metadata_path = project_path / ".project_metadata.json"
+            metadata_path.write_text(json.dumps(metadata, indent=2))
+
+            logger.info(f"Saved project '{safe_name}' to {project_path}")
+            return project_path
+
+        except Exception as e:
+            logger.error(f"Failed to save project '{project_name}': {e}")
+            return None
+
+    def list_saved_projects(self) -> list:
+        """
+        List all saved projects.
+
+        Returns:
+            List of project metadata dicts
+        """
+        projects = []
+
+        for project_dir in self.PROJECTS_DIR.iterdir():
+            if not project_dir.is_dir():
+                continue
+
+            metadata_path = project_dir / ".project_metadata.json"
+            if metadata_path.exists():
+                try:
+                    metadata = json.loads(metadata_path.read_text())
+                    metadata["path"] = str(project_dir)
+                    projects.append(metadata)
+                except Exception as e:
+                    logger.warning(f"Failed to read metadata for {project_dir}: {e}")
+                    # Still include project with basic info
+                    projects.append({
+                        "name": project_dir.name,
+                        "path": str(project_dir),
+                        "saved_at": datetime.fromtimestamp(project_dir.stat().st_mtime).isoformat()
+                    })
+            else:
+                # Project without metadata file
+                projects.append({
+                    "name": project_dir.name,
+                    "path": str(project_dir),
+                    "saved_at": datetime.fromtimestamp(project_dir.stat().st_mtime).isoformat()
+                })
+
+        # Sort by saved_at descending
+        projects.sort(key=lambda p: p.get("saved_at", ""), reverse=True)
+        return projects
+
+    def restore_project(self, project_name: str, medresearch_id: str) -> Optional[Path]:
+        """
+        Restore a saved project to a new workspace.
+
+        Args:
+            project_name: Name of saved project
+            medresearch_id: New session ID
+
+        Returns:
+            Path to new workspace, or None on failure
+        """
+        project_path = self.PROJECTS_DIR / project_name
+
+        if not project_path.exists():
+            logger.error(f"Project '{project_name}' not found")
+            return None
+
+        try:
+            # Create new workspace
+            workspace = self.BASE_DIR / medresearch_id
+
+            # Copy project files to workspace
+            shutil.copytree(
+                project_path,
+                workspace,
+                ignore=shutil.ignore_patterns('.project_metadata.json')
+            )
+
+            # Update CLAUDE.md with new session info
+            claude_md_path = workspace / "CLAUDE.md"
+            if claude_md_path.exists():
+                claude_md_content = CLAUDE_MD_TEMPLATE.format(
+                    session_id=medresearch_id,
+                    created_at=datetime.utcnow().isoformat(),
+                    workspace_dir=str(workspace)
+                )
+                claude_md_path.write_text(claude_md_content)
+
+            # Create isolated .claude directory
+            self._setup_claude_config(workspace)
+
+            logger.info(f"Restored project '{project_name}' to workspace {workspace}")
+            return workspace
+
+        except Exception as e:
+            logger.error(f"Failed to restore project '{project_name}': {e}")
+            return None
+
+    def _setup_claude_config(self, workspace: Path):
+        """Set up isolated .claude config for a workspace"""
+        claude_dir = workspace / ".claude"
+        claude_dir.mkdir(parents=True, exist_ok=True)
+
+        global_claude = Path.home() / ".claude"
+
+        # Copy settings.json
+        global_settings = global_claude / "settings.json"
+        if global_settings.exists():
+            shutil.copy(global_settings, claude_dir / "settings.json")
+
+        # Symlink plugins
+        global_plugins = global_claude / "plugins"
+        session_plugins = claude_dir / "plugins"
+        if global_plugins.exists() and not session_plugins.exists():
+            try:
+                session_plugins.symlink_to(global_plugins)
+            except OSError:
+                pass
+
+        # Copy credentials
+        global_credentials = global_claude / "credentials.json"
+        if global_credentials.exists():
+            shutil.copy(global_credentials, claude_dir / "credentials.json")
+
+        # Write settings.local.json
+        settings_local_path = claude_dir / "settings.local.json"
+        settings_local_path.write_text(json.dumps(CLAUDE_SETTINGS_TEMPLATE, indent=2))
+
+    def delete_project(self, project_name: str) -> bool:
+        """
+        Delete a saved project.
+
+        Args:
+            project_name: Name of project to delete
+
+        Returns:
+            True if deletion successful
+        """
+        project_path = self.PROJECTS_DIR / project_name
+
+        try:
+            if project_path.exists() and project_path.is_dir():
+                # Safety check
+                if str(project_path).startswith(str(self.PROJECTS_DIR)):
+                    shutil.rmtree(project_path)
+                    logger.info(f"Deleted project: {project_name}")
+                    return True
+            return False
+        except Exception as e:
+            logger.error(f"Failed to delete project '{project_name}': {e}")
+            return False
 
 
 # Global instance

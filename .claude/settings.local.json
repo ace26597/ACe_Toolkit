@@ -95,7 +95,12 @@
       "Bash(__NEW_LINE_f85d32182264d91a__ echo \"Session creation API:\")",
       "Bash(echo \"Searching in different location...\" ls -la /home/ace/dev/ACe_Toolkit/apps/web/.next/static/chunks/*.js)",
       "Bash(fuser:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(lsblk:*)",
+      "Bash(sudo fdisk:*)",
+      "Bash(sudo blkid:*)",
+      "Bash(mount:*)",
+      "Bash(sudo chown:*)"
     ]
   }
 }

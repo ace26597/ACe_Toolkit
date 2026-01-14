@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     # AI - Tavily Search API (for web search in Research Assistant)
     TAVILY_API_KEY: Optional[str] = None
 
+    # Storage Paths (SSD-backed for data persistence)
+    DATA_BASE_DIR: str = "/data"
+    MERMAID_DATA_DIR: str = "/data/mermaid-projects"
+    MEDRESEARCH_DATA_DIR: str = "/data/medresearch-projects"
+    CLAUDE_WORKSPACES_DIR: str = "/data/claude-workspaces"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

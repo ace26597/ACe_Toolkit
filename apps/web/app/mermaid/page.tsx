@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Sun, Moon, Download, Save, Plus, Trash2, Upload, ChevronRight, ChevronDown, FolderOpen, Folder, FileCode2, Sparkles, Send, Loader2, Layout, Palette, RefreshCw, PanelLeftClose, PanelLeft, Zap, Search, Settings, Check, Cloud, CloudOff, RefreshCcw, FileText, File } from 'lucide-react';
+import { Sun, Moon, Download, Save, Plus, Trash2, Upload, ChevronRight, ChevronDown, FolderOpen, Folder, FileCode2, Sparkles, Send, Loader2, Layout, Palette, RefreshCw, PanelLeftClose, PanelLeft, Zap, Search, Settings, Check, Cloud, CloudOff, RefreshCcw, FileText, File, HardDrive, FolderInput, FolderOutput } from 'lucide-react';
 import Editor from '@monaco-editor/react';
-import { aiApi, projectsApi, chartsApi, Project as ApiProject, Chart as ApiChart, Edition as ApiEdition } from '@/lib/api';
+import { aiApi, projectsApi, chartsApi, mermaidDiskApi, DiskProject, Project as ApiProject, Chart as ApiChart, Edition as ApiEdition } from '@/lib/api';
 import MarkdownDocumentView from '@/components/mermaid/MarkdownDocumentView';
 import { useToast } from '@/components/ui/ToastProvider';
 
@@ -101,6 +101,10 @@ export default function MermaidPage() {
     const [viewMode, setViewMode] = useState<'diagram' | 'markdown'>('diagram');
     const [sidebarWidth, setSidebarWidth] = useState(380);
     const [isResizing, setIsResizing] = useState(false);
+    const [showDiskDialog, setShowDiskDialog] = useState(false);
+    const [diskProjects, setDiskProjects] = useState<DiskProject[]>([]);
+    const [isExporting, setIsExporting] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
 
     const currentProject = projects.find(p => p.id === currentProjectId);
     const currentChart = currentProject?.charts.find(c => c.id === currentChartId);
@@ -1306,6 +1310,76 @@ export default function MermaidPage() {
         setTimeout(() => setSaveMessage(null), 2000);
     };
 
+    // Load disk projects list
+    const loadDiskProjects = async () => {
+        try {
+            const projects = await mermaidDiskApi.listDiskProjects();
+            setDiskProjects(projects);
+        } catch (error) {
+            console.error('Failed to load disk projects:', error);
+        }
+    };
+
+    // Export current project to SSD
+    const exportProjectToDisk = async () => {
+        if (!currentProject) return;
+        setIsExporting(true);
+        try {
+            const result = await mermaidDiskApi.exportToDisk(currentProject.id);
+            showToast({ type: 'success', message: `Exported "${result.name}" to SSD (${result.chart_files.length} charts)` });
+            loadDiskProjects();
+        } catch (error) {
+            showToast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to export' });
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    // Import project from SSD
+    const importProjectFromDisk = async (folderName: string) => {
+        setIsImporting(true);
+        try {
+            const imported = await mermaidDiskApi.importFromDisk(folderName);
+            // Add to local state
+            const newProject: Project = {
+                id: imported.id,
+                name: imported.name,
+                charts: imported.charts.map((c: any) => ({
+                    ...c,
+                    editions: c.editions || [],
+                    currentEditionId: c.currentEditionId || ''
+                })),
+                documents: imported.documents || [],
+                createdAt: imported.createdAt,
+                updatedAt: imported.updatedAt
+            };
+            setProjects(prev => [...prev, newProject]);
+            setCurrentProjectId(newProject.id);
+            if (newProject.charts.length > 0) {
+                setCurrentChartId(newProject.charts[0].id);
+                setCode(newProject.charts[0].code);
+            }
+            setShowDiskDialog(false);
+            showToast({ type: 'success', message: `Imported "${imported.name}" from SSD` });
+        } catch (error) {
+            showToast({ type: 'error', message: error instanceof Error ? error.message : 'Failed to import' });
+        } finally {
+            setIsImporting(false);
+        }
+    };
+
+    // Delete disk project
+    const deleteDiskProject = async (folderName: string) => {
+        if (!confirm(`Delete "${folderName}" from SSD?`)) return;
+        try {
+            await mermaidDiskApi.deleteDiskProject(folderName);
+            setDiskProjects(prev => prev.filter(p => p.name !== folderName));
+            showToast({ type: 'success', message: 'Deleted from SSD' });
+        } catch (error) {
+            showToast({ type: 'error', message: 'Failed to delete' });
+        }
+    };
+
     const startRename = (id: string, currentName: string) => {
         setEditingId(id);
         setEditValue(currentName);
@@ -1393,6 +1467,14 @@ export default function MermaidPage() {
 
                     <button onClick={exportCurrentChart} disabled={!currentChart} className="flex items-center gap-1 px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg">
                         <Download size={14} /> Export
+                    </button>
+
+                    <button
+                        onClick={() => { setShowDiskDialog(true); loadDiskProjects(); }}
+                        className="flex items-center gap-1 px-2 py-1.5 text-xs bg-slate-800 hover:bg-emerald-700 rounded-lg"
+                        title="Save/Load from SSD"
+                    >
+                        <HardDrive size={14} /> SSD
                     </button>
 
                     {/* Sync Status Indicator */}
@@ -1710,6 +1792,98 @@ export default function MermaidPage() {
                     )}
                 </div>
             </div>
+
+            {/* SSD Storage Dialog */}
+            {showDiskDialog && (
+                <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+                    <div className="bg-slate-900 border border-slate-700 rounded-xl w-[480px] max-h-[80vh] overflow-hidden shadow-2xl">
+                        <div className="flex items-center justify-between p-4 border-b border-slate-700">
+                            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                                <HardDrive size={20} className="text-emerald-400" />
+                                SSD Storage
+                            </h3>
+                            <button
+                                onClick={() => setShowDiskDialog(false)}
+                                className="p-1 hover:bg-slate-700 rounded"
+                            >
+                                <span className="text-slate-400">✕</span>
+                            </button>
+                        </div>
+
+                        {/* Export Current Project */}
+                        {currentProject && (
+                            <div className="p-4 border-b border-slate-700 bg-slate-800/50">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium text-white">Export Current Project</p>
+                                        <p className="text-xs text-slate-400">{currentProject.name} ({currentProject.charts.length} charts)</p>
+                                    </div>
+                                    <button
+                                        onClick={exportProjectToDisk}
+                                        disabled={isExporting}
+                                        className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-700 text-white text-sm rounded-lg transition-colors"
+                                    >
+                                        {isExporting ? (
+                                            <Loader2 size={16} className="animate-spin" />
+                                        ) : (
+                                            <FolderOutput size={16} />
+                                        )}
+                                        Export to SSD
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Saved Projects on SSD */}
+                        <div className="p-4">
+                            <p className="text-xs font-semibold text-slate-400 uppercase mb-3">Projects on SSD</p>
+                            <div className="space-y-2 max-h-64 overflow-y-auto">
+                                {diskProjects.length === 0 ? (
+                                    <div className="py-8 text-center text-slate-500">
+                                        <HardDrive size={32} className="mx-auto mb-2 opacity-50" />
+                                        <p className="text-sm">No projects saved to SSD yet</p>
+                                    </div>
+                                ) : (
+                                    diskProjects.map(project => (
+                                        <div
+                                            key={project.name}
+                                            className="flex items-center gap-3 p-3 bg-slate-800 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors group"
+                                            onClick={() => importProjectFromDisk(project.name)}
+                                        >
+                                            <FolderOpen size={20} className="text-emerald-400 flex-shrink-0" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-medium text-white truncate">{project.name}</p>
+                                                <p className="text-xs text-slate-400">
+                                                    {project.chart_count} charts • {project.document_count} docs
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); deleteDiskProject(project.name); }}
+                                                className="p-1.5 hover:bg-red-900/50 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                                                title="Delete from SSD"
+                                            >
+                                                <Trash2 size={14} className="text-red-400" />
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); importProjectFromDisk(project.name); }}
+                                                disabled={isImporting}
+                                                className="flex items-center gap-1 px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded transition-colors"
+                                            >
+                                                {isImporting ? <Loader2 size={12} className="animate-spin" /> : <FolderInput size={12} />}
+                                                Import
+                                            </button>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="p-3 bg-slate-800/50 border-t border-slate-700 text-xs text-slate-500">
+                            Projects are stored at /data/mermaid-projects/ on the SSD
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

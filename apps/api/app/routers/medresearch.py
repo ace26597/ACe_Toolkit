@@ -88,6 +88,31 @@ class FileListResponse(BaseModel):
     current_path: str
 
 
+class SaveProjectRequest(BaseModel):
+    project_name: str
+    description: Optional[str] = ""
+
+
+class SaveProjectResponse(BaseModel):
+    name: str
+    path: str
+    saved_at: str
+
+
+class ProjectInfo(BaseModel):
+    name: str
+    path: str
+    description: Optional[str] = None
+    saved_at: str
+    files: Optional[List[str]] = None
+
+
+class CreateFromProjectRequest(BaseModel):
+    session_id: str  # Browser session ID
+    project_name: str
+    title: Optional[str] = None
+
+
 # ============ REST Endpoints ============
 
 @router.post("/sessions", response_model=SessionResponse)
@@ -423,6 +448,103 @@ async def download_workspace_zip(
         shutil.rmtree(temp_dir, ignore_errors=True)
         logger.error(f"Failed to create ZIP: {e}")
         raise HTTPException(status_code=500, detail="Failed to create ZIP file")
+
+
+# ============ Project Management Endpoints ============
+
+@router.post("/sessions/{medresearch_id}/save-project", response_model=SaveProjectResponse)
+async def save_session_as_project(
+    medresearch_id: str,
+    request: SaveProjectRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Save current session workspace as a persistent project on SSD"""
+    result = await db.execute(
+        select(MedResearchSession)
+        .where(MedResearchSession.id == medresearch_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    workspace = Path(session.workspace_dir)
+    if not workspace.exists():
+        raise HTTPException(status_code=404, detail="Workspace not found")
+
+    project_path = medresearch_manager.save_project(
+        workspace,
+        request.project_name,
+        request.description or ""
+    )
+
+    if not project_path:
+        raise HTTPException(status_code=500, detail="Failed to save project")
+
+    logger.info(f"Saved session {medresearch_id} as project '{request.project_name}'")
+
+    return SaveProjectResponse(
+        name=request.project_name,
+        path=str(project_path),
+        saved_at=datetime.utcnow().isoformat()
+    )
+
+
+@router.get("/projects", response_model=List[ProjectInfo])
+async def list_projects():
+    """List all saved projects on SSD"""
+    projects = medresearch_manager.list_saved_projects()
+    return [ProjectInfo(**p) for p in projects]
+
+
+@router.post("/sessions/from-project", response_model=SessionResponse)
+async def create_session_from_project(
+    request: CreateFromProjectRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Create a new session by restoring a saved project"""
+    medresearch_id = str(uuid.uuid4())
+
+    # Restore project files to new workspace
+    workspace_dir = medresearch_manager.restore_project(
+        request.project_name,
+        medresearch_id
+    )
+
+    if not workspace_dir:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Project '{request.project_name}' not found"
+        )
+
+    # Create database entry
+    session = MedResearchSession(
+        id=medresearch_id,
+        session_id=request.session_id,
+        title=request.title or f"Restored: {request.project_name}",
+        workspace_dir=str(workspace_dir),
+        status="created",
+        expires_at=datetime.utcnow() + timedelta(hours=24)
+    )
+
+    db.add(session)
+    await db.commit()
+    await db.refresh(session)
+
+    logger.info(f"Created session {medresearch_id} from project '{request.project_name}'")
+    return session
+
+
+@router.delete("/projects/{project_name}")
+async def delete_project(project_name: str):
+    """Delete a saved project from SSD"""
+    success = medresearch_manager.delete_project(project_name)
+
+    if not success:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    logger.info(f"Deleted project '{project_name}'")
+    return {"status": "deleted", "name": project_name}
 
 
 # ============ WebSocket Endpoint ============

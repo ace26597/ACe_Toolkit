@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Guide for ACe_Toolkit
 
-**Last Updated:** January 13, 2026
+**Last Updated:** January 14, 2026
 **Repository:** ACe_Toolkit
 **Status:** Active Development
 **Deployment:** Raspberry Pi (Cloudflare Tunnel Active)
@@ -61,6 +61,7 @@ Full-featured diagram editor for creating and managing Mermaid diagrams.
 - Version control via diagram editions
 - Export to PNG/PDF via Playwright
 - Multi-project organization
+- **SSD Storage:** Export/import projects to external SSD for persistent backup
 
 **Supported Diagram Types:**
 - Flowcharts, Sequence, Class, State, ER
@@ -98,6 +99,7 @@ Web-based Claude Code terminal for medical research with isolated workspaces.
 - **Scientific MCP Tools:** 140+ tools (PubMed, UniProt, RDKit, PyTorch, etc.)
 - **Isolated Workspaces:** Each session has dedicated directory with CLAUDE.md
 - **24-Hour Sessions:** Auto-cleanup of expired sessions
+- **Project Save/Restore:** Save sessions to SSD for permanent storage, restore anytime
 - **File Browser:** Navigate and download workspace files
 - **Session Management:** Create, list, delete research sessions
 
@@ -192,6 +194,15 @@ Session-based note-taking application.
 | Auto-Start | crontab @reboot |
 | Logs | /home/ace/dev/ACe_Toolkit/logs/ |
 | Database | SQLite (apps/api/app.db) |
+| **SSD Storage** | Samsung T7 1.8TB at `/data` → `/media/ace/T7/dev` |
+
+**SSD Data Directories:**
+```
+/data/
+├── mermaid-projects/      # Exported Mermaid diagrams
+├── medresearch-projects/  # Saved MedResearch sessions
+└── claude-workspaces/     # Active Claude Code workspaces
+```
 
 ---
 
@@ -305,6 +316,10 @@ ACe_Toolkit/
 | GET | `/charts/project/{id}` | List charts in project |
 | POST | `/charts/` | Create chart |
 | PUT | `/charts/{id}` | Update chart |
+| POST | `/projects/{id}/export-to-disk` | Export project to SSD |
+| GET | `/projects/disk-projects` | List projects on SSD |
+| POST | `/projects/import-from-disk/{name}` | Import project from SSD |
+| DELETE | `/projects/disk-projects/{name}` | Delete project from SSD |
 
 ### AI (`/ai`)
 
@@ -358,6 +373,10 @@ ACe_Toolkit/
 | GET | `/sessions/{id}/files` | List workspace files |
 | GET | `/sessions/{id}/files/download` | Download file |
 | WS | `/terminal/{id}` | Bidirectional terminal I/O |
+| POST | `/sessions/{id}/save-project` | Save session to SSD |
+| GET | `/projects` | List saved projects on SSD |
+| POST | `/sessions/from-project` | Create session from saved project |
+| DELETE | `/projects/{name}` | Delete saved project |
 
 ### Logs (`/logs`)
 
@@ -668,6 +687,9 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 | Date | Change |
 |------|--------|
+| 2026-01-14 | Add SSD storage integration (1.8TB Samsung T7) for persistent data |
+| 2026-01-14 | Add project save/restore to MedResearch Terminal |
+| 2026-01-14 | Add disk export/import to Mermaid Studio |
 | 2026-01-13 | Add MedResearch Terminal, remove Scientific Skills Terminal |
 | 2026-01-13 | Add comprehensive logs viewing system with auto-scroll |
 | 2026-01-12 | Add Research Assistant with LangGraph workflows |
