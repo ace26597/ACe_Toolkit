@@ -3,21 +3,21 @@
 **Last Updated:** January 13, 2026
 **Repository:** ACe_Toolkit
 **Status:** Active Development
-**Deployment:** Raspberry Pi (Local Network + Cloudflare Tunnel Active)
+**Deployment:** Raspberry Pi (Cloudflare Tunnel Active)
 
 ---
 
 ## Table of Contents
 
 1. [Repository Overview](#repository-overview)
-2. [Tech Stack](#tech-stack)
-3. [Codebase Structure](#codebase-structure)
-4. [API Reference](#api-reference)
-5. [Database Schema](#database-schema)
-6. [Development Workflows](#development-workflows)
-7. [Key Conventions](#key-conventions)
-8. [AI Assistant Guidelines](#ai-assistant-guidelines)
-9. [Common Tasks](#common-tasks)
+2. [Applications](#applications)
+3. [Tech Stack](#tech-stack)
+4. [Codebase Structure](#codebase-structure)
+5. [API Reference](#api-reference)
+6. [Database Schema](#database-schema)
+7. [Development Workflows](#development-workflows)
+8. [Key Conventions](#key-conventions)
+9. [AI Assistant Guidelines](#ai-assistant-guidelines)
 10. [Deployment](#deployment)
 
 ---
@@ -26,40 +26,120 @@
 
 ### Project Description
 
-**ACe_Toolkit** is a full-stack productivity toolkit for creating, editing, and managing Mermaid diagrams and notes. It features a document-based workflow where users can upload markdown files to automatically extract and organize diagrams, with bidirectional sync between diagram edits and source files.
-
-> **Note:** Docker is currently not required for local development and is intended for future production/Raspberry Pi deployment.
+**ACe_Toolkit** is a full-stack productivity platform featuring AI-powered research tools, diagram creation, and web-based terminal interfaces. The platform runs on a Raspberry Pi and is accessible globally via Cloudflare Tunnel.
 
 ### Core Features
 
-- **Document-Based Workflow**: Upload markdown files to automatically extract and organize Mermaid charts
-- **Bidirectional Sync**: Edits to diagrams automatically update the source markdown file
-- **Multi-Project Hierarchy**: Organize charts within documents or as standalone diagrams
-- **Diagram Editions**: Version control for diagram changes with descriptions
-- **AI-Powered Generation**: Create, repair, and enhance diagrams using Claude (Anthropic)
-- **Research Assistant** (NEW): Multi-model AI research with GPT-4o/GPT-5.1/Claude, file upload, web search, LangGraph workflows, and report generation
-- **Scientific Skills Terminal** (NEW): Browser-based access to 140+ scientific tools (PubMed, UniProt, RDKit, PyTorch) via MCP
-- **Session-Based Storage**: No authentication required for basic usage
-- **User Authentication**: Optional register/login for persistent storage
-- **Notes Application**: Markdown-enabled note-taking with auto-sync
-- **Export Functionality**: Export diagrams as images/PDF
-- **Multiple Diagram Types**: Flowcharts, sequence, class, state, ER, Gantt, pie, journey, git graph, mindmap, timeline, quadrant, requirement diagrams
+| Feature | Description |
+|---------|-------------|
+| **Mermaid Studio** | Document-based diagram editor with Monaco editor, AI assistance, and bidirectional markdown sync |
+| **Research Assistant** | Multi-model AI research with GPT-4o/GPT-5.x, file upload, Tavily web search, LangGraph workflows, and report generation |
+| **MedResearch Terminal** | Web-based Claude Code terminal for medical research QA with 140+ scientific MCP tools |
+| **Logs Viewer** | Real-time log monitoring for backend, frontend, Cloudflare, and MedResearch sessions |
+| **Notes App** | Markdown-enabled note-taking with project organization |
 
-### Apps & Pages
+### Quick Links
 
-| Route | Description |
-|-------|-------------|
-| `/` | Home page with navigation to all apps |
-| `/mermaid` | Full-featured diagram editor with live preview, Monaco editor, AI assistance |
-| `/research` | Research Assistant with multi-model AI, file upload, web search, LangGraph workflows, and report generation |
-| `/scientific` | Scientific Skills Terminal with 140+ tools (PubMed, UniProt, RDKit, PyTorch) |
-| `/notes` | Session-based note-taking with project organization |
+- **Production:** https://ai.ultronsolar.in
+- **API:** https://api.ultronsolar.in
+- **API Docs:** https://api.ultronsolar.in/docs
+- **Local Dev:** http://localhost:3000 (frontend), http://localhost:8000 (backend)
 
-### Repository Information
+---
 
-- **Owner:** ace26597
-- **Git Remote:** Local proxy configuration
-- **Primary Branch:** main
+## Applications
+
+### 1. Mermaid Studio (`/mermaid`)
+
+Full-featured diagram editor for creating and managing Mermaid diagrams.
+
+**Features:**
+- Monaco editor with Mermaid syntax highlighting
+- Live diagram preview with ELK.js layout
+- Document upload with automatic diagram extraction
+- AI-powered diagram generation and repair (OpenAI)
+- Version control via diagram editions
+- Export to PNG/PDF via Playwright
+- Multi-project organization
+
+**Supported Diagram Types:**
+- Flowcharts, Sequence, Class, State, ER
+- Gantt, Pie, Journey, Git Graph
+- Mindmap, Timeline, Quadrant, Requirement
+
+---
+
+### 2. Research Assistant (`/research`)
+
+Multi-model AI research platform with LangGraph workflows.
+
+**Features:**
+- **Multi-Model Support:** OpenAI (gpt-4o, gpt-5.1, gpt-5.2)
+- **File Upload:** Images (AI vision), PDFs (pypdf), CSV/Excel (pandas)
+- **Web Search:** Tavily API integration for real-time research
+- **LangGraph Workflows:** Router → Search → Analysis → Synthesis → Report
+- **Report Generation:** Markdown, HTML, PDF, CSV formats
+- **WebSocket Streaming:** Real-time response streaming with workflow progress
+
+**Workflow Types:**
+- `search` - Web research with Tavily
+- `analysis` - File and data analysis
+- `direct` - Direct conversation
+
+---
+
+### 3. MedResearch Terminal (`/medresearch`)
+
+Web-based Claude Code terminal for medical research with isolated workspaces.
+
+**Features:**
+- **Full PTY Terminal:** xterm.js with WebSocket bidirectional I/O
+- **Claude Code Integration:** Spawns Claude Code CLI via pexpect
+- **Scientific MCP Tools:** 140+ tools (PubMed, UniProt, RDKit, PyTorch, etc.)
+- **Isolated Workspaces:** Each session has dedicated directory with CLAUDE.md
+- **24-Hour Sessions:** Auto-cleanup of expired sessions
+- **File Browser:** Navigate and download workspace files
+- **Session Management:** Create, list, delete research sessions
+
+**Terminal Capabilities:**
+- Full terminal emulation (bash, vim, etc.)
+- Resize support for responsive layouts
+- File upload/download from workspace
+- Auto-generated medical research CLAUDE.md per session
+
+---
+
+### 4. Logs Viewer (`/logs`)
+
+Real-time log monitoring dashboard.
+
+**Log Types:**
+| Type | Source |
+|------|--------|
+| Backend | uvicorn/FastAPI logs |
+| Frontend | Next.js logs |
+| Cloudflare | systemd journal for cloudflared |
+| Startup | Application startup logs |
+| Shutdown | Graceful shutdown logs |
+| MedResearch | Filtered terminal session logs |
+
+**Features:**
+- Real-time auto-refresh
+- Search across log files
+- Download logs
+- Configurable line limits
+
+---
+
+### 5. Notes App (`/notes`)
+
+Session-based note-taking application.
+
+**Features:**
+- Markdown editing with live preview
+- Project-based organization
+- Tags and pinning
+- Auto-sync to backend
 
 ---
 
@@ -76,9 +156,9 @@
 | Code Editor | Monaco Editor | 4.6.0 |
 | Diagrams | Mermaid | 11.12.2 |
 | Graph Layout | ELK.js | 0.11.0 |
+| Terminal | xterm.js | 5.5.0 |
 | HTTP Client | Axios | 1.6.7 |
-| Icons | Lucide React | >=0.469.0 |
-| Linting | ESLint | 9 |
+| Icons | Lucide React | 0.469.0+ |
 
 ### Backend (`apps/api`)
 
@@ -87,30 +167,31 @@
 | Framework | FastAPI | 0.109.0 |
 | Server | Uvicorn (ASGI) | 0.27.0 |
 | Language | Python | 3.11+ |
-| ORM | SQLAlchemy | >=2.0.36 |
-| Database | SQLite (dev) / PostgreSQL (prod) | - |
+| ORM | SQLAlchemy (async) | 2.0.36+ |
+| Database | SQLite (aiosqlite) | - |
 | Migrations | Alembic | 1.13.1 |
-| Validation | Pydantic | >=2.9.0 |
+| Validation | Pydantic | 2.9.0+ |
 | Auth | python-jose (JWT), passlib (Argon2) | - |
-| Browser Automation | Playwright | >=1.50.0 |
-| AI Integration | Anthropic SDK (Claude) | >=0.40.0 |
-| AI Integration | OpenAI SDK | latest |
-| AI Workflows | LangGraph | >=0.2.0 |
-| AI Framework | LangChain | >=0.1.0 |
-| Web Search | Tavily API | >=0.5.0 |
-| MCP Tools | Scientific Skills MCP | 140+ tools |
+| Browser Automation | Playwright | 1.50.0+ |
+| AI - OpenAI | OpenAI SDK | 1.12.0+ |
+| AI - Anthropic | Anthropic SDK | 0.40.0+ |
+| AI Workflows | LangGraph, LangChain | 0.2.0+, 0.1.0+ |
+| Web Search | Tavily API | 0.5.0+ |
+| MCP Integration | fastmcp, mcp | 0.4.0+, 0.9.0+ |
+| Terminal PTY | pexpect | 4.9.0+ |
 | File Processing | pypdf, openpyxl, pandas, pillow | latest |
-| Report Generation | reportlab, markdown | latest |
+| Reports | reportlab, markdown | latest |
 
 ### Infrastructure
 
-- **Containerization:** Docker (optional)
-- **Deployment:** Raspberry Pi (local network + Cloudflare Tunnel)
-- **Auto-Start:** systemd service with auto-restart on reboot
-- **Networking:** UFW firewall, local network access
-- **Cloudflare Tunnel:** Active (ai.ultronsolar.in, api.ultronsolar.in)
-- **WebSocket:** Enabled with HTTP/1.1 for real-time streaming
-- **Production Scripts:** Automated startup, shutdown, restart, and log management
+| Component | Details |
+|-----------|---------|
+| Platform | Raspberry Pi 5 (Linux ARM64) |
+| Tunnel | Cloudflare Tunnel (active) |
+| Domains | ai.ultronsolar.in, api.ultronsolar.in |
+| Auto-Start | crontab @reboot |
+| Logs | /home/ace/dev/ACe_Toolkit/logs/ |
+| Database | SQLite (apps/api/app.db) |
 
 ---
 
@@ -119,90 +200,77 @@
 ```
 ACe_Toolkit/
 ├── apps/
-│   ├── web/                         # Next.js Frontend
-│   │   ├── app/                     # App Router pages
-│   │   │   ├── page.tsx             # Home page
-│   │   │   ├── layout.tsx           # Root layout
-│   │   │   ├── globals.css          # Global styles
-│   │   │   ├── mermaid/page.tsx     # Mermaid editor
-│   │   │   └── notes/page.tsx       # Notes app
-│   │   ├── components/              # React components
-│   │   │   ├── mermaid/             # Mermaid-specific components
+│   ├── web/                           # Next.js Frontend
+│   │   ├── app/                       # App Router pages
+│   │   │   ├── page.tsx               # Home page
+│   │   │   ├── layout.tsx             # Root layout
+│   │   │   ├── mermaid/page.tsx       # Mermaid editor
+│   │   │   ├── research/page.tsx      # Research Assistant
+│   │   │   ├── medresearch/page.tsx   # MedResearch Terminal
+│   │   │   ├── logs/page.tsx          # Logs viewer
+│   │   │   └── notes/page.tsx         # Notes app
+│   │   ├── components/
+│   │   │   ├── mermaid/               # Diagram components
 │   │   │   │   ├── MermaidPreview.tsx
 │   │   │   │   └── MarkdownDocumentView.tsx
-│   │   │   └── ui/                  # UI utilities
+│   │   │   ├── research/              # Research Assistant UI
+│   │   │   │   ├── ResearchChatInterface.tsx
+│   │   │   │   ├── WorkflowVisualizer.tsx
+│   │   │   │   ├── FileUploadZone.tsx
+│   │   │   │   ├── ModelSelector.tsx
+│   │   │   │   └── ReportViewer.tsx
+│   │   │   ├── medresearch/           # Terminal components
+│   │   │   │   ├── MedResearchTerminal.tsx
+│   │   │   │   └── FileBrowser.tsx
+│   │   │   └── ui/
 │   │   │       └── ToastProvider.tsx
-│   │   ├── lib/                     # Utilities
-│   │   │   ├── api.ts               # API client layer
-│   │   │   └── types.ts             # TypeScript definitions
-│   │   ├── public/                  # Static assets
+│   │   ├── lib/
+│   │   │   ├── api.ts                 # API client
+│   │   │   └── types.ts               # TypeScript types
 │   │   ├── package.json
-│   │   ├── next.config.ts
-│   │   ├── tsconfig.json
-│   │   ├── tailwind.config.ts
-│   │   └── postcss.config.mjs
+│   │   └── next.config.ts
 │   │
-│   ├── api/                         # FastAPI Backend
-│   │   ├── app/
-│   │   │   ├── main.py              # FastAPI entry point
-│   │   │   ├── schemas.py           # Pydantic request/response schemas
-│   │   │   ├── models/
-│   │   │   │   └── models.py        # SQLAlchemy models
-│   │   │   ├── routers/             # API endpoints
-│   │   │   │   ├── auth.py          # Authentication
-│   │   │   │   ├── diagrams.py      # Diagram CRUD
-│   │   │   │   ├── projects.py      # Project management
-│   │   │   │   ├── charts.py        # Chart management
-│   │   │   │   ├── session_notes.py # Session-based notes
-│   │   │   │   ├── notes.py         # User notes (authenticated)
-│   │   │   │   ├── ai.py            # AI-powered generation
-│   │   │   │   └── export.py        # Export to image/PDF
-│   │   │   ├── core/                # Core utilities
-│   │   │   │   ├── config.py        # Configuration/settings
-│   │   │   │   ├── database.py      # SQLAlchemy setup
-│   │   │   │   └── security.py      # JWT, password hashing
-│   │   │   └── wiki/                # Knowledge base integration
-│   │   │       ├── openai_client.py
-│   │   │       ├── bedrock_client.py
-│   │   │       ├── openrouter_client.py
-│   │   │       ├── azureai_client.py
-│   │   │       ├── dashscope_client.py
-│   │   │       ├── ollama_patch.py
-│   │   │       ├── simple_chat.py
-│   │   │       ├── rag.py
-│   │   │       ├── websocket_wiki.py
-│   │   │       └── tools/embedder.py
-│   │   ├── .env.example             # Environment template
-│   │   ├── requirements.txt         # Python dependencies
-│   │   └── Dockerfile               # Container definition
-│   │
-│   └── deepwiki/                    # Placeholder (future use)
+│   └── api/                           # FastAPI Backend
+│       ├── app/
+│       │   ├── main.py                # FastAPI entry + lifespan
+│       │   ├── schemas.py             # Pydantic schemas
+│       │   ├── models/
+│       │   │   └── models.py          # SQLAlchemy models
+│       │   ├── routers/
+│       │   │   ├── auth.py            # Authentication
+│       │   │   ├── diagrams.py        # User diagrams
+│       │   │   ├── projects.py        # Session projects
+│       │   │   ├── charts.py          # Session charts
+│       │   │   ├── session_notes.py   # Session notes
+│       │   │   ├── notes.py           # User notes (auth)
+│       │   │   ├── ai.py              # AI generation
+│       │   │   ├── export.py          # Export to image/PDF
+│       │   │   ├── research_chat.py   # Research Assistant
+│       │   │   ├── medresearch.py     # MedResearch Terminal
+│       │   │   └── logs.py            # Log viewer
+│       │   └── core/
+│       │       ├── config.py          # Settings
+│       │       ├── database.py        # SQLAlchemy async setup
+│       │       ├── security.py        # JWT, passwords
+│       │       ├── sandbox_manager.py # Research sandboxes
+│       │       ├── medresearch_manager.py # Terminal manager
+│       │       ├── langgraph_workflows.py # LangGraph graphs
+│       │       ├── report_generator.py    # Report formats
+│       │       └── file_processor.py      # File extraction
+│       ├── requirements.txt
+│       └── .env.example
 │
-├── infra/                           # Infrastructure & Deployment
-│   └── scripts/
-│       ├── pi_setup.sh              # Raspberry Pi setup
-│       └── run_tunnel.md            # Cloudflare Tunnel docs
+├── infra/scripts/                     # Deployment scripts
+│   ├── start_all.sh                   # Start services
+│   ├── stop_all.sh                    # Stop services
+│   ├── status.sh                      # Check status
+│   ├── restart_cloudflare.sh          # Restart tunnel
+│   └── CURRENT_SETUP.md               # Setup docs
 │
-├── packages/                        # Shared packages (future use)
-├── .claude/                         # Claude Code metadata
-├── package.json                     # Root monorepo config
-├── package-lock.json
-├── README.md
-├── CLAUDE.md                        # This file
-├── .gitignore
-└── .env.web.example                 # Frontend env template
+├── logs/                              # Application logs
+├── CLAUDE.md                          # This file
+└── README.md
 ```
-
-### Key Source Files
-
-| File | Purpose | Lines |
-|------|---------|-------|
-| `apps/web/app/mermaid/page.tsx` | Main diagram editor with Monaco, AI panel, sidebar | 1000+ |
-| `apps/web/app/notes/page.tsx` | Notes application with markdown editing | 800+ |
-| `apps/web/lib/api.ts` | API client with all backend calls | 300+ |
-| `apps/api/app/main.py` | FastAPI entry point, router mounting | 43 |
-| `apps/api/app/routers/ai.py` | AI diagram generation (3-step process) | 100+ |
-| `apps/api/app/models/models.py` | All SQLAlchemy database models | 100+ |
 
 ---
 
@@ -210,103 +278,100 @@ ACe_Toolkit/
 
 ### Authentication (`/auth`)
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| POST | `/register` | User registration | No |
-| POST | `/login` | User login, returns JWT | No |
-| POST | `/refresh` | Refresh access token | Yes (refresh token) |
-| POST | `/logout` | User logout | Yes |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/register` | User registration |
+| POST | `/login` | Login, returns JWT |
+| POST | `/refresh` | Refresh access token |
+| POST | `/logout` | User logout |
 
 ### Diagrams (`/diagrams`) - Authenticated
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/` | List user's diagrams |
-| GET | `/{id}` | Get specific diagram |
+| GET | `/{id}` | Get diagram |
 | POST | `/` | Create diagram |
 | PUT | `/{id}` | Update diagram |
 | DELETE | `/{id}` | Delete diagram |
 
-### Projects (`/projects`) - Session-based
+### Projects & Charts (`/projects`, `/charts`) - Session-based
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/` | List all projects |
-| GET | `/{id}` | Get specific project |
-| POST | `/` | Create project |
-| PUT | `/{id}` | Update project |
-| DELETE | `/{id}` | Delete project |
-| POST | `/sync` | Bulk sync projects |
-
-### Charts (`/charts`) - Session-based
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/project/{project_id}` | List charts in project |
-| GET | `/{id}` | Get specific chart |
-| POST | `/` | Create chart |
-| PUT | `/{id}` | Update chart |
-| DELETE | `/{id}` | Delete chart |
-
-### Session Notes (`/session-notes`)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/projects` | List note projects |
-| POST | `/projects` | Create note project |
-| PUT | `/projects/{id}` | Update note project |
-| DELETE | `/projects/{id}` | Delete note project |
-| POST | `/note` | Create note |
-| PUT | `/note/{id}` | Update note |
-| DELETE | `/note/{id}` | Delete note |
-| POST | `/sync` | Sync all note projects |
+| GET | `/projects/` | List projects |
+| POST | `/projects/` | Create project |
+| POST | `/projects/sync` | Bulk sync |
+| GET | `/charts/project/{id}` | List charts in project |
+| POST | `/charts/` | Create chart |
+| PUT | `/charts/{id}` | Update chart |
 
 ### AI (`/ai`)
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| POST | `/generate` | Generate/repair diagrams using OpenAI | No |
-
-AI generation uses a 3-step process:
-1. Context analysis - Understands diagram type and user intent
-2. Code generation - Creates valid Mermaid syntax
-3. Summary creation - Provides changelog for the edition
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/generate` | Generate/repair diagrams using OpenAI |
 
 ### Export (`/export`)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/` | Export diagram to image/PDF (uses Playwright) |
+| POST | `/` | Export diagram to PNG/PDF |
 
-### Research Assistant (`/research`) - NEW!
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| WebSocket | `/stream` | Real-time research chat with LangGraph workflows |
-| POST | `/upload` | Upload files (images, PDFs, CSV, Excel) to conversation |
-| GET | `/reports/{conversation_id}` | Download report (MD, HTML, PDF, CSV) |
-| GET | `/conversations` | List research conversations for session |
-| POST | `/conversations` | Create new research conversation |
-| DELETE | `/conversations/{id}` | Delete conversation and sandbox |
-
-**Features:**
-- Multi-model support: OpenAI (gpt-4o, gpt-5.1, gpt-5.2) + Anthropic (claude-sonnet-4, claude-opus-4.5)
-- WebSocket streaming for real-time responses
-- LangGraph workflows: Router → Search → File Processing → Analysis → Synthesis → Report
-- Tavily web search integration
-- Multi-modal file processing (AI vision, pypdf, pandas)
-- Report generation in multiple formats
-
-### Scientific Skills (`/skills`) - NEW!
+### Research Assistant (`/research`)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/status` | MCP server status and metrics |
-| GET | `/list` | List all available scientific skills |
-| POST | `/execute` | Execute a skill with parameters |
-| GET | `/history/{session_id}` | Get execution history |
+| WS | `/stream` | WebSocket streaming with LangGraph |
+| POST | `/upload` | Upload files to conversation |
+| GET | `/reports/{id}` | Download report (MD/HTML/PDF/CSV) |
+| GET | `/conversations` | List conversations |
+| POST | `/conversations` | Create conversation |
+| DELETE | `/conversations/{id}` | Delete conversation |
 
-**Available Tools:** 140+ scientific computing tools including PubMed, UniProt, RDKit, PyTorch, and more via MCP
+**WebSocket Protocol:**
+```json
+// Client → Server
+{
+  "type": "message",
+  "conversation_id": "uuid",
+  "content": "Research CRISPR papers",
+  "session_id": "session_xxx",
+  "model_config": {"provider": "openai", "model_name": "gpt-5.2"}
+}
+
+// Server → Client
+{"type": "workflow_step", "step": "router", "status": "in_progress"}
+{"type": "content_delta", "delta": "Found 127 papers..."}
+{"type": "message_complete", "conversation_id": "uuid", "tokens_used": 3421}
+```
+
+### MedResearch Terminal (`/medresearch`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/sessions` | Create terminal session |
+| GET | `/sessions/{browser_id}` | List sessions |
+| GET | `/sessions/detail/{id}` | Get session details |
+| DELETE | `/sessions/{id}` | Delete session |
+| POST | `/sessions/{id}/resize` | Resize terminal |
+| GET | `/sessions/{id}/files` | List workspace files |
+| GET | `/sessions/{id}/files/download` | Download file |
+| WS | `/terminal/{id}` | Bidirectional terminal I/O |
+
+### Logs (`/logs`)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/list` | List all log files |
+| GET | `/backend` | Backend logs |
+| GET | `/frontend` | Frontend logs |
+| GET | `/cloudflare` | Cloudflare tunnel logs |
+| GET | `/startup` | Startup logs |
+| GET | `/shutdown` | Shutdown logs |
+| GET | `/medresearch` | MedResearch logs |
+| GET | `/search` | Search across logs |
+| GET | `/tail/{type}` | Stream live logs |
 
 ---
 
@@ -316,115 +381,95 @@ AI generation uses a 3-step process:
 
 ```
 User
-├── id: Integer (PK)
+├── id: UUID (PK)
 ├── name: String
 ├── email: String (unique)
 ├── hashed_password: String
-├── created_at: DateTime
-└── updated_at: DateTime
-
-RefreshToken
-├── id: Integer (PK)
-├── token_hash: String
-├── user_id: Integer (FK -> User)
-├── expires_at: DateTime
 └── created_at: DateTime
 
 Diagram
-├── id: Integer (PK)
+├── id: UUID (PK)
 ├── title: String
-├── code: Text
+├── mermaid_code: Text
 ├── theme: String
-├── owner_id: Integer (FK -> User)
-├── created_at: DateTime
-└── updated_at: DateTime
-
-Note (authenticated)
-├── id: Integer (PK)
-├── title: String
-├── content: Text
-├── owner_id: Integer (FK -> User)
+├── user_id: UUID (FK → User)
 ├── created_at: DateTime
 └── updated_at: DateTime
 ```
 
-### Session-Based Models (No Auth Required)
+### Session-Based Models
 
 ```
 SessionProject
-├── id: String (PK, UUID)
-├── session_id: String
+├── id: String (PK)
 ├── name: String
-├── documents: JSON (array)
-├── created_at: DateTime
-└── updated_at: DateTime
+├── documents_json: Text (JSON array)
+└── charts: [SessionChart]
 
 SessionChart
-├── id: String (PK, UUID)
-├── project_id: String (FK -> SessionProject)
+├── id: String (PK)
+├── project_id: String (FK)
+├── document_id: String (nullable)
 ├── name: String
 ├── code: Text
-├── editions: JSON (array of {code, description, timestamp})
-├── document_id: String (nullable)
-├── metadata: JSON
-├── created_at: DateTime
-└── updated_at: DateTime
+├── editions: Text (JSON array)
+└── metadata_json: Text
 
-SessionNoteProject
-├── id: String (PK, UUID)
-├── session_id: String
-├── name: String
-├── created_at: DateTime
-└── updated_at: DateTime
+SessionNoteProject / SessionNote
+├── Similar structure for notes app
+```
 
-SessionNote
-├── id: String (PK, UUID)
-├── project_id: String (FK -> SessionNoteProject)
-├── title: String
-├── content: Text
-├── tags: JSON (array)
-├── pinned: Boolean
-├── created_at: DateTime
-└── updated_at: DateTime
+### Research Assistant Models
 
-ResearchConversation (NEW)
-├── id: String (PK, UUID)
+```
+ResearchConversation
+├── id: String (PK)
 ├── session_id: String
 ├── title: String
 ├── sandbox_dir: String
-├── provider: String (openai | anthropic)
-├── model_name: String
-├── workflow_type: String (search | analysis | direct)
+├── provider: String ("openai")
+├── model_name: String ("gpt-5.2")
+├── workflow_type: String
 ├── message_count: Integer
-├── total_tokens_used: Integer
-├── created_at: DateTime
-└── last_message_at: DateTime
+└── total_tokens_used: Integer
 
-ResearchMessage (NEW)
-├── id: String (PK, UUID)
-├── conversation_id: String (FK -> ResearchConversation)
-├── role: String (user | assistant)
+ResearchMessage
+├── id: String (PK)
+├── conversation_id: String (FK)
+├── role: String ("user" | "assistant")
 ├── content: Text
-├── workflow_steps: JSON
-├── search_results: JSON
+├── workflow_steps: Text (JSON)
+├── search_results: Text (JSON)
 ├── synthesis: Text
 ├── report: Text
-├── tool_calls_json: JSON
-├── tool_results_json: JSON
-├── tokens_used: Integer
-└── created_at: DateTime
+└── tokens_used: Integer
 
-UploadedFile (NEW)
-├── id: String (PK, UUID)
-├── conversation_id: String (FK -> ResearchConversation)
+UploadedFile
+├── id: String (PK)
+├── conversation_id: String (FK)
 ├── original_filename: String
 ├── file_path: String
-├── file_type: String (image | pdf | csv | excel | text)
-├── file_size_bytes: Integer
-├── mime_type: String
+├── file_type: String
 ├── extracted_content: Text
-├── extraction_method: String (vision | pypdf | pandas | text)
-└── created_at: DateTime
+└── extraction_method: String
+```
+
+### MedResearch Terminal Models
+
+```
+MedResearchSession
+├── id: String (PK)
+├── session_id: String (browser)
+├── title: String
+├── workspace_dir: String
+├── pid: Integer (nullable)
+├── status: String (created|active|disconnected|terminated|error)
+├── terminal_rows: Integer
+├── terminal_cols: Integer
+├── commands_executed: Integer
+├── created_at: DateTime
+├── last_activity_at: DateTime
+└── expires_at: DateTime (24h from creation)
 ```
 
 ---
@@ -434,76 +479,51 @@ UploadedFile (NEW)
 ### Quick Start
 
 ```bash
-# Terminal 1: Backend (from root)
+# Terminal 1: Backend
 npm run dev:api
 
-# Terminal 2: Frontend (from root)
+# Terminal 2: Frontend
 npm run dev:web
 ```
 
-**Ports:**
+**Development URLs:**
 - Frontend: http://localhost:3000
 - Backend: http://localhost:8000
+- API Docs: http://localhost:8000/docs
 
-### Manual Backend Setup
+### Manual Setup
 
+**Backend:**
 ```bash
 cd apps/api
 python3 -m venv .venv
-
-# Activate virtual environment
-source .venv/bin/activate      # Linux/macOS
-.venv\Scripts\activate         # Windows
-
-# Install dependencies
+source .venv/bin/activate
 pip install -r requirements.txt
-
-# Run server
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Manual Frontend Setup
-
+**Frontend:**
 ```bash
 cd apps/web
 npm install
 npm run dev
 ```
 
-### Git Branching Strategy
+### Git Branching
 
-All feature branches MUST follow this pattern:
-```
-claude/<description>-<SESSION_ID>
-```
+Feature branches must follow: `claude/<description>-<SESSION_ID>`
 
-**Examples:**
-- `claude/add-claude-documentation-MVWIy`
-- `claude/implement-core-features-XYZ12`
+Examples:
+- `claude/add-medresearch-terminal-ABC12`
+- `claude/fix-websocket-streaming-XYZ99`
 
-**Important:** The `claude/` prefix and session ID suffix are REQUIRED for successful pushes.
-
-### Commit Message Conventions
+### Commit Messages
 
 ```
 <type>: <subject>
 
-<body (optional)>
+Types: feat, fix, docs, style, refactor, test, chore
 ```
-
-**Types:**
-- `feat:` New feature
-- `fix:` Bug fix
-- `docs:` Documentation changes
-- `style:` Code style/formatting
-- `refactor:` Code refactoring
-- `test:` Adding or updating tests
-- `chore:` Maintenance tasks
-
-**Best Practices:**
-- Use present tense ("add" not "added")
-- Use imperative mood ("move" not "moves")
-- Keep subject line under 50 characters
 
 ---
 
@@ -511,31 +531,24 @@ claude/<description>-<SESSION_ID>
 
 ### Code Style
 
-**TypeScript (Frontend):**
-- Strict mode enabled
-- ES modules (esModuleInterop)
-- Path aliases: `@/*` maps to source root
+**TypeScript:**
+- Strict mode, ES modules
 - Functional components with hooks
-- State management via React hooks (useState, useEffect, useCallback)
+- Path alias: `@/*` → source root
 
-**Python (Backend):**
-- Type hints with Pydantic models
-- Async/await patterns with FastAPI
-- SQLAlchemy 2.0 style queries
-- Router-based endpoint organization
+**Python:**
+- Type hints with Pydantic
+- Async/await with FastAPI
+- SQLAlchemy 2.0 async queries
 
 ### File Naming
 
-- **React Components:** PascalCase (`MermaidPreview.tsx`)
-- **Utilities/Hooks:** camelCase (`api.ts`, `types.ts`)
-- **Python Modules:** snake_case (`session_notes.py`)
-- **Routes:** kebab-case in URLs (`/session-notes`)
-
-### Testing
-
-- **Frontend:** `npm run lint` for ESLint validation
-- **Backend:** FastAPI Swagger UI at `/docs` for manual testing
-- No automated test framework configured yet
+| Type | Convention | Example |
+|------|------------|---------|
+| React Components | PascalCase | `MedResearchTerminal.tsx` |
+| Utilities | camelCase | `api.ts` |
+| Python Modules | snake_case | `medresearch_manager.py` |
+| Routes | kebab-case | `/medresearch` |
 
 ---
 
@@ -543,195 +556,124 @@ claude/<description>-<SESSION_ID>
 
 ### Core Principles
 
-1. **Read Before Modifying:**
-   - ALWAYS read files before suggesting changes
-   - Understand existing code structure
-   - Maintain consistency with existing patterns
-
-2. **Minimal Changes:**
-   - Only make requested changes
-   - Avoid over-engineering
-   - Don't add unrequested features
-   - Keep solutions simple and focused
-
-3. **Security First:**
-   - Watch for OWASP Top 10 vulnerabilities
-   - Avoid command injection, XSS, SQL injection
-   - Validate inputs at system boundaries
-   - Use secure defaults
-
-4. **Task Management:**
-   - Use TodoWrite for multi-step tasks
-   - Mark tasks in_progress when starting
-   - Mark completed immediately when done
-   - Keep only ONE task in_progress at a time
-
-### Workflow for AI Assistants
-
-**For New Features:**
-1. Read CLAUDE.md to understand conventions
-2. Create TodoWrite task list
-3. Explore relevant existing code
-4. Plan implementation
-5. Implement incrementally
-6. Test changes
-7. Commit with clear message
-8. Push to feature branch
-
-**For Bug Fixes:**
-1. Understand the bug (read related code)
-2. Locate the issue
-3. Fix with minimal changes
-4. Verify fix works
-5. Commit and push
-
-### What NOT to Do
-
-- Commit changes without explicit user request
-- Skip git hooks (unless explicitly requested)
-- Force push to main/master
-- Create files unnecessarily
-- Add features beyond requirements
-- Use emojis unless requested
-- Make time estimates
-- Add backwards-compatibility hacks for unused code
-- Create abstractions for one-time operations
+1. **Read Before Modifying** - Always read files before changes
+2. **Minimal Changes** - Only make requested changes
+3. **Security First** - Avoid OWASP Top 10 vulnerabilities
+4. **Use TodoWrite** - Track multi-step tasks
 
 ### Tool Usage
 
-- **Exploring codebase:** Use Task tool with subagent_type=Explore
-- **File operations:** Use Read, Edit, Write (not bash cat/sed/echo)
-- **Searching code:** Use Grep (not bash grep/rg)
-- **Finding files:** Use Glob (not bash find/ls)
-- **Git operations:** Use Bash for git commands
-- **Multiple independent tasks:** Run tools in parallel
-- **Dependent tasks:** Run tools sequentially
+| Task | Tool |
+|------|------|
+| Explore codebase | Task (subagent_type=Explore) |
+| Read files | Read |
+| Edit files | Edit |
+| Create files | Write |
+| Search code | Grep |
+| Find files | Glob |
+| Git operations | Bash |
 
----
+### What NOT to Do
 
-## Common Tasks
-
-### Adding a New API Endpoint
-
-1. Create or update router in `apps/api/app/routers/`
-2. Add Pydantic schemas to `apps/api/app/schemas.py`
-3. Register router in `apps/api/app/main.py`
-4. Add API client function in `apps/web/lib/api.ts`
-5. Add TypeScript types in `apps/web/lib/types.ts`
-
-### Adding a New Frontend Page
-
-1. Create page in `apps/web/app/<route>/page.tsx`
-2. Add components in `apps/web/components/`
-3. Update navigation in home page if needed
-
-### Database Migrations
-
-```bash
-cd apps/api
-alembic revision --autogenerate -m "description"
-alembic upgrade head
-```
-
-### Environment Configuration
-
-**Backend (`apps/api/.env`):**
-```env
-DATABASE_URL=sqlite:///./app.db
-SECRET_KEY=your-secret-key
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=15
-REFRESH_TOKEN_EXPIRE_DAYS=30
-ALLOWED_ORIGINS=["http://localhost:3000","https://yourdomain.com"]
-ANTHROPIC_API_KEY=your-anthropic-api-key
-```
-
-**Frontend (`apps/web/.env.local`):**
-```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-```
+- Commit without explicit request
+- Skip git hooks
+- Force push to main
+- Create unnecessary files
+- Add unrequested features
+- Use emojis unless requested
 
 ---
 
 ## Deployment
 
-### Current Setup (Raspberry Pi - Local Network)
+### Production (Raspberry Pi + Cloudflare)
 
-**Status:** ✅ Backend & Frontend auto-start configured
+**Status:** Active
 
-**Auto-Start Configuration:**
-```bash
-# Setup crontab
-crontab -e
+| Service | Local Port | Public URL |
+|---------|------------|------------|
+| Frontend | 3000 | https://ai.ultronsolar.in |
+| Backend | 8000 | https://api.ultronsolar.in |
 
-# Add this line:
+**Auto-Start (crontab):**
+```cron
 @reboot sleep 30 && /home/ace/dev/ACe_Toolkit/infra/scripts/start_all.sh
 ```
-
-**Services:**
-- Backend (FastAPI): Port 8000
-- Frontend (Next.js): Port 3000
-- Auto-starts on Pi reboot
-- Logs to `/home/ace/dev/ACe_Toolkit/logs/`
-
-**Access:**
-- Local: `http://localhost:3000`
-- Network: `http://<PI_IP>:3000`
 
 **Management:**
 ```bash
 # Check status
 ./infra/scripts/status.sh
 
-# Start/stop manually
+# Start/stop
 ./infra/scripts/start_all.sh
 ./infra/scripts/stop_all.sh
+
+# Restart Cloudflare
+./infra/scripts/restart_cloudflare.sh
 
 # View logs
 tail -f logs/backend-*.log
 tail -f logs/frontend-*.log
+journalctl -u cloudflared -f
 ```
 
-**See:** [CURRENT_SETUP.md](infra/scripts/CURRENT_SETUP.md) for detailed instructions
+### Architecture
 
-### Future: Cloudflare Tunnel (In Progress)
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Internet                              │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────────────┐
+│                 Cloudflare Edge                              │
+│         ai.ultronsolar.in  →  localhost:3000                │
+│        api.ultronsolar.in  →  localhost:8000                │
+└─────────────────────────┬───────────────────────────────────┘
+                          │ Encrypted Tunnel
+┌─────────────────────────▼───────────────────────────────────┐
+│                   Raspberry Pi 5                             │
+│  ┌──────────────────┐  ┌──────────────────────────────────┐ │
+│  │ Frontend (Next)  │  │ Backend (FastAPI)                │ │
+│  │ Port: 3000       │  │ Port: 8000                       │ │
+│  └──────────────────┘  │                                  │ │
+│                        │ ├── SQLite DB                    │ │
+│                        │ ├── LangGraph Workflows          │ │
+│                        │ ├── MedResearch PTY Manager      │ │
+│                        │ └── Sandbox Manager              │ │
+│                        └──────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
 
-**Status:** 🔜 Waiting for free Cloudflare domain
+### Environment Variables
 
-**Once configured:**
-1. Create tunnel: `cloudflared tunnel create acetoolkit`
-2. Configure ingress rules in `~/.cloudflared/config.yml`
-3. Route DNS: `cloudflared tunnel route dns acetoolkit yourdomain.com`
-4. Enable service: `sudo systemctl enable cloudflared`
-5. Access from anywhere via `https://yourdomain.com`
+**Backend (`apps/api/.env`):**
+```env
+DATABASE_URL=sqlite:///./app.db
+SECRET_KEY=your-secret-key
+OPENAI_API_KEY=your-openai-key
+ANTHROPIC_API_KEY=your-anthropic-key
+TAVILY_API_KEY=your-tavily-key
+```
 
-**See:** [CLOUDFLARE_GUIDE.md](infra/scripts/CLOUDFLARE_GUIDE.md) for complete setup
-
-### Security Configuration
-
-- **JWT:** Tokens stored in HTTPOnly SameSite=Lax cookies
-- **CORS:** Restricted to frontend domain only (update when Cloudflare added)
-- **Network:** Local network access only (no exposed ports)
-- **Firewall:** UFW configured to allow only SSH
-- **Future:** Cloudflare Tunnel for secure external access (no port forwarding needed)
-
-### Vercel Frontend Deployment
-
-Frontend can be deployed to Vercel with:
-- Build command: `npm run build`
-- Output directory: `.next`
-- Environment variable: `NEXT_PUBLIC_API_BASE_URL`
+**Frontend (`apps/web/.env.local`):**
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+# Production: https://api.ultronsolar.in
+```
 
 ---
 
-## Changelog
+## Recent Changes
 
-| Date | Change | Author |
-|------|--------|--------|
-| 2026-01-13 | Update deployment section: crontab auto-start, Cloudflare in progress | Claude |
-| 2026-01-12 | Complete rewrite with accurate codebase documentation | Claude |
-| 2026-01-09 | Initial CLAUDE.md creation | Claude |
+| Date | Change |
+|------|--------|
+| 2026-01-13 | Add MedResearch Terminal, remove Scientific Skills Terminal |
+| 2026-01-13 | Add comprehensive logs viewing system with auto-scroll |
+| 2026-01-12 | Add Research Assistant with LangGraph workflows |
+| 2026-01-12 | Switch to OpenAI GPT-5.2 as default model |
+| 2026-01-12 | Complete Cloudflare Tunnel deployment |
 
 ---
 
-**Note to AI Assistants:** This document is your primary reference for understanding and working with the ACe_Toolkit repository. Always consult this file before making significant changes. Keep it updated as the project evolves.
+**Note to AI Assistants:** This document is your primary reference for the ACe_Toolkit repository. Always consult before making changes. Keep it updated as the project evolves.
