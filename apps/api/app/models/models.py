@@ -262,9 +262,42 @@ class UploadedFile(Base):
     conversation = relationship("ResearchConversation", back_populates="files")
 
 
-# MedResearch - Web-based Claude Code Terminal
+# CCResearch - Claude Code Research Platform (Web-based Terminal)
+class CCResearchSession(Base):
+    """Claude Code terminal session for research"""
+    __tablename__ = "ccresearch_sessions"
+
+    id = Column(String, primary_key=True)  # UUID
+    session_id = Column(String, nullable=False, index=True)  # Browser session
+    email = Column(String, nullable=False, index=True)  # User's email address
+    title = Column(String, nullable=False, default="New Research Session")
+
+    # Session workspace: /data/claude-workspaces/{id}/
+    workspace_dir = Column(String, nullable=False)
+
+    # Uploaded files (JSON array of filenames in data/ directory)
+    uploaded_files = Column(Text, nullable=True)
+
+    # Process state
+    pid = Column(Integer, nullable=True)  # pexpect process ID
+    status = Column(String, nullable=False, default="created")  # created|active|disconnected|terminated|error
+
+    # Terminal dimensions (for PTY)
+    terminal_rows = Column(Integer, default=24)
+    terminal_cols = Column(Integer, default=80)
+
+    # Usage tracking
+    commands_executed = Column(Integer, default=0)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_activity_at = Column(DateTime, default=datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)  # 24 hours from creation
+
+
+# Legacy: MedResearch - Web-based Claude Code Terminal (kept for backward compatibility)
 class MedResearchSession(Base):
-    """Claude Code terminal session for medical research QA"""
+    """Claude Code terminal session for medical research QA (LEGACY - use CCResearchSession)"""
     __tablename__ = "medresearch_sessions"
 
     id = Column(String, primary_key=True)  # UUID

@@ -42,11 +42,16 @@ class Settings(BaseSettings):
     # Storage Paths (SSD-backed for data persistence)
     DATA_BASE_DIR: str = "/data"
     MERMAID_DATA_DIR: str = "/data/mermaid-projects"
-    MEDRESEARCH_DATA_DIR: str = "/data/medresearch-projects"
     CLAUDE_WORKSPACES_DIR: str = "/data/claude-workspaces"
 
-    # MedResearch Terminal Security
-    # Set to False to disable bwrap sandbox (for debugging only)
+    # CCResearch (Claude Code Research Platform) Settings
+    CCRESEARCH_DATA_DIR: str = "/data/ccresearch-projects"
+    CCRESEARCH_LOGS_DIR: str = "/data/ccresearch-logs"
+    CCRESEARCH_SANDBOX_ENABLED: bool = True  # Set to False to disable bwrap sandbox (debugging only)
+
+    # Legacy aliases (for backward compatibility during migration)
+    MEDRESEARCH_DATA_DIR: str = "/data/ccresearch-projects"
+    MEDRESEARCH_LOGS_DIR: str = "/data/ccresearch-logs"
     MEDRESEARCH_SANDBOX_ENABLED: bool = True
 
     class Config:

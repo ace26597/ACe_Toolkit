@@ -45,18 +45,18 @@ export default function Home() {
           </Link>
 
           <Link
-            href="/medresearch"
+            href="/ccresearch"
             className="group rounded-lg border border-emerald-200 dark:border-emerald-700 px-6 py-5 transition-all hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:shadow-lg md:col-span-2 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10"
           >
             <div className="flex items-center gap-2 mb-2">
               <h2 className="text-xl font-semibold text-gray-800 dark:text-white">
-                🔬 MedResearch Terminal
+                🔬 CCResearch Terminal
                 <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
               </h2>
               <span className="text-xs bg-emerald-500 text-white px-2 py-0.5 rounded-full font-medium">NEW</span>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-              Web-based Claude Code terminal for medical research QA.
+              Claude Code Research Platform with web-based terminal.
               Each session has isolated workspace with 140+ scientific skills via MCP.
             </p>
             <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">

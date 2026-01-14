@@ -6,7 +6,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 
-interface MedResearchTerminalProps {
+interface CCResearchTerminalProps {
   sessionId: string;
   onResize?: (rows: number, cols: number) => void;
   onStatusChange?: (connected: boolean) => void;
@@ -14,21 +14,21 @@ interface MedResearchTerminalProps {
 }
 
 /**
- * MedResearch Terminal Component
+ * CCResearch Terminal Component
  *
- * Full PTY terminal for Claude Code with:
+ * Full PTY terminal for Claude Code Research Platform with:
  * - Binary WebSocket for raw ANSI passthrough
  * - Bidirectional terminal I/O
  * - Resize handling with PTY sync
  * - Tokyo Night color theme
  * - Connection status indicator
  */
-export default function MedResearchTerminal({
+export default function CCResearchTerminal({
   sessionId,
   onResize,
   onStatusChange,
   className = ''
-}: MedResearchTerminalProps) {
+}: CCResearchTerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
@@ -151,7 +151,7 @@ export default function MedResearchTerminal({
     const connectWebSocket = () => {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
       const wsUrl = apiUrl.replace(/^https/, 'wss').replace(/^http/, 'ws');
-      const ws = new WebSocket(`${wsUrl}/medresearch/terminal/${sessionId}`);
+      const ws = new WebSocket(`${wsUrl}/ccresearch/terminal/${sessionId}`);
 
       ws.binaryType = 'arraybuffer';
       wsRef.current = ws;
@@ -160,7 +160,7 @@ export default function MedResearchTerminal({
         setConnected(true);
         setError(null);
         reconnectAttempts.current = 0;
-        term.write('\x1b[1;32mConnected to MedResearch session\x1b[0m\r\n\r\n');
+        term.write('\x1b[1;32mConnected to CCResearch session\x1b[0m\r\n\r\n');
 
         // Send initial terminal size
         const { rows, cols } = term;

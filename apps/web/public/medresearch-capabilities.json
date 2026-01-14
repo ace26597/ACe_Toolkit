@@ -1,0 +1,385 @@
+{
+  "generated_at": "2026-01-14T21:00:00Z",
+  "version": "2.19.0",
+  "platform": "ACe_Toolkit MedResearch Terminal",
+
+  "plugins": {
+    "installed": [
+      {
+        "id": "scientific-skills@claude-scientific-skills",
+        "name": "K-Dense Scientific Skills",
+        "version": "2.17.0",
+        "git_sha": "955a36ac82d8",
+        "status": "active",
+        "skills_count": 140,
+        "description": "140 scientific research skills for databases, libraries, workflows",
+        "installed_at": "2026-01-14T01:00:56.053Z"
+      },
+      {
+        "id": "context7@claude-plugins-official",
+        "name": "Context7",
+        "version": "f70b65538da0",
+        "status": "active",
+        "mcp_required": true,
+        "description": "Documentation lookup for programming libraries via MCP",
+        "installed_at": "2026-01-14T00:58:46.296Z"
+      },
+      {
+        "id": "frontend-design@claude-plugins-official",
+        "name": "Frontend Design",
+        "version": "f70b65538da0",
+        "status": "active",
+        "description": "Production-grade frontend interface generation",
+        "installed_at": "2026-01-14T00:58:33.072Z"
+      },
+      {
+        "id": "code-simplifier@claude-plugins-official",
+        "name": "Code Simplifier",
+        "version": "1.0.0",
+        "status": "active",
+        "description": "Simplifies and refines code for clarity",
+        "installed_at": "2026-01-13T03:07:20.241Z"
+      },
+      {
+        "id": "plugin-dev@claude-plugins-official",
+        "name": "Plugin Dev",
+        "version": "f70b65538da0",
+        "status": "active",
+        "description": "Plugin development and validation tools",
+        "installed_at": "2026-01-14T03:16:39.605Z"
+      }
+    ],
+    "summary": {
+      "total": 5,
+      "active": 5,
+      "with_mcp": 1
+    }
+  },
+
+  "mcp_servers": {
+    "active": [
+      {
+        "name": "context7",
+        "status": "running",
+        "type": "stdio",
+        "command": "npx -y @upstash/context7-mcp",
+        "description": "Library documentation lookup",
+        "tools": ["resolve-library-id", "query-docs"]
+      },
+      {
+        "name": "filesystem",
+        "status": "running",
+        "type": "stdio",
+        "command": "npx -y @modelcontextprotocol/server-filesystem",
+        "description": "Secure file operations with configurable access",
+        "tools": ["read_file", "write_file", "list_directory", "create_directory", "move_file", "search_files", "get_file_info"]
+      },
+      {
+        "name": "memory",
+        "status": "running",
+        "type": "stdio",
+        "command": "npx -y @modelcontextprotocol/server-memory",
+        "description": "Knowledge graph-based persistent memory",
+        "tools": ["create_entities", "create_relations", "add_observations", "delete_entities", "delete_observations", "delete_relations", "read_graph", "search_nodes", "open_nodes"]
+      },
+      {
+        "name": "sequential-thinking",
+        "status": "running",
+        "type": "stdio",
+        "command": "npx -y @modelcontextprotocol/server-sequential-thinking",
+        "description": "Dynamic problem-solving through thought sequences",
+        "tools": ["sequentialthinking"]
+      },
+      {
+        "name": "fetch",
+        "status": "running",
+        "type": "stdio",
+        "command": "uvx mcp-server-fetch",
+        "description": "Web content fetching and conversion",
+        "tools": ["fetch"]
+      },
+      {
+        "name": "git",
+        "status": "running",
+        "type": "stdio",
+        "command": "uvx mcp-server-git",
+        "description": "Git repository operations",
+        "tools": ["git_status", "git_diff", "git_commit", "git_add", "git_reset", "git_log", "git_create_branch", "git_checkout", "git_search", "git_diff_staged", "git_list_branches", "git_init", "git_show"]
+      },
+      {
+        "name": "time",
+        "status": "running",
+        "type": "stdio",
+        "command": "uvx mcp-server-time",
+        "description": "Time and timezone utilities",
+        "tools": ["get_current_time", "convert_time"]
+      },
+      {
+        "name": "sqlite",
+        "status": "running",
+        "type": "stdio",
+        "command": "uvx mcp-server-sqlite",
+        "description": "SQLite database operations",
+        "tools": ["read_query", "write_query", "create_table", "list_tables", "describe_table", "append_insight"]
+      },
+      {
+        "name": "playwright",
+        "status": "running",
+        "type": "stdio",
+        "command": "npx -y @playwright/mcp@latest",
+        "description": "Browser automation and testing",
+        "tools": ["browser_navigate", "browser_screenshot", "browser_click", "browser_fill", "browser_select", "browser_hover", "browser_evaluate", "browser_console_messages", "browser_close", "browser_wait", "browser_press_key", "browser_snapshot", "browser_install", "browser_file_upload", "browser_pdf_save", "browser_tab_list", "browser_tab_new", "browser_tab_select", "browser_tab_close", "browser_generate_playwright_test", "browser_network_requests", "browser_resize", "browser_handle_dialog", "browser_drag"]
+      }
+    ],
+    "available": [
+      {"name": "github", "type": "http", "requires_auth": true},
+      {"name": "gitlab", "type": "http", "requires_auth": false},
+      {"name": "firebase", "type": "stdio", "requires_auth": true},
+      {"name": "supabase", "type": "http", "requires_auth": true},
+      {"name": "slack", "type": "http", "requires_auth": true},
+      {"name": "sentry", "type": "http", "requires_auth": true}
+    ],
+    "summary": {
+      "running": 9,
+      "available": 6
+    }
+  },
+
+  "scientific_skills": {
+    "total": 140,
+    "categories": {
+      "databases": {
+        "count": 28,
+        "status": "all_working",
+        "skills": [
+          {"name": "pubmed-database", "description": "Biomedical literature search", "status": "working"},
+          {"name": "uniprot-database", "description": "Protein sequences & functions", "status": "working"},
+          {"name": "chembl-database", "description": "Bioactive molecules", "status": "working"},
+          {"name": "drugbank-database", "description": "Drug & target info", "status": "working"},
+          {"name": "pdb-database", "description": "Protein structures", "status": "working"},
+          {"name": "alphafold-database", "description": "AI protein predictions", "status": "working"},
+          {"name": "kegg-database", "description": "Pathways & diseases", "status": "working"},
+          {"name": "reactome-database", "description": "Biological pathways", "status": "working"},
+          {"name": "string-database", "description": "Protein interactions", "status": "working"},
+          {"name": "clinicaltrials-database", "description": "Clinical trials registry", "status": "working"},
+          {"name": "clinvar-database", "description": "Genetic variants", "status": "working"},
+          {"name": "cosmic-database", "description": "Cancer mutations", "status": "working"},
+          {"name": "gwas-database", "description": "GWAS catalog", "status": "working"},
+          {"name": "opentargets-database", "description": "Target-disease links", "status": "working"},
+          {"name": "ensembl-database", "description": "Genome annotation", "status": "working"},
+          {"name": "gene-database", "description": "NCBI gene info", "status": "working"},
+          {"name": "geo-database", "description": "Gene expression", "status": "working"},
+          {"name": "ena-database", "description": "Nucleotide archive", "status": "working"},
+          {"name": "pubchem-database", "description": "Chemical compounds", "status": "working"},
+          {"name": "zinc-database", "description": "Purchasable compounds", "status": "working"},
+          {"name": "hmdb-database", "description": "Human metabolome", "status": "working"},
+          {"name": "brenda-database", "description": "Enzyme information", "status": "working"},
+          {"name": "fda-database", "description": "FDA drug approvals", "status": "working"},
+          {"name": "clinpgx-database", "description": "Pharmacogenomics", "status": "working"},
+          {"name": "biorxiv-database", "description": "Biology preprints", "status": "working"},
+          {"name": "openalex-database", "description": "Academic papers", "status": "working"},
+          {"name": "metabolomics-workbench-database", "description": "Metabolomics data", "status": "working"},
+          {"name": "uspto-database", "description": "Patent search", "status": "working"}
+        ]
+      },
+      "bioinformatics": {
+        "count": 15,
+        "status": "all_working",
+        "skills": [
+          {"name": "biopython", "description": "Sequence analysis toolkit", "status": "working"},
+          {"name": "scanpy", "description": "Single-cell RNA-seq", "status": "working"},
+          {"name": "anndata", "description": "Annotated data matrices", "status": "working"},
+          {"name": "scvi-tools", "description": "Probabilistic scRNA models", "status": "working"},
+          {"name": "cellxgene-census", "description": "CELLxGENE data access", "status": "working"},
+          {"name": "pysam", "description": "SAM/BAM manipulation", "status": "working"},
+          {"name": "pydeseq2", "description": "Differential expression", "status": "working"},
+          {"name": "scikit-bio", "description": "Bioinformatics algorithms", "status": "working"},
+          {"name": "gget", "description": "Gene/protein retrieval", "status": "working"},
+          {"name": "geniml", "description": "Genomic interval ML", "status": "working"},
+          {"name": "gtars", "description": "Genomic region analysis", "status": "working"},
+          {"name": "etetoolkit", "description": "Phylogenetic analysis", "status": "working"},
+          {"name": "arboreto", "description": "Gene regulatory networks", "status": "working"},
+          {"name": "deeptools", "description": "NGS analysis toolkit", "status": "working"},
+          {"name": "neuropixels-analysis", "description": "Neural probe analysis", "status": "working"}
+        ]
+      },
+      "cheminformatics": {
+        "count": 8,
+        "status": "all_working",
+        "skills": [
+          {"name": "rdkit", "description": "Molecular modeling", "status": "working"},
+          {"name": "datamol", "description": "Molecular data science", "status": "working"},
+          {"name": "molfeat", "description": "Molecular featurization", "status": "working"},
+          {"name": "medchem", "description": "Medicinal chemistry filters", "status": "working"},
+          {"name": "deepchem", "description": "Molecular ML", "status": "working"},
+          {"name": "torchdrug", "description": "Drug discovery ML", "status": "working"},
+          {"name": "pytdc", "description": "Therapeutics Data Commons", "status": "working"},
+          {"name": "diffdock", "description": "Molecular docking", "status": "working"}
+        ]
+      },
+      "data_science_ml": {
+        "count": 18,
+        "status": "all_working",
+        "skills": [
+          {"name": "polars", "description": "Fast DataFrames", "status": "working"},
+          {"name": "dask", "description": "Parallel computing", "status": "working"},
+          {"name": "vaex", "description": "Out-of-core DataFrames", "status": "working"},
+          {"name": "scikit-learn", "description": "Machine learning", "status": "working"},
+          {"name": "pytorch-lightning", "description": "PyTorch training", "status": "working"},
+          {"name": "transformers", "description": "Hugging Face models", "status": "working"},
+          {"name": "torch_geometric", "description": "Graph neural networks", "status": "working"},
+          {"name": "stable-baselines3", "description": "Reinforcement learning", "status": "working"},
+          {"name": "pufferlib", "description": "RL environments", "status": "working"},
+          {"name": "shap", "description": "Model interpretability", "status": "working"},
+          {"name": "umap-learn", "description": "Dimensionality reduction", "status": "working"},
+          {"name": "statsmodels", "description": "Statistical models", "status": "working"},
+          {"name": "pymc", "description": "Probabilistic programming", "status": "working"},
+          {"name": "pymoo", "description": "Multi-objective optimization", "status": "working"},
+          {"name": "scikit-survival", "description": "Survival analysis", "status": "working"},
+          {"name": "networkx", "description": "Network analysis", "status": "working"},
+          {"name": "esm", "description": "Protein language models", "status": "working"},
+          {"name": "bioservices", "description": "Web services access", "status": "working"}
+        ]
+      },
+      "visualization": {
+        "count": 5,
+        "status": "all_working",
+        "skills": [
+          {"name": "matplotlib", "description": "Plotting library", "status": "working"},
+          {"name": "seaborn", "description": "Statistical visualization", "status": "working"},
+          {"name": "plotly", "description": "Interactive charts", "status": "working"},
+          {"name": "scientific-visualization", "description": "Publication figures", "status": "working"},
+          {"name": "scientific-schematics", "description": "Scientific diagrams", "status": "working"}
+        ]
+      },
+      "domain_specific": {
+        "count": 18,
+        "status": "all_working",
+        "skills": [
+          {"name": "astropy", "description": "Astronomy/astrophysics", "status": "working"},
+          {"name": "geopandas", "description": "Geospatial data", "status": "working"},
+          {"name": "pydicom", "description": "Medical imaging DICOM", "status": "working"},
+          {"name": "pathml", "description": "Pathology imaging", "status": "working"},
+          {"name": "histolab", "description": "Histology analysis", "status": "working"},
+          {"name": "flowio", "description": "Flow cytometry FCS", "status": "working"},
+          {"name": "neurokit2", "description": "Biosignal processing", "status": "working"},
+          {"name": "pyhealth", "description": "Healthcare ML", "status": "working"},
+          {"name": "pyopenms", "description": "Mass spectrometry", "status": "working"},
+          {"name": "matchms", "description": "Spectral similarity", "status": "working"},
+          {"name": "cobrapy", "description": "Metabolic modeling", "status": "working"},
+          {"name": "pymatgen", "description": "Materials science", "status": "working"},
+          {"name": "fluidsim", "description": "Fluid dynamics", "status": "working"},
+          {"name": "simpy", "description": "Discrete event simulation", "status": "working"},
+          {"name": "sympy", "description": "Symbolic mathematics", "status": "working"},
+          {"name": "rowan", "description": "Quaternion operations", "status": "working"},
+          {"name": "matlab", "description": "MATLAB/Octave support", "status": "working"},
+          {"name": "datacommons-client", "description": "Public statistics", "status": "working"}
+        ]
+      },
+      "quantum_computing": {
+        "count": 4,
+        "status": "all_working",
+        "skills": [
+          {"name": "qiskit", "description": "IBM quantum computing", "status": "working"},
+          {"name": "cirq", "description": "Google quantum computing", "status": "working"},
+          {"name": "pennylane", "description": "Quantum ML", "status": "working"},
+          {"name": "qutip", "description": "Quantum simulations", "status": "working"}
+        ]
+      },
+      "document_generation": {
+        "count": 11,
+        "status": "all_working",
+        "skills": [
+          {"name": "document-skills", "description": "Core document operations", "status": "working"},
+          {"name": "generate-image", "description": "AI image generation", "status": "working"},
+          {"name": "latex-posters", "description": "LaTeX poster creation", "status": "working"},
+          {"name": "pptx-posters", "description": "PowerPoint posters", "status": "working"},
+          {"name": "scientific-slides", "description": "Presentation slides", "status": "working"},
+          {"name": "venue-templates", "description": "Conference templates", "status": "working"},
+          {"name": "clinical-reports", "description": "Clinical reports", "status": "working"},
+          {"name": "markitdown", "description": "File to Markdown", "status": "working"},
+          {"name": "paper-2-web", "description": "Paper visualization", "status": "working"},
+          {"name": "scientific-writing", "description": "Manuscript writing", "status": "working"},
+          {"name": "citation-management", "description": "Reference management", "status": "working"}
+        ]
+      },
+      "research_workflows": {
+        "count": 10,
+        "status": "all_working",
+        "skills": [
+          {"name": "exploratory-data-analysis", "description": "EDA workflows", "status": "working"},
+          {"name": "hypothesis-generation", "description": "Research hypotheses", "status": "working"},
+          {"name": "literature-review", "description": "Systematic reviews", "status": "working"},
+          {"name": "peer-review", "description": "Manuscript review", "status": "working"},
+          {"name": "scholar-evaluation", "description": "Researcher evaluation", "status": "working"},
+          {"name": "scientific-brainstorming", "description": "Idea generation", "status": "working"},
+          {"name": "scientific-critical-thinking", "description": "Critical analysis", "status": "working"},
+          {"name": "statistical-analysis", "description": "Statistical methods", "status": "working"},
+          {"name": "hypogenic", "description": "Hypothesis testing", "status": "working"},
+          {"name": "research-lookup", "description": "Research discovery", "status": "working"}
+        ]
+      },
+      "lab_integrations": {
+        "count": 9,
+        "status": "all_working",
+        "skills": [
+          {"name": "adaptyv", "description": "Protein testing platform", "status": "working"},
+          {"name": "benchling-integration", "description": "Lab notebook platform", "status": "working"},
+          {"name": "dnanexus-integration", "description": "Genomics cloud", "status": "working"},
+          {"name": "labarchive-integration", "description": "ELN integration", "status": "working"},
+          {"name": "latchbio-integration", "description": "Bioinformatics workflows", "status": "working"},
+          {"name": "omero-integration", "description": "Image data management", "status": "working"},
+          {"name": "opentrons-integration", "description": "Lab automation", "status": "working"},
+          {"name": "protocolsio-integration", "description": "Protocol sharing", "status": "working"},
+          {"name": "pylabrobot", "description": "Lab robotics", "status": "working"}
+        ]
+      },
+      "cloud_infrastructure": {
+        "count": 3,
+        "status": "all_working",
+        "skills": [
+          {"name": "modal", "description": "Serverless GPU computing", "status": "working"},
+          {"name": "zarr-python", "description": "Chunked array storage", "status": "working"},
+          {"name": "lamindb", "description": "Biology data framework", "status": "working"}
+        ]
+      },
+      "other": {
+        "count": 11,
+        "status": "all_working",
+        "skills": [
+          {"name": "aeon", "description": "Time series ML", "status": "working"},
+          {"name": "biomni", "description": "Biomedical AI agent", "status": "working"},
+          {"name": "denario", "description": "Research automation", "status": "working"},
+          {"name": "perplexity-search", "description": "AI search", "status": "working"},
+          {"name": "clinical-decision-support", "description": "CDS systems", "status": "working"},
+          {"name": "market-research-reports", "description": "Market analysis", "status": "working"},
+          {"name": "research-grants", "description": "Grant writing", "status": "working"},
+          {"name": "treatment-plans", "description": "Treatment planning", "status": "working"},
+          {"name": "iso-13485-certification", "description": "Medical device QMS", "status": "working"},
+          {"name": "get-available-resources", "description": "Resource discovery", "status": "working"},
+          {"name": "offer-k-dense-web", "description": "K-Dense platform", "status": "working"}
+        ]
+      }
+    }
+  },
+
+  "security": {
+    "sandbox_enabled": true,
+    "sandbox_type": "bubblewrap",
+    "isolation_features": [
+      "Isolated workspace per session",
+      "No access to host filesystem",
+      "Read-only system directories",
+      "Network allowed for APIs only",
+      "24-hour session auto-cleanup",
+      "Terminal logs preserved"
+    ]
+  },
+
+  "session_config": {
+    "max_duration_hours": 24,
+    "workspace_location": "/data/claude-workspaces",
+    "logs_location": "/data/medresearch-logs",
+    "saved_projects_location": "/data/medresearch-projects"
+  }
+}

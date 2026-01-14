@@ -34,8 +34,8 @@
 |---------|-------------|
 | **Mermaid Studio** | Document-based diagram editor with Monaco editor, AI assistance, and bidirectional markdown sync |
 | **Research Assistant** | Multi-model AI research with GPT-4o/GPT-5.x, file upload, Tavily web search, LangGraph workflows, and report generation |
-| **MedResearch Terminal** | Web-based Claude Code terminal for medical research QA with 140+ scientific MCP tools |
-| **Logs Viewer** | Real-time log monitoring for backend, frontend, Cloudflare, and MedResearch sessions |
+| **CCResearch Terminal** | Claude Code Research Platform - web-based terminal with email tracking, file upload, and 140+ scientific MCP tools |
+| **Logs Viewer** | Real-time log monitoring for backend, frontend, Cloudflare, and CCResearch sessions |
 | **Notes App** | Markdown-enabled note-taking with project organization |
 
 ### Quick Links
@@ -44,6 +44,43 @@
 - **API:** https://api.ultronsolar.in
 - **API Docs:** https://api.ultronsolar.in/docs
 - **Local Dev:** http://localhost:3000 (frontend), http://localhost:8000 (backend)
+
+---
+
+## CRITICAL: Port Management
+
+**THIS PROJECT'S PORTS - DO NOT CONFUSE WITH OTHER APPS:**
+
+| Service | Port | Notes |
+|---------|------|-------|
+| **Frontend (Next.js)** | 3000 | ACe_Toolkit web app |
+| **Backend (FastAPI)** | 8000 | ACe_Toolkit API |
+
+**NEVER KILL OR INTERFERE WITH THESE PORTS:**
+
+| Port | Owner |
+|------|-------|
+| 3001 | Other application (NOT this project) |
+| 8001 | Other application (NOT this project) |
+
+**Rules:**
+1. When restarting services, ONLY kill ports 3000 and 8000
+2. When checking status, ONLY check ports 3000 and 8000
+3. NEVER run `pkill -f next` or `pkill -f uvicorn` without port specificity
+4. Use `lsof -i :3000` or `fuser -k 3000/tcp` for targeted operations
+5. Always verify the port before killing any process
+
+**Safe Commands:**
+```bash
+# Kill frontend (port 3000 only)
+fuser -k 3000/tcp
+
+# Kill backend (port 8000 only)
+fuser -k 8000/tcp
+
+# Check what's on our ports
+lsof -i :3000 -i :8000
+```
 
 ---
 
@@ -89,19 +126,27 @@ Multi-model AI research platform with LangGraph workflows.
 
 ---
 
-### 3. MedResearch Terminal (`/medresearch`)
+### 3. CCResearch Terminal (`/ccresearch`)
 
-Web-based Claude Code terminal for medical research with isolated workspaces.
+Claude Code Research Platform - web-based terminal with email tracking and file upload support.
 
 **Features:**
 - **Full PTY Terminal:** xterm.js with WebSocket bidirectional I/O
 - **Claude Code Integration:** Spawns Claude Code CLI via pexpect
+- **Email Tracking:** Required email for each session (tracked in database)
+- **File Upload:** Upload data files when creating session (stored in `workspace/data/`)
 - **Scientific MCP Tools:** 140+ tools (PubMed, UniProt, RDKit, PyTorch, etc.)
-- **Isolated Workspaces:** Each session has dedicated directory with CLAUDE.md
+- **Isolated Workspaces:** Each session has dedicated directory with auto-generated CLAUDE.md
 - **24-Hour Sessions:** Auto-cleanup of expired sessions
 - **Project Save/Restore:** Save sessions to SSD for permanent storage, restore anytime
 - **File Browser:** Navigate and download workspace files
 - **Session Management:** Create, list, delete research sessions
+
+**Session Creation:**
+1. User provides email address (required)
+2. Optional: Upload data files (CSV, PDF, images, etc.)
+3. Session created with isolated workspace
+4. CLAUDE.md auto-generated with user email and uploaded files info
 
 **Security (Bubblewrap Sandbox):**
 - Sessions run in isolated bubblewrap (bwrap) sandbox
@@ -109,18 +154,20 @@ Web-based Claude Code terminal for medical research with isolated workspaces.
 - Cannot access other sessions (only own workspace visible)
 - Read-only access to system binaries and Claude installation
 - Network access allowed for API calls
-- Configurable via `MEDRESEARCH_SANDBOX_ENABLED` env var
+- Configurable via `CCRESEARCH_SANDBOX_ENABLED` env var
 
 **Navbar Controls:**
 - Back button (arrow) - return to session list
-- New button (blue) - create new session
+- New button (blue) - create new session (opens modal)
 - End button (red) - delete current session
 
 **Terminal Capabilities:**
 - Full terminal emulation (bash, vim, etc.)
 - Debounced resize handling (prevents flickering)
 - File upload/download from workspace
-- Auto-generated medical research CLAUDE.md per session
+- Auto-generated research CLAUDE.md per session
+
+**Legacy:** MedResearch (`/medresearch`) remains available for backward compatibility
 
 ---
 
@@ -136,7 +183,7 @@ Real-time log monitoring dashboard.
 | Cloudflare | systemd journal for cloudflared |
 | Startup | Application startup logs |
 | Shutdown | Graceful shutdown logs |
-| MedResearch | Filtered terminal session logs |
+| CCResearch | Filtered terminal session logs |
 
 **Features:**
 - Real-time auto-refresh
@@ -213,7 +260,8 @@ Session-based note-taking application.
 ```
 /data/
 ├── mermaid-projects/      # Exported Mermaid diagrams
-├── medresearch-projects/  # Saved MedResearch sessions
+├── ccresearch-projects/   # Saved CCResearch sessions
+├── ccresearch-logs/       # CCResearch session logs
 └── claude-workspaces/     # Active Claude Code workspaces
 ```
 
@@ -230,7 +278,8 @@ ACe_Toolkit/
 │   │   │   ├── layout.tsx             # Root layout
 │   │   │   ├── mermaid/page.tsx       # Mermaid editor
 │   │   │   ├── research/page.tsx      # Research Assistant
-│   │   │   ├── medresearch/page.tsx   # MedResearch Terminal
+│   │   │   ├── ccresearch/page.tsx    # CCResearch Terminal (main)
+│   │   │   ├── medresearch/page.tsx   # MedResearch Terminal (legacy)
 │   │   │   ├── logs/page.tsx          # Logs viewer
 │   │   │   └── notes/page.tsx         # Notes app
 │   │   ├── components/
@@ -243,7 +292,10 @@ ACe_Toolkit/
 │   │   │   │   ├── FileUploadZone.tsx
 │   │   │   │   ├── ModelSelector.tsx
 │   │   │   │   └── ReportViewer.tsx
-│   │   │   ├── medresearch/           # Terminal components
+│   │   │   ├── ccresearch/            # CCResearch components
+│   │   │   │   ├── CCResearchTerminal.tsx
+│   │   │   │   └── FileBrowser.tsx
+│   │   │   ├── medresearch/           # MedResearch components (legacy)
 │   │   │   │   ├── MedResearchTerminal.tsx
 │   │   │   │   └── FileBrowser.tsx
 │   │   │   └── ui/
@@ -270,14 +322,16 @@ ACe_Toolkit/
 │       │   │   ├── ai.py              # AI generation
 │       │   │   ├── export.py          # Export to image/PDF
 │       │   │   ├── research_chat.py   # Research Assistant
-│       │   │   ├── medresearch.py     # MedResearch Terminal
+│       │   │   ├── ccresearch.py      # CCResearch Terminal (main)
+│       │   │   ├── medresearch.py     # MedResearch Terminal (legacy)
 │       │   │   └── logs.py            # Log viewer
 │       │   └── core/
 │       │       ├── config.py          # Settings
 │       │       ├── database.py        # SQLAlchemy async setup
 │       │       ├── security.py        # JWT, passwords
 │       │       ├── sandbox_manager.py # Research sandboxes
-│       │       ├── medresearch_manager.py # Terminal manager
+│       │       ├── ccresearch_manager.py  # CCResearch manager (main)
+│       │       ├── medresearch_manager.py # MedResearch manager (legacy)
 │       │       ├── langgraph_workflows.py # LangGraph graphs
 │       │       ├── report_generator.py    # Report formats
 │       │       └── file_processor.py      # File extraction
@@ -374,22 +428,34 @@ ACe_Toolkit/
 {"type": "message_complete", "conversation_id": "uuid", "tokens_used": 3421}
 ```
 
-### MedResearch Terminal (`/medresearch`)
+### CCResearch Terminal (`/ccresearch`)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/sessions` | Create terminal session |
+| POST | `/sessions` | Create session (FormData: email, session_id, title?, files[]) |
+| POST | `/sessions/{id}/upload` | Upload files to session |
 | GET | `/sessions/{browser_id}` | List sessions |
 | GET | `/sessions/detail/{id}` | Get session details |
 | DELETE | `/sessions/{id}` | Delete session |
 | POST | `/sessions/{id}/resize` | Resize terminal |
 | GET | `/sessions/{id}/files` | List workspace files |
 | GET | `/sessions/{id}/files/download` | Download file |
+| GET | `/sessions/{id}/files/content` | Preview file content |
+| GET | `/sessions/{id}/download-zip` | Download workspace as ZIP |
 | WS | `/terminal/{id}` | Bidirectional terminal I/O |
 | POST | `/sessions/{id}/save-project` | Save session to SSD |
 | GET | `/projects` | List saved projects on SSD |
 | POST | `/sessions/from-project` | Create session from saved project |
 | DELETE | `/projects/{name}` | Delete saved project |
+
+### MedResearch Terminal (`/medresearch`) - Legacy
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/sessions` | Create terminal session |
+| GET | `/sessions/{browser_id}` | List sessions |
+| DELETE | `/sessions/{id}` | Delete session |
+| WS | `/terminal/{id}` | Bidirectional terminal I/O |
 
 ### Logs (`/logs`)
 
@@ -401,7 +467,7 @@ ACe_Toolkit/
 | GET | `/cloudflare` | Cloudflare tunnel logs |
 | GET | `/startup` | Startup logs |
 | GET | `/shutdown` | Shutdown logs |
-| GET | `/medresearch` | MedResearch logs |
+| GET | `/ccresearch` | CCResearch logs |
 | GET | `/search` | Search across logs |
 | GET | `/tail/{type}` | Stream live logs |
 
@@ -486,14 +552,16 @@ UploadedFile
 └── extraction_method: String
 ```
 
-### MedResearch Terminal Models
+### CCResearch Terminal Models
 
 ```
-MedResearchSession
+CCResearchSession
 ├── id: String (PK)
 ├── session_id: String (browser)
+├── email: String (required, indexed)
 ├── title: String
 ├── workspace_dir: String
+├── uploaded_files: Text (JSON array of filenames)
 ├── pid: Integer (nullable)
 ├── status: String (created|active|disconnected|terminated|error)
 ├── terminal_rows: Integer
@@ -502,6 +570,16 @@ MedResearchSession
 ├── created_at: DateTime
 ├── last_activity_at: DateTime
 └── expires_at: DateTime (24h from creation)
+
+MedResearchSession (Legacy)
+├── id: String (PK)
+├── session_id: String (browser)
+├── title: String
+├── workspace_dir: String
+├── pid: Integer (nullable)
+├── status: String
+├── created_at: DateTime
+└── expires_at: DateTime
 ```
 
 ---
@@ -577,10 +655,10 @@ Types: feat, fix, docs, style, refactor, test, chore
 
 | Type | Convention | Example |
 |------|------------|---------|
-| React Components | PascalCase | `MedResearchTerminal.tsx` |
+| React Components | PascalCase | `CCResearchTerminal.tsx` |
 | Utilities | camelCase | `api.ts` |
-| Python Modules | snake_case | `medresearch_manager.py` |
-| Routes | kebab-case | `/medresearch` |
+| Python Modules | snake_case | `ccresearch_manager.py` |
+| Routes | kebab-case | `/ccresearch` |
 
 ---
 
@@ -671,7 +749,7 @@ journalctl -u cloudflared -f
 │  └──────────────────┘  │                                  │ │
 │                        │ ├── SQLite DB                    │ │
 │                        │ ├── LangGraph Workflows          │ │
-│                        │ ├── MedResearch PTY Manager      │ │
+│                        │ ├── CCResearch PTY Manager       │ │
 │                        │ └── Sandbox Manager              │ │
 │                        └──────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────┘
@@ -700,11 +778,16 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 | Date | Change |
 |------|--------|
-| 2026-01-14 | Add bubblewrap sandbox security for MedResearch sessions |
-| 2026-01-14 | Add navbar controls (back, new, end session) to MedResearch |
+| 2026-01-14 | Rename to CCResearch (Claude Code Research Platform) at `/ccresearch` |
+| 2026-01-14 | Add email tracking requirement for CCResearch sessions |
+| 2026-01-14 | Add file upload on session creation (stored in `data/` directory) |
+| 2026-01-14 | Add session creation modal with quick start guide |
+| 2026-01-14 | Keep MedResearch at `/medresearch` as legacy |
+| 2026-01-14 | Add bubblewrap sandbox security for sessions |
+| 2026-01-14 | Add navbar controls (back, new, end session) |
 | 2026-01-14 | Fix terminal flickering with debounced resize handling |
 | 2026-01-14 | Add SSD storage integration (1.8TB Samsung T7) for persistent data |
-| 2026-01-14 | Add project save/restore to MedResearch Terminal |
+| 2026-01-14 | Add project save/restore to terminal sessions |
 | 2026-01-14 | Add disk export/import to Mermaid Studio |
 | 2026-01-13 | Add MedResearch Terminal, remove Scientific Skills Terminal |
 | 2026-01-13 | Add comprehensive logs viewing system with auto-scroll |

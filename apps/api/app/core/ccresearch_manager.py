@@ -1,8 +1,8 @@
 """
-MedResearch Process Manager
+CCResearch Process Manager (Claude Code Research Platform)
 
 Manages Claude Code CLI processes using pexpect with PTY support for
-web-based medical research QA sessions.
+web-based research sessions.
 
 Key Features:
 - PTY allocation for interactive terminal
@@ -10,6 +10,7 @@ Key Features:
 - Async read/write operations
 - Process lifecycle management
 - Multiple concurrent sessions support
+- File upload handling with CLAUDE.md updates
 """
 
 import asyncio
@@ -20,7 +21,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Optional, Callable, Any
+from typing import Dict, Optional, Callable, Any, List
 from dataclasses import dataclass, field
 
 try:
@@ -30,7 +31,7 @@ except ImportError:
 
 from app.core.config import settings
 
-logger = logging.getLogger("medresearch_manager")
+logger = logging.getLogger("ccresearch_manager")
 
 # Claude settings for scientific-skills MCP plugin
 CLAUDE_SETTINGS_TEMPLATE = {
@@ -50,16 +51,17 @@ CLAUDE_SETTINGS_TEMPLATE = {
     }
 }
 
-# CLAUDE.md template for medical research sessions
-CLAUDE_MD_TEMPLATE = """# CLAUDE.md - Medical Research QA Session
+# CLAUDE.md template for research sessions
+CLAUDE_MD_TEMPLATE = """# CLAUDE.md - Claude Code Research Session
 
-**Session Type:** Medical Research Assistant with Scientific Skills
+**Session Type:** Research Assistant with Scientific Skills
 **Environment:** Sandboxed workspace with scientific-skills MCP enabled
 **Session ID:** {session_id}
+**User Email:** {email}
 **Created:** {created_at}
 
 ---
-
+{uploaded_files_section}
 ## IMPORTANT: Scientific Skills Plugin
 
 This session has the **scientific-skills** MCP plugin enabled with 140+ scientific tools.
@@ -67,7 +69,7 @@ This session has the **scientific-skills** MCP plugin enabled with 140+ scientif
 **ALWAYS USE THESE TOOLS for research tasks:**
 
 ### Literature & Databases
-- `pubmed` - Search PubMed for medical literature
+- `pubmed` - Search PubMed for literature
 - `biorxiv` / `medrxiv` - Search preprint servers
 - `uniprot` - Protein sequence and function data
 - `chembl` - Bioactive molecules and drug data
@@ -78,7 +80,6 @@ This session has the **scientific-skills** MCP plugin enabled with 140+ scientif
 ### Molecular Analysis
 - `rdkit` - Molecular structure analysis, SMILES parsing
 - `biopython` - Sequence analysis, alignments
-- `openbabel` - Chemical format conversion
 
 ### Data Science
 - `pandas` - Data manipulation and analysis
@@ -95,7 +96,7 @@ This session has the **scientific-skills** MCP plugin enabled with 140+ scientif
 
 ## Role & Context
 
-You are a specialized medical research assistant. Your primary function is to assist with medical and healthcare research questions using the scientific tools available.
+You are a specialized research assistant. Your primary function is to assist with research questions using the scientific tools available.
 
 **PROACTIVELY USE SCIENTIFIC SKILLS** - Don't just explain concepts, use the tools to:
 - Search PubMed for relevant papers
@@ -103,33 +104,6 @@ You are a specialized medical research assistant. Your primary function is to as
 - Analyze molecular structures
 - Generate visualizations
 - Process research data
-
-## Core Capabilities
-
-### 1. Literature Research (USE: pubmed, biorxiv, medrxiv)
-- Search and analyze medical literature
-- Summarize research papers and clinical studies
-- Identify key findings and methodologies
-
-### 2. Database Queries (USE: uniprot, chembl, drugbank, kegg)
-- Query protein and drug databases
-- Find molecular targets and pathways
-- Retrieve compound information
-
-### 3. Molecular Analysis (USE: rdkit, biopython)
-- Analyze chemical structures
-- Process sequence data
-- Calculate molecular properties
-
-### 4. Data Processing (USE: pandas, numpy, scipy)
-- Analyze medical datasets
-- Generate statistical summaries
-- Machine learning analysis
-
-### 5. Visualization (USE: matplotlib, seaborn, plotly)
-- Create publication-ready figures
-- Generate data visualizations
-- Plot analysis results
 
 ## Guidelines
 
@@ -150,69 +124,92 @@ You are a specialized medical research assistant. Your primary function is to as
 **Remember:** USE THE SCIENTIFIC SKILLS! Don't just explain - demonstrate with actual tool calls.
 """
 
+# Template section for uploaded files
+UPLOADED_FILES_SECTION = """
+## UPLOADED DATA FILES
+
+The user has uploaded the following files for this research session.
+**These files are located in the `data/` directory.**
+
+{file_list}
+
+**IMPORTANT:** When the user asks questions related to these files, READ THEM FIRST
+using the Read tool before answering. Analyze the data they contain.
+
+---
+"""
+
 
 @dataclass
 class ClaudeProcess:
     """Container for Claude Code process state"""
     process: Any  # pexpect.spawn
     workspace_dir: Path
-    medresearch_id: str
+    ccresearch_id: str
     created_at: datetime
     read_task: Optional[asyncio.Task] = None
     is_alive: bool = True
     log_file: Optional[Any] = None  # File handle for terminal logging
 
 
-class MedResearchManager:
-    """Manages Claude Code CLI processes for medical research sessions"""
+class CCResearchManager:
+    """Manages Claude Code CLI processes for research sessions"""
 
     def __init__(self):
         self.processes: Dict[str, ClaudeProcess] = {}
         # Use config paths for SSD storage
         self.BASE_DIR = Path(settings.CLAUDE_WORKSPACES_DIR)
-        self.PROJECTS_DIR = Path(settings.MEDRESEARCH_DATA_DIR)
-        self.LOGS_DIR = Path(settings.MEDRESEARCH_LOGS_DIR)
+        self.PROJECTS_DIR = Path(settings.CCRESEARCH_DATA_DIR)
+        self.LOGS_DIR = Path(settings.CCRESEARCH_LOGS_DIR)
         # Ensure directories exist
         self.BASE_DIR.mkdir(parents=True, exist_ok=True)
         self.PROJECTS_DIR.mkdir(parents=True, exist_ok=True)
         self.LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        logger.info(f"MedResearchManager initialized. Workspaces: {self.BASE_DIR}, Projects: {self.PROJECTS_DIR}, Logs: {self.LOGS_DIR}")
+        logger.info(f"CCResearchManager initialized. Workspaces: {self.BASE_DIR}, Projects: {self.PROJECTS_DIR}, Logs: {self.LOGS_DIR}")
 
-    def create_workspace(self, medresearch_id: str) -> Path:
+    def create_workspace(
+        self,
+        ccresearch_id: str,
+        email: str = "",
+        uploaded_files: List[str] = None
+    ) -> Path:
         """
         Create workspace directory with isolated Claude config.
 
         Creates:
-        - CLAUDE.md with session instructions
-        - .claude/ directory with:
-          - settings.json (copied from global ~/.claude/)
-          - settings.local.json (session-specific permissions)
-          - plugins/ (config files copied - uses absolute paths to global cache)
-          - skills/ (copied from global)
-          - statsig/ (copied from global)
-
-        NOTE: SSD uses exFAT which doesn't support symlinks, so we copy files.
-        The installed_plugins.json uses absolute paths to ~/.claude/plugins/cache/
-        so the actual plugin code is referenced from the SD card.
-
-        This isolation allows multiple Claude Code instances to run
-        simultaneously without conflicts.
+        - CLAUDE.md with session instructions and uploaded file info
+        - data/ directory for uploaded files
+        - .claude/ directory with session-specific config
 
         Args:
-            medresearch_id: UUID for the session
+            ccresearch_id: UUID for the session
+            email: User's email address
+            uploaded_files: List of uploaded filenames
 
         Returns:
             Path to workspace directory
         """
-        workspace = self.BASE_DIR / medresearch_id
+        workspace = self.BASE_DIR / ccresearch_id
         workspace.mkdir(parents=True, exist_ok=True)
+
+        # Create data directory for uploaded files
+        data_dir = workspace / "data"
+        data_dir.mkdir(exist_ok=True)
+
+        # Build uploaded files section if files exist
+        uploaded_files_section = ""
+        if uploaded_files:
+            file_list = "\n".join([f"- `data/{f}`" for f in uploaded_files])
+            uploaded_files_section = UPLOADED_FILES_SECTION.format(file_list=file_list)
 
         # Write CLAUDE.md template
         claude_md_path = workspace / "CLAUDE.md"
         claude_md_content = CLAUDE_MD_TEMPLATE.format(
-            session_id=medresearch_id,
+            session_id=ccresearch_id,
+            email=email or "Not provided",
             created_at=datetime.utcnow().isoformat(),
-            workspace_dir=str(workspace)
+            workspace_dir=str(workspace),
+            uploaded_files_section=uploaded_files_section
         )
         claude_md_path.write_text(claude_md_content)
 
@@ -282,6 +279,45 @@ class MedResearchManager:
 
         logger.info(f"Created isolated workspace: {workspace}")
         return workspace
+
+    def update_workspace_claude_md(
+        self,
+        ccresearch_id: str,
+        workspace_dir: str,
+        email: str = "",
+        uploaded_files: List[str] = None
+    ):
+        """
+        Update CLAUDE.md with file upload information.
+
+        Called after files are uploaded to update the session's CLAUDE.md
+        so Claude knows about the available data.
+
+        Args:
+            ccresearch_id: Session ID
+            workspace_dir: Workspace path
+            email: User's email
+            uploaded_files: List of uploaded filenames
+        """
+        workspace = Path(workspace_dir)
+        claude_md_path = workspace / "CLAUDE.md"
+
+        # Build uploaded files section
+        uploaded_files_section = ""
+        if uploaded_files:
+            file_list = "\n".join([f"- `data/{f}`" for f in uploaded_files])
+            uploaded_files_section = UPLOADED_FILES_SECTION.format(file_list=file_list)
+
+        # Write updated CLAUDE.md
+        claude_md_content = CLAUDE_MD_TEMPLATE.format(
+            session_id=ccresearch_id,
+            email=email or "Not provided",
+            created_at=datetime.utcnow().isoformat(),
+            workspace_dir=str(workspace),
+            uploaded_files_section=uploaded_files_section
+        )
+        claude_md_path.write_text(claude_md_content)
+        logger.info(f"Updated CLAUDE.md with {len(uploaded_files or [])} files for session {ccresearch_id}")
 
     def _build_sandbox_command(self, workspace_dir: Path) -> list:
         """
@@ -366,7 +402,7 @@ class MedResearchManager:
 
         return cmd
 
-    def _create_session_log(self, medresearch_id: str, workspace_dir: Path) -> Any:
+    def _create_session_log(self, ccresearch_id: str, workspace_dir: Path) -> Any:
         """
         Create log file for terminal session.
 
@@ -377,14 +413,14 @@ class MedResearchManager:
         then logs all terminal I/O (both input and output) with timestamps.
 
         Args:
-            medresearch_id: Session ID
+            ccresearch_id: Session ID
             workspace_dir: Workspace path (for metadata)
 
         Returns:
             File handle for writing log entries
         """
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        log_filename = f"{medresearch_id}_{timestamp}.log"
+        log_filename = f"{ccresearch_id}_{timestamp}.log"
         log_path = self.LOGS_DIR / log_filename
 
         # Open log file in append mode
@@ -392,9 +428,9 @@ class MedResearchManager:
 
         # Write session metadata header
         header = f"""================================================================================
-MEDRESEARCH TERMINAL LOG
+CCRESEARCH TERMINAL LOG
 ================================================================================
-Session ID:     {medresearch_id}
+Session ID:     {ccresearch_id}
 Started:        {datetime.utcnow().isoformat()}
 Workspace:      {workspace_dir}
 Log File:       {log_path}
@@ -447,13 +483,13 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
 """
                 process_info.log_file.write(footer)
                 process_info.log_file.close()
-                logger.info(f"Closed session log for {process_info.medresearch_id}")
+                logger.info(f"Closed session log for {process_info.ccresearch_id}")
             except Exception as e:
                 logger.error(f"Error closing log file: {e}")
 
     async def spawn_claude(
         self,
-        medresearch_id: str,
+        ccresearch_id: str,
         workspace_dir: Path,
         rows: int = 24,
         cols: int = 80,
@@ -470,7 +506,7 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
         - Maintains network access for API calls
 
         Args:
-            medresearch_id: Session ID
+            ccresearch_id: Session ID
             workspace_dir: Working directory for Claude
             rows: Terminal height
             cols: Terminal width
@@ -484,14 +520,14 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             logger.error("pexpect not installed. Install with: pip install pexpect")
             return False
 
-        if medresearch_id in self.processes:
-            proc = self.processes[medresearch_id]
+        if ccresearch_id in self.processes:
+            proc = self.processes[ccresearch_id]
             if proc.process.isalive():
-                logger.warning(f"Process already exists and alive for {medresearch_id}")
+                logger.warning(f"Process already exists and alive for {ccresearch_id}")
                 return True
             else:
                 # Clean up dead process
-                await self.terminate_session(medresearch_id)
+                await self.terminate_session(ccresearch_id)
 
         try:
             env = os.environ.copy()
@@ -512,7 +548,7 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             if sandboxed:
                 # Use bubblewrap for secure sandboxing
                 sandbox_cmd = self._build_sandbox_command(workspace_dir)
-                logger.info(f"Spawning sandboxed Claude Code for {medresearch_id}")
+                logger.info(f"Spawning sandboxed Claude Code for {ccresearch_id}")
                 logger.debug(f"Sandbox command: {' '.join(sandbox_cmd)}")
 
                 process = pexpect.spawn(
@@ -526,7 +562,7 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
                 )
             else:
                 # Non-sandboxed mode (for debugging only)
-                logger.warning(f"Spawning UNSANDBOXED Claude Code for {medresearch_id}")
+                logger.warning(f"Spawning UNSANDBOXED Claude Code for {ccresearch_id}")
                 process = pexpect.spawn(
                     'claude',
                     args=[],
@@ -538,24 +574,24 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
                 )
 
             # Create session log file
-            log_file = self._create_session_log(medresearch_id, workspace_dir)
+            log_file = self._create_session_log(ccresearch_id, workspace_dir)
 
             # Store process info
-            self.processes[medresearch_id] = ClaudeProcess(
+            self.processes[ccresearch_id] = ClaudeProcess(
                 process=process,
                 workspace_dir=workspace_dir,
-                medresearch_id=medresearch_id,
+                ccresearch_id=ccresearch_id,
                 created_at=datetime.utcnow(),
                 log_file=log_file
             )
 
             # Start async read task if callback provided
             if output_callback:
-                self.processes[medresearch_id].read_task = asyncio.create_task(
-                    self._async_read_loop(medresearch_id, output_callback)
+                self.processes[ccresearch_id].read_task = asyncio.create_task(
+                    self._async_read_loop(ccresearch_id, output_callback)
                 )
 
-            logger.info(f"Spawned Claude Code for {medresearch_id}, PID: {process.pid}, Sandboxed: {sandboxed}")
+            logger.info(f"Spawned Claude Code for {ccresearch_id}, PID: {process.pid}, Sandboxed: {sandboxed}")
             return True
 
         except FileNotFoundError as e:
@@ -567,11 +603,11 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
 
     async def _async_read_loop(
         self,
-        medresearch_id: str,
+        ccresearch_id: str,
         callback: Callable[[bytes], Any]
     ):
         """Async loop reading from pexpect process and calling callback with output"""
-        process_info = self.processes.get(medresearch_id)
+        process_info = self.processes.get(ccresearch_id)
         if not process_info:
             return
 
@@ -610,10 +646,10 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
                     await result
                 break
             except asyncio.CancelledError:
-                logger.info(f"Read task cancelled for {medresearch_id}")
+                logger.info(f"Read task cancelled for {ccresearch_id}")
                 break
             except Exception as e:
-                logger.error(f"Read error for {medresearch_id}: {e}")
+                logger.error(f"Read error for {ccresearch_id}: {e}")
                 await asyncio.sleep(0.1)  # Prevent tight loop on error
 
     def _read_nonblocking(self, process: Any, size: int = 4096) -> bytes:
@@ -625,24 +661,24 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
         except pexpect.EOF:
             raise
 
-    async def write_input(self, medresearch_id: str, data: bytes) -> bool:
+    async def write_input(self, ccresearch_id: str, data: bytes) -> bool:
         """
         Write user input to Claude process
 
         Args:
-            medresearch_id: Session ID
+            ccresearch_id: Session ID
             data: Raw bytes to send to process stdin
 
         Returns:
             True if write successful
         """
-        process_info = self.processes.get(medresearch_id)
+        process_info = self.processes.get(ccresearch_id)
         if not process_info:
-            logger.warning(f"No process found for {medresearch_id}")
+            logger.warning(f"No process found for {ccresearch_id}")
             return False
 
         if not process_info.process.isalive():
-            logger.warning(f"Process not alive for {medresearch_id}")
+            logger.warning(f"Process not alive for {ccresearch_id}")
             return False
 
         try:
@@ -651,22 +687,22 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             process_info.process.send(data)
             return True
         except Exception as e:
-            logger.error(f"Write error for {medresearch_id}: {e}")
+            logger.error(f"Write error for {ccresearch_id}: {e}")
             return False
 
-    async def resize_terminal(self, medresearch_id: str, rows: int, cols: int) -> bool:
+    async def resize_terminal(self, ccresearch_id: str, rows: int, cols: int) -> bool:
         """
         Resize PTY dimensions
 
         Args:
-            medresearch_id: Session ID
+            ccresearch_id: Session ID
             rows: New terminal height
             cols: New terminal width
 
         Returns:
             True if resize successful
         """
-        process_info = self.processes.get(medresearch_id)
+        process_info = self.processes.get(ccresearch_id)
         if not process_info:
             return False
 
@@ -675,30 +711,30 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
 
         try:
             process_info.process.setwinsize(rows, cols)
-            logger.debug(f"Resized terminal for {medresearch_id}: {rows}x{cols}")
+            logger.debug(f"Resized terminal for {ccresearch_id}: {rows}x{cols}")
             return True
         except Exception as e:
-            logger.error(f"Resize error for {medresearch_id}: {e}")
+            logger.error(f"Resize error for {ccresearch_id}: {e}")
             return False
 
-    def is_process_alive(self, medresearch_id: str) -> bool:
+    def is_process_alive(self, ccresearch_id: str) -> bool:
         """Check if process is still running"""
-        process_info = self.processes.get(medresearch_id)
+        process_info = self.processes.get(ccresearch_id)
         if not process_info:
             return False
         return process_info.process.isalive()
 
-    async def terminate_session(self, medresearch_id: str) -> bool:
+    async def terminate_session(self, ccresearch_id: str) -> bool:
         """
         Terminate Claude process and cleanup
 
         Args:
-            medresearch_id: Session ID
+            ccresearch_id: Session ID
 
         Returns:
             True if termination successful
         """
-        process_info = self.processes.pop(medresearch_id, None)
+        process_info = self.processes.pop(ccresearch_id, None)
         if not process_info:
             return False
 
@@ -721,11 +757,11 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             if process_info.process.isalive():
                 process_info.process.terminate(force=True)
 
-            logger.info(f"Terminated session {medresearch_id}")
+            logger.info(f"Terminated session {ccresearch_id}")
             return True
 
         except Exception as e:
-            logger.error(f"Termination error for {medresearch_id}: {e}")
+            logger.error(f"Termination error for {ccresearch_id}: {e}")
             return False
 
     def delete_workspace(self, workspace_dir: Path) -> bool:
@@ -958,13 +994,13 @@ following their stated goals and next steps.
         projects.sort(key=lambda p: p.get("saved_at", ""), reverse=True)
         return projects
 
-    def restore_project(self, project_name: str, medresearch_id: str) -> Optional[Path]:
+    def restore_project(self, project_name: str, ccresearch_id: str) -> Optional[Path]:
         """
         Restore a saved project to a new workspace.
 
         Args:
             project_name: Name of saved project
-            medresearch_id: New session ID
+            ccresearch_id: New session ID
 
         Returns:
             Path to new workspace, or None on failure
@@ -977,7 +1013,7 @@ following their stated goals and next steps.
 
         try:
             # Create new workspace
-            workspace = self.BASE_DIR / medresearch_id
+            workspace = self.BASE_DIR / ccresearch_id
 
             # Copy project files to workspace
             shutil.copytree(
@@ -990,7 +1026,7 @@ following their stated goals and next steps.
             claude_md_path = workspace / "CLAUDE.md"
             if claude_md_path.exists():
                 claude_md_content = CLAUDE_MD_TEMPLATE.format(
-                    session_id=medresearch_id,
+                    session_id=ccresearch_id,
                     created_at=datetime.utcnow().isoformat(),
                     workspace_dir=str(workspace)
                 )
@@ -1089,4 +1125,4 @@ following their stated goals and next steps.
 
 
 # Global instance
-medresearch_manager = MedResearchManager()
+ccresearch_manager = CCResearchManager()

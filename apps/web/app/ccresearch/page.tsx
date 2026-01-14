@@ -44,8 +44,8 @@ import Link from 'next/link';
 import { useToast } from '@/components/ui/ToastProvider';
 
 // Dynamic import for Terminal (client-only, xterm.js requires DOM)
-const MedResearchTerminal = dynamic(
-  () => import('@/components/medresearch/MedResearchTerminal'),
+const CCResearchTerminal = dynamic(
+  () => import('@/components/ccresearch/CCResearchTerminal'),
   {
     ssr: false,
     loading: () => (
@@ -61,7 +61,7 @@ const MedResearchTerminal = dynamic(
 
 // Dynamic import for FileBrowser
 const FileBrowser = dynamic(
-  () => import('@/components/medresearch/FileBrowser'),
+  () => import('@/components/ccresearch/FileBrowser'),
   {
     ssr: false,
     loading: () => (
@@ -73,9 +73,10 @@ const FileBrowser = dynamic(
 );
 
 // Types
-interface MedResearchSession {
+interface CCResearchSession {
   id: string;
   session_id: string;
+  email: string;
   title: string;
   workspace_dir: string;
   status: 'created' | 'active' | 'disconnected' | 'terminated' | 'error';
@@ -85,6 +86,7 @@ interface MedResearchSession {
   created_at: string;
   last_activity_at: string;
   expires_at: string;
+  uploaded_files?: string[];
 }
 
 interface SavedProject {
@@ -141,12 +143,24 @@ interface CapabilitiesData {
 // API functions
 const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
 
-const medresearchApi = {
-  createSession: async (browserSessionId: string, title?: string): Promise<MedResearchSession> => {
-    const res = await fetch(`${API_URL}/medresearch/sessions`, {
+const ccresearchApi = {
+  createSession: async (
+    browserSessionId: string,
+    email: string,
+    title?: string,
+    files?: File[]
+  ): Promise<CCResearchSession> => {
+    const formData = new FormData();
+    formData.append('session_id', browserSessionId);
+    formData.append('email', email);
+    if (title) formData.append('title', title);
+    if (files) {
+      files.forEach(file => formData.append('files', file));
+    }
+
+    const res = await fetch(`${API_URL}/ccresearch/sessions`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: browserSessionId, title }),
+      body: formData,
     });
     if (!res.ok) {
       const error = await res.json().catch(() => ({ detail: 'Failed to create session' }));
@@ -155,38 +169,53 @@ const medresearchApi = {
     return res.json();
   },
 
-  listSessions: async (browserSessionId: string): Promise<MedResearchSession[]> => {
-    const res = await fetch(`${API_URL}/medresearch/sessions/${browserSessionId}`);
+  uploadFiles: async (ccresearchId: string, files: File[]): Promise<{ uploaded_files: string[]; data_dir: string }> => {
+    const formData = new FormData();
+    files.forEach(file => formData.append('files', file));
+
+    const res = await fetch(`${API_URL}/ccresearch/sessions/${ccresearchId}/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: 'Failed to upload files' }));
+      throw new Error(error.detail || 'Failed to upload files');
+    }
+    return res.json();
+  },
+
+  listSessions: async (browserSessionId: string): Promise<CCResearchSession[]> => {
+    const res = await fetch(`${API_URL}/ccresearch/sessions/${browserSessionId}`);
     if (!res.ok) throw new Error('Failed to list sessions');
     return res.json();
   },
 
-  deleteSession: async (medresearchId: string): Promise<void> => {
-    const res = await fetch(`${API_URL}/medresearch/sessions/${medresearchId}`, {
+  deleteSession: async (ccresearchId: string): Promise<void> => {
+    const res = await fetch(`${API_URL}/ccresearch/sessions/${ccresearchId}`, {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error('Failed to delete session');
   },
 
-  resizeTerminal: async (medresearchId: string, rows: number, cols: number): Promise<void> => {
-    await fetch(`${API_URL}/medresearch/sessions/${medresearchId}/resize`, {
+  resizeTerminal: async (ccresearchId: string, rows: number, cols: number): Promise<void> => {
+    await fetch(`${API_URL}/ccresearch/sessions/${ccresearchId}/resize`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ rows, cols }),
     });
   },
 
-  downloadWorkspaceZip: (medresearchId: string): void => {
-    window.open(`${API_URL}/medresearch/sessions/${medresearchId}/download-zip`, '_blank');
+  downloadWorkspaceZip: (ccresearchId: string): void => {
+    window.open(`${API_URL}/ccresearch/sessions/${ccresearchId}/download-zip`, '_blank');
   },
 
   // Project save/restore
-  saveProject: async (medresearchId: string, projectName: string, description?: string): Promise<{
+  saveProject: async (ccresearchId: string, projectName: string, description?: string): Promise<{
     name: string;
     path: string;
     saved_at: string;
   }> => {
-    const res = await fetch(`${API_URL}/medresearch/sessions/${medresearchId}/save-project`, {
+    const res = await fetch(`${API_URL}/ccresearch/sessions/${ccresearchId}/save-project`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ project_name: projectName, description }),
@@ -199,16 +228,16 @@ const medresearchApi = {
   },
 
   listProjects: async (): Promise<SavedProject[]> => {
-    const res = await fetch(`${API_URL}/medresearch/projects`);
+    const res = await fetch(`${API_URL}/ccresearch/projects`);
     if (!res.ok) throw new Error('Failed to list projects');
     return res.json();
   },
 
-  createFromProject: async (browserSessionId: string, projectName: string, title?: string): Promise<MedResearchSession> => {
-    const res = await fetch(`${API_URL}/medresearch/sessions/from-project`, {
+  createFromProject: async (browserSessionId: string, email: string, projectName: string, title?: string): Promise<CCResearchSession> => {
+    const res = await fetch(`${API_URL}/ccresearch/sessions/from-project`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: browserSessionId, project_name: projectName, title }),
+      body: JSON.stringify({ session_id: browserSessionId, email, project_name: projectName, title }),
     });
     if (!res.ok) {
       const error = await res.json().catch(() => ({ detail: 'Failed to restore project' }));
@@ -218,7 +247,7 @@ const medresearchApi = {
   },
 
   deleteProject: async (projectName: string): Promise<void> => {
-    const res = await fetch(`${API_URL}/medresearch/projects/${encodeURIComponent(projectName)}`, {
+    const res = await fetch(`${API_URL}/ccresearch/projects/${encodeURIComponent(projectName)}`, {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error('Failed to delete project');
@@ -228,16 +257,16 @@ const medresearchApi = {
 // Generate browser session ID
 const generateSessionId = () => {
   if (typeof window === 'undefined') return '';
-  const stored = sessionStorage.getItem('medresearch_session_id');
+  const stored = sessionStorage.getItem('ccresearch_session_id');
   if (stored) return stored;
   const newId = `browser_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  sessionStorage.setItem('medresearch_session_id', newId);
+  sessionStorage.setItem('ccresearch_session_id', newId);
   return newId;
 };
 
-export default function MedResearchPage() {
+export default function CCResearchPage() {
   const { showToast } = useToast();
-  const [sessions, setSessions] = useState<MedResearchSession[]>([]);
+  const [sessions, setSessions] = useState<CCResearchSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -253,6 +282,13 @@ export default function MedResearchPage() {
   const [showProjectsTab, setShowProjectsTab] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [capabilities, setCapabilities] = useState<CapabilitiesData | null>(null);
+
+  // New session creation state
+  const [showNewSessionModal, setShowNewSessionModal] = useState(false);
+  const [newSessionEmail, setNewSessionEmail] = useState('');
+  const [newSessionTitle, setNewSessionTitle] = useState('');
+  const [newSessionFiles, setNewSessionFiles] = useState<File[]>([]);
+  const [emailError, setEmailError] = useState('');
 
   // Initialize browser session ID
   useEffect(() => {
@@ -414,7 +450,7 @@ export default function MedResearchPage() {
   const loadSessions = useCallback(async () => {
     if (!browserSessionId) return;
     try {
-      const data = await medresearchApi.listSessions(browserSessionId);
+      const data = await ccresearchApi.listSessions(browserSessionId);
       setSessions(data);
     } catch (error) {
       console.error('Failed to load sessions:', error);
@@ -432,7 +468,7 @@ export default function MedResearchPage() {
   // Load saved projects
   const loadProjects = useCallback(async () => {
     try {
-      const data = await medresearchApi.listProjects();
+      const data = await ccresearchApi.listProjects();
       setSavedProjects(data);
     } catch (error) {
       console.error('Failed to load projects:', error);
@@ -459,15 +495,63 @@ export default function MedResearchPage() {
     }
   }, [terminalConnected, activeSessionId]);
 
+  // Validate email
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Open new session modal
+  const openNewSessionModal = () => {
+    setNewSessionEmail('');
+    setNewSessionTitle('');
+    setNewSessionFiles([]);
+    setEmailError('');
+    setShowNewSessionModal(true);
+  };
+
+  // Handle file selection
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setNewSessionFiles(prev => [...prev, ...files]);
+  };
+
+  // Remove selected file
+  const removeFile = (index: number) => {
+    setNewSessionFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Create session with email and files
   const createSession = async () => {
     if (!browserSessionId) return;
+
+    // Validate email
+    if (!newSessionEmail.trim()) {
+      setEmailError('Email is required');
+      return;
+    }
+    if (!validateEmail(newSessionEmail)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+
     setIsCreating(true);
+    setEmailError('');
     try {
-      const session = await medresearchApi.createSession(browserSessionId);
+      const session = await ccresearchApi.createSession(
+        browserSessionId,
+        newSessionEmail.trim(),
+        newSessionTitle.trim() || undefined,
+        newSessionFiles.length > 0 ? newSessionFiles : undefined
+      );
       setSessions(prev => [session, ...prev]);
       setActiveSessionId(session.id);
+      setShowNewSessionModal(false);
       setShowSessionDropdown(false);
-      showToast({ message: 'Session created', type: 'success' });
+      showToast({
+        message: `Session created${newSessionFiles.length > 0 ? ` with ${newSessionFiles.length} file(s)` : ''}`,
+        type: 'success'
+      });
     } catch (error) {
       showToast({
         message: error instanceof Error ? error.message : 'Failed to create session',
@@ -478,11 +562,16 @@ export default function MedResearchPage() {
     }
   };
 
+  // Legacy: simple create session (for backward compatibility)
+  const createSessionSimple = () => {
+    openNewSessionModal();
+  };
+
   const deleteSession = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Delete this session?')) return;
     try {
-      await medresearchApi.deleteSession(sessionId);
+      await ccresearchApi.deleteSession(sessionId);
       setSessions(prev => prev.filter(s => s.id !== sessionId));
       if (activeSessionId === sessionId) {
         setActiveSessionId(null);
@@ -497,7 +586,7 @@ export default function MedResearchPage() {
     if (!activeSessionId || !saveProjectName.trim()) return;
     setIsSaving(true);
     try {
-      await medresearchApi.saveProject(activeSessionId, saveProjectName.trim(), saveProjectContext.trim());
+      await ccresearchApi.saveProject(activeSessionId, saveProjectName.trim(), saveProjectContext.trim());
       showToast({ message: `Project "${saveProjectName}" saved to SSD`, type: 'success' });
       setShowSaveDialog(false);
       setSaveProjectName('');
@@ -515,9 +604,17 @@ export default function MedResearchPage() {
 
   const restoreProject = async (projectName: string) => {
     if (!browserSessionId) return;
+
+    // Prompt for email if not available
+    const email = prompt('Enter your email address to restore this project:');
+    if (!email || !validateEmail(email)) {
+      showToast({ message: 'Valid email is required to restore a project', type: 'error' });
+      return;
+    }
+
     setIsCreating(true);
     try {
-      const session = await medresearchApi.createFromProject(browserSessionId, projectName);
+      const session = await ccresearchApi.createFromProject(browserSessionId, email, projectName);
       setSessions(prev => [session, ...prev]);
       setActiveSessionId(session.id);
       setShowSessionDropdown(false);
@@ -536,7 +633,7 @@ export default function MedResearchPage() {
     e.stopPropagation();
     if (!confirm(`Delete saved project "${projectName}"?`)) return;
     try {
-      await medresearchApi.deleteProject(projectName);
+      await ccresearchApi.deleteProject(projectName);
       setSavedProjects(prev => prev.filter(p => p.name !== projectName));
       showToast({ message: 'Project deleted', type: 'success' });
     } catch {
@@ -546,7 +643,7 @@ export default function MedResearchPage() {
 
   const handleResize = useCallback((rows: number, cols: number) => {
     if (activeSessionId) {
-      medresearchApi.resizeTerminal(activeSessionId, rows, cols).catch(console.error);
+      ccresearchApi.resizeTerminal(activeSessionId, rows, cols).catch(console.error);
     }
   }, [activeSessionId]);
 
@@ -617,7 +714,7 @@ export default function MedResearchPage() {
 
               <div className="flex items-center gap-2">
                 <span className="text-xl">🔬</span>
-                <span className="font-semibold text-lg">MedResearch</span>
+                <span className="font-semibold text-lg">CCResearch</span>
               </div>
 
               {/* Separator */}
@@ -625,7 +722,7 @@ export default function MedResearchPage() {
 
               {/* Quick Actions */}
               <button
-                onClick={createSession}
+                onClick={openNewSessionModal}
                 disabled={isCreating}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed rounded-lg transition-colors text-sm font-medium"
                 title="New session"
@@ -702,7 +799,7 @@ export default function MedResearchPage() {
                       <>
                         {/* New Session Button */}
                         <button
-                          onClick={createSession}
+                          onClick={openNewSessionModal}
                           disabled={isCreating}
                           className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-800 transition-colors text-blue-400 border-b border-gray-700"
                         >
@@ -818,7 +915,7 @@ export default function MedResearchPage() {
                     <span>Save</span>
                   </button>
                   <button
-                    onClick={() => medresearchApi.downloadWorkspaceZip(activeSessionId!)}
+                    onClick={() => ccresearchApi.downloadWorkspaceZip(activeSessionId!)}
                     className="flex items-center gap-1.5 px-2 py-1 text-xs hover:bg-gray-700/50 rounded transition-colors text-gray-400 hover:text-blue-400"
                     title="Download workspace as ZIP"
                   >
@@ -871,7 +968,7 @@ export default function MedResearchPage() {
 
               {/* Terminal Component - Full Height */}
               <div className="flex-1 overflow-hidden">
-                <MedResearchTerminal
+                <CCResearchTerminal
                   key={activeSessionId}
                   sessionId={activeSessionId}
                   onResize={handleResize}
@@ -902,13 +999,13 @@ export default function MedResearchPage() {
                     <Microscope className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <h1 className="text-2xl font-bold text-white">MedResearch Terminal</h1>
-                    <p className="text-sm text-gray-400">Claude Code + 140 Scientific MCP Tools</p>
+                    <h1 className="text-2xl font-bold text-white">CCResearch Terminal</h1>
+                    <p className="text-sm text-gray-400">Claude Code Research Platform + 140 Scientific Tools</p>
                   </div>
                 </div>
 
                 <button
-                  onClick={createSession}
+                  onClick={openNewSessionModal}
                   disabled={isCreating}
                   className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 disabled:from-gray-700 disabled:to-gray-700 rounded-xl transition-all font-semibold text-lg shadow-lg shadow-blue-500/25"
                 >
@@ -1342,7 +1439,7 @@ export default function MedResearchPage() {
       {/* Minimal Footer */}
       <div className="flex-shrink-0 border-t border-gray-800 bg-gray-900/50 px-4 py-1.5">
         <div className="flex items-center justify-between text-xs text-gray-600">
-          <span>Powered by Claude Code + Scientific Skills MCP</span>
+          <span>Powered by Claude Code Research Platform + Scientific Skills MCP</span>
           <div className="flex items-center gap-1">
             <AlertCircle className="w-3 h-3" />
             <span>For research purposes only</span>
@@ -1411,6 +1508,173 @@ Example:
                   <Save className="w-4 h-4" />
                 )}
                 Save Project
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New Session Modal with Email and File Upload */}
+      {showNewSessionModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-800">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                    <SquarePlus className="w-6 h-6 text-blue-400" />
+                    Create New Research Session
+                  </h2>
+                  <p className="text-sm text-gray-400 mt-1">Claude Code Research Platform</p>
+                </div>
+                <button
+                  onClick={() => setShowNewSessionModal(false)}
+                  className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <AlertCircle className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+            </div>
+
+            {/* Form */}
+            <div className="p-6 space-y-6">
+              {/* Email Input */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Email Address <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={newSessionEmail}
+                  onChange={(e) => {
+                    setNewSessionEmail(e.target.value);
+                    setEmailError('');
+                  }}
+                  placeholder="your@email.com"
+                  className={`w-full px-4 py-3 bg-gray-800 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    emailError ? 'border-red-500' : 'border-gray-700'
+                  }`}
+                />
+                {emailError && (
+                  <p className="mt-1 text-sm text-red-400">{emailError}</p>
+                )}
+              </div>
+
+              {/* Session Title */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Session Title (optional)
+                </label>
+                <input
+                  type="text"
+                  value={newSessionTitle}
+                  onChange={(e) => setNewSessionTitle(e.target.value)}
+                  placeholder="e.g., CRISPR Gene Analysis"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              {/* File Upload */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Upload Data Files (optional)
+                </label>
+                <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+                  <input
+                    type="file"
+                    multiple
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="file-upload"
+                  />
+                  <label htmlFor="file-upload" className="cursor-pointer">
+                    <FolderOpen className="w-10 h-10 mx-auto text-gray-500 mb-3" />
+                    <p className="text-gray-300">Click to upload files</p>
+                    <p className="text-xs text-gray-500 mt-1">CSV, Excel, PDF, images, or any data files</p>
+                  </label>
+                </div>
+
+                {/* Selected Files */}
+                {newSessionFiles.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {newSessionFiles.map((file, index) => (
+                      <div key={index} className="flex items-center justify-between bg-gray-800 px-3 py-2 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-blue-400" />
+                          <span className="text-sm text-gray-300">{file.name}</span>
+                          <span className="text-xs text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                        <button
+                          onClick={() => removeFile(index)}
+                          className="p-1 hover:bg-gray-700 rounded"
+                        >
+                          <Trash2 className="w-4 h-4 text-red-400" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Start Guide */}
+              <div className="bg-gray-800/50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-200 mb-3 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-yellow-400" />
+                  Quick Start Guide
+                </h3>
+                <ol className="text-xs text-gray-400 space-y-2">
+                  <li className="flex gap-2">
+                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600/20 text-blue-400 text-[10px] flex items-center justify-center font-bold">1</span>
+                    <span><strong className="text-gray-300">Wait:</strong> Claude Code will start automatically</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600/20 text-blue-400 text-[10px] flex items-center justify-center font-bold">2</span>
+                    <span><strong className="text-gray-300">Auth:</strong> Click login URL or paste code</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600/20 text-blue-400 text-[10px] flex items-center justify-center font-bold">3</span>
+                    <span><strong className="text-gray-300">Setup:</strong> Press Enter through prompts</span>
+                  </li>
+                  <li className="flex gap-2">
+                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-600/20 text-green-400 text-[10px] flex items-center justify-center font-bold">4</span>
+                    <span><strong className="text-gray-300">Research:</strong> Ask Claude anything!</span>
+                  </li>
+                </ol>
+                {newSessionFiles.length > 0 && (
+                  <div className="mt-3 p-2 bg-green-900/30 border border-green-700/50 rounded-lg">
+                    <p className="text-xs text-green-400">
+                      <strong>Tip:</strong> Your {newSessionFiles.length} uploaded file(s) will be available in the <code className="bg-gray-800 px-1 rounded">data/</code> directory.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-800 flex justify-end gap-3">
+              <button
+                onClick={() => setShowNewSessionModal(false)}
+                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={createSession}
+                disabled={isCreating}
+                className="px-6 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors flex items-center gap-2"
+              >
+                {isCreating ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <TerminalIcon className="w-4 h-4" />
+                    Create Session
+                  </>
+                )}
               </button>
             </div>
           </div>
