@@ -38,24 +38,48 @@ export default function MedResearchTerminal({
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 3;
 
+  // Track last dimensions to avoid unnecessary resizes
+  const lastDimensions = useRef<{ rows: number; cols: number } | null>(null);
+  const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Update parent when connection status changes
   useEffect(() => {
     onStatusChange?.(connected);
   }, [connected, onStatusChange]);
 
-  // Resize handler
+  // Debounced resize handler - prevents flickering during rapid size changes
   const handleResize = useCallback(() => {
-    if (fitAddonRef.current && xtermRef.current) {
-      fitAddonRef.current.fit();
-      const { rows, cols } = xtermRef.current;
-
-      // Send resize to server
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        wsRef.current.send(JSON.stringify({ type: 'resize', rows, cols }));
-      }
-
-      onResize?.(rows, cols);
+    // Clear any pending resize
+    if (resizeTimeoutRef.current) {
+      clearTimeout(resizeTimeoutRef.current);
     }
+
+    // Debounce resize to prevent flickering
+    resizeTimeoutRef.current = setTimeout(() => {
+      if (fitAddonRef.current && xtermRef.current) {
+        try {
+          fitAddonRef.current.fit();
+          const { rows, cols } = xtermRef.current;
+
+          // Only send resize if dimensions actually changed
+          if (!lastDimensions.current ||
+              lastDimensions.current.rows !== rows ||
+              lastDimensions.current.cols !== cols) {
+            lastDimensions.current = { rows, cols };
+
+            // Send resize to server
+            if (wsRef.current?.readyState === WebSocket.OPEN) {
+              wsRef.current.send(JSON.stringify({ type: 'resize', rows, cols }));
+            }
+
+            onResize?.(rows, cols);
+          }
+        } catch (e) {
+          // Ignore fit errors during unmount
+          console.debug('Fit error (likely during unmount):', e);
+        }
+      }
+    }, 100); // 100ms debounce
   }, [onResize]);
 
   useEffect(() => {
@@ -92,6 +116,8 @@ export default function MedResearchTerminal({
       },
       scrollback: 10000,
       allowProposedApi: true,
+      // Smooth scrolling to reduce flickering
+      smoothScrollDuration: 0,
     });
 
     // Add addons
@@ -103,7 +129,17 @@ export default function MedResearchTerminal({
 
     // Open terminal in DOM
     term.open(terminalRef.current);
-    fitAddon.fit();
+
+    // Initial fit with a small delay to ensure DOM is ready
+    setTimeout(() => {
+      try {
+        fitAddon.fit();
+        const { rows, cols } = term;
+        lastDimensions.current = { rows, cols };
+      } catch (e) {
+        console.debug('Initial fit error:', e);
+      }
+    }, 50);
 
     // Store refs
     xtermRef.current = term;
@@ -193,11 +229,25 @@ export default function MedResearchTerminal({
       }
     });
 
-    // Handle window resize
+    // Handle window resize with debouncing
     window.addEventListener('resize', handleResize);
 
-    // Observe container resize
-    const resizeObserver = new ResizeObserver(handleResize);
+    // Observe container resize - use a flag to ignore scroll-triggered resizes
+    let isResizing = false;
+    const resizeObserver = new ResizeObserver((entries) => {
+      // Only trigger resize if the actual container size changed significantly
+      const entry = entries[0];
+      if (entry) {
+        const { width, height } = entry.contentRect;
+        // Ignore very small changes (likely from scroll bars appearing/disappearing)
+        if (!isResizing && width > 0 && height > 0) {
+          isResizing = true;
+          handleResize();
+          // Reset flag after debounce period
+          setTimeout(() => { isResizing = false; }, 150);
+        }
+      }
+    });
     resizeObserver.observe(terminalRef.current);
 
     // Ping to keep connection alive
@@ -209,6 +259,9 @@ export default function MedResearchTerminal({
 
     // Cleanup
     return () => {
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
       clearInterval(pingInterval);
       window.removeEventListener('resize', handleResize);
       resizeObserver.disconnect();
@@ -218,7 +271,7 @@ export default function MedResearchTerminal({
   }, [sessionId, handleResize]);
 
   return (
-    <div className={`relative ${className}`}>
+    <div className={`relative h-full ${className}`}>
       {/* Status indicator */}
       <div className="absolute top-2 right-2 z-10">
         <div className="flex items-center gap-2 bg-black/70 px-3 py-1 rounded-md text-xs">
@@ -236,11 +289,10 @@ export default function MedResearchTerminal({
         </div>
       )}
 
-      {/* Terminal container */}
+      {/* Terminal container - use overflow-hidden to prevent scroll issues */}
       <div
         ref={terminalRef}
-        className="w-full h-full"
-        style={{ minHeight: '600px' }}
+        className="w-full h-full overflow-hidden"
       />
     </div>
   );

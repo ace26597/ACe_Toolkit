@@ -39,6 +39,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.core.medresearch_manager import medresearch_manager
 from app.models.models import MedResearchSession
 
@@ -601,7 +602,8 @@ async def terminal_websocket(
                 Path(session.workspace_dir),
                 session.terminal_rows,
                 session.terminal_cols,
-                send_output
+                send_output,
+                sandboxed=settings.MEDRESEARCH_SANDBOX_ENABLED
             )
 
             if not success:

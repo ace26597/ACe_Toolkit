@@ -103,9 +103,22 @@ Web-based Claude Code terminal for medical research with isolated workspaces.
 - **File Browser:** Navigate and download workspace files
 - **Session Management:** Create, list, delete research sessions
 
+**Security (Bubblewrap Sandbox):**
+- Sessions run in isolated bubblewrap (bwrap) sandbox
+- Cannot access home directory (`/home/ace/dev/` blocked)
+- Cannot access other sessions (only own workspace visible)
+- Read-only access to system binaries and Claude installation
+- Network access allowed for API calls
+- Configurable via `MEDRESEARCH_SANDBOX_ENABLED` env var
+
+**Navbar Controls:**
+- Back button (arrow) - return to session list
+- New button (blue) - create new session
+- End button (red) - delete current session
+
 **Terminal Capabilities:**
 - Full terminal emulation (bash, vim, etc.)
-- Resize support for responsive layouts
+- Debounced resize handling (prevents flickering)
 - File upload/download from workspace
 - Auto-generated medical research CLAUDE.md per session
 
@@ -687,6 +700,9 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 | Date | Change |
 |------|--------|
+| 2026-01-14 | Add bubblewrap sandbox security for MedResearch sessions |
+| 2026-01-14 | Add navbar controls (back, new, end session) to MedResearch |
+| 2026-01-14 | Fix terminal flickering with debounced resize handling |
 | 2026-01-14 | Add SSD storage integration (1.8TB Samsung T7) for persistent data |
 | 2026-01-14 | Add project save/restore to MedResearch Terminal |
 | 2026-01-14 | Add disk export/import to Mermaid Studio |

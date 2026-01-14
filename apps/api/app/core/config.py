@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     MEDRESEARCH_DATA_DIR: str = "/data/medresearch-projects"
     CLAUDE_WORKSPACES_DIR: str = "/data/claude-workspaces"
 
+    # MedResearch Terminal Security
+    # Set to False to disable bwrap sandbox (for debugging only)
+    MEDRESEARCH_SANDBOX_ENABLED: bool = True
+
     class Config:
         env_file = ".env"
         case_sensitive = True

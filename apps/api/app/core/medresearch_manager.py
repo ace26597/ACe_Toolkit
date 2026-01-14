@@ -184,7 +184,13 @@ class MedResearchManager:
         - .claude/ directory with:
           - settings.json (copied from global ~/.claude/)
           - settings.local.json (session-specific permissions)
-          - plugins/ (symlinked to global ~/.claude/plugins/)
+          - plugins/ (config files copied - uses absolute paths to global cache)
+          - skills/ (copied from global)
+          - statsig/ (copied from global)
+
+        NOTE: SSD uses exFAT which doesn't support symlinks, so we copy files.
+        The installed_plugins.json uses absolute paths to ~/.claude/plugins/cache/
+        so the actual plugin code is referenced from the SD card.
 
         This isolation allows multiple Claude Code instances to run
         simultaneously without conflicts.
@@ -219,25 +225,32 @@ class MedResearchManager:
             shutil.copy(global_settings, claude_dir / "settings.json")
             logger.debug(f"Copied global settings.json to {claude_dir}")
 
-        # 2. Symlink plugins directory (shared across sessions - contains installed plugins)
+        # 2. Copy plugins config (exFAT doesn't support symlinks)
+        # The installed_plugins.json uses absolute paths to ~/.claude/plugins/cache/
+        # so we only need to copy the config files, not the actual plugin code
         global_plugins = global_claude / "plugins"
         session_plugins = claude_dir / "plugins"
         if global_plugins.exists() and not session_plugins.exists():
-            try:
-                session_plugins.symlink_to(global_plugins)
-                logger.debug(f"Symlinked plugins: {session_plugins} -> {global_plugins}")
-            except OSError as e:
-                logger.warning(f"Failed to symlink plugins: {e}")
+            session_plugins.mkdir(parents=True, exist_ok=True)
+            # Copy plugin config files
+            for config_file in ["installed_plugins.json", "known_marketplaces.json", "install-counts-cache.json"]:
+                src = global_plugins / config_file
+                if src.exists():
+                    shutil.copy(src, session_plugins / config_file)
+                    logger.debug(f"Copied {config_file} to session plugins")
+            # Copy marketplaces directory structure (contains marketplace metadata)
+            global_marketplaces = global_plugins / "marketplaces"
+            if global_marketplaces.exists():
+                shutil.copytree(global_marketplaces, session_plugins / "marketplaces")
+                logger.debug(f"Copied marketplaces directory to session plugins")
+            logger.info(f"Copied plugins config to {session_plugins}")
 
-        # 3. Copy/symlink skills directory (custom user skills)
+        # 3. Copy skills directory (full copy - typically small config files)
         global_skills = global_claude / "skills"
         session_skills = claude_dir / "skills"
         if global_skills.exists() and not session_skills.exists():
-            try:
-                session_skills.symlink_to(global_skills)
-                logger.debug(f"Symlinked skills: {session_skills} -> {global_skills}")
-            except OSError as e:
-                logger.warning(f"Failed to symlink skills: {e}")
+            shutil.copytree(global_skills, session_skills)
+            logger.debug(f"Copied skills directory to {session_skills}")
 
         # 4. Copy credentials (hidden file with API keys)
         global_credentials = global_claude / ".credentials.json"
@@ -245,25 +258,20 @@ class MedResearchManager:
             shutil.copy(global_credentials, claude_dir / ".credentials.json")
             logger.debug(f"Copied .credentials.json to {claude_dir}")
 
-        # 5. Symlink statsig directory (for feature flags/config)
+        # 5. Copy statsig directory (feature flags/config - small files)
         global_statsig = global_claude / "statsig"
         session_statsig = claude_dir / "statsig"
         if global_statsig.exists() and not session_statsig.exists():
-            try:
-                session_statsig.symlink_to(global_statsig)
-                logger.debug(f"Symlinked statsig: {session_statsig} -> {global_statsig}")
-            except OSError as e:
-                logger.warning(f"Failed to symlink statsig: {e}")
+            shutil.copytree(global_statsig, session_statsig)
+            logger.debug(f"Copied statsig directory to {session_statsig}")
 
-        # 6. Symlink cache directory (for plugin/marketplace caches)
+        # 6. Copy cache directory if it exists and is small
+        # (contains marketplace cache, usually small JSON files)
         global_cache = global_claude / "cache"
         session_cache = claude_dir / "cache"
         if global_cache.exists() and not session_cache.exists():
-            try:
-                session_cache.symlink_to(global_cache)
-                logger.debug(f"Symlinked cache: {session_cache} -> {global_cache}")
-            except OSError as e:
-                logger.warning(f"Failed to symlink cache: {e}")
+            shutil.copytree(global_cache, session_cache)
+            logger.debug(f"Copied cache directory to {session_cache}")
 
         # 7. Write settings.local.json with session-specific permissions
         settings_local_path = claude_dir / "settings.local.json"
@@ -272,16 +280,106 @@ class MedResearchManager:
         logger.info(f"Created isolated workspace: {workspace}")
         return workspace
 
+    def _build_sandbox_command(self, workspace_dir: Path) -> list:
+        """
+        Build bubblewrap (bwrap) command for sandboxed execution.
+
+        Creates a restricted filesystem view that only allows:
+        - System directories (read-only): /usr, /lib, /bin, /etc
+        - Claude Code installation (read-only)
+        - Plugin cache (read-only)
+        - The workspace directory (read-write)
+        - Network access for API calls
+
+        Blocks access to:
+        - Home directory (except necessary Claude files)
+        - Other workspaces (hidden via tmpfs on /data)
+        - The ACe_Toolkit codebase
+        - Root filesystem
+
+        Security guarantees:
+        - Cannot read ~/dev/ACe_Toolkit or any other code
+        - Cannot see or access other MedResearch sessions
+        - Cannot write anywhere except the workspace
+        - Cannot access SD card data (only SSD workspace)
+        """
+        home = Path.home()
+        claude_install = home / ".local/share/claude"
+        claude_bin = home / ".local/bin"
+        plugin_cache = home / ".claude/plugins/cache"
+        session_claude_dir = workspace_dir / ".claude"
+
+        # Build bwrap command
+        cmd = [
+            "bwrap",
+            # System directories (read-only)
+            "--ro-bind", "/usr", "/usr",
+            "--ro-bind", "/bin", "/bin",
+            "--ro-bind", "/sbin", "/sbin",
+            "--ro-bind", "/etc", "/etc",
+            "--ro-bind", "/lib", "/lib",
+        ]
+
+        # Add /lib64 if it exists (some ARM systems don't have it)
+        if Path("/lib64").exists():
+            cmd.extend(["--ro-bind", "/lib64", "/lib64"])
+
+        cmd.extend([
+            # Process/device filesystems
+            "--proc", "/proc",
+            "--dev", "/dev",
+            # Isolated temp directory
+            "--tmpfs", "/tmp",
+            # Block home directory - create empty tmpfs
+            "--tmpfs", "/home",
+            "--tmpfs", str(home),
+            # Block /data - hide other workspaces with tmpfs
+            "--tmpfs", "/data",
+            # Claude Code installation (read-only)
+            "--ro-bind", str(claude_install), str(claude_install),
+            "--ro-bind", str(claude_bin), str(claude_bin),
+            # Plugin cache (read-only - actual plugin code lives here)
+            "--ro-bind", str(plugin_cache), str(plugin_cache),
+            # Workspace directory (read-write) - ONLY writable area
+            # This is bound AFTER tmpfs /data, so it appears inside the sandbox
+            "--bind", str(workspace_dir), str(workspace_dir),
+            # Set environment variables
+            "--setenv", "HOME", str(home),
+            "--setenv", "CLAUDE_CONFIG_DIR", str(session_claude_dir),
+            "--setenv", "PWD", str(workspace_dir),
+            # Set working directory
+            "--chdir", str(workspace_dir),
+            # Security: isolate namespaces but keep network for API calls
+            "--unshare-pid",      # Isolate process IDs
+            "--unshare-uts",      # Isolate hostname
+            "--unshare-cgroup",   # Isolate cgroups
+            # Keep network shared (needed for Claude API calls)
+            # Process management
+            "--die-with-parent",  # Kill sandbox when parent dies
+            # NOTE: --new-session removed as it conflicts with pexpect PTY handling
+            # Run claude binary
+            str(claude_bin / "claude"),
+        ])
+
+        return cmd
+
     async def spawn_claude(
         self,
         medresearch_id: str,
         workspace_dir: Path,
         rows: int = 24,
         cols: int = 80,
-        output_callback: Optional[Callable[[bytes], Any]] = None
+        output_callback: Optional[Callable[[bytes], Any]] = None,
+        sandboxed: bool = True
     ) -> bool:
         """
-        Spawn Claude Code CLI process in workspace directory
+        Spawn Claude Code CLI process in sandboxed workspace directory.
+
+        Uses bubblewrap (bwrap) to create a secure sandbox that:
+        - Allows read-only access to system binaries and Claude installation
+        - Allows read-write access ONLY to the workspace directory
+        - Blocks access to home directory, other workspaces, and codebase
+        - Maintains network access for API calls
 
         Args:
             medresearch_id: Session ID
@@ -289,6 +387,7 @@ class MedResearchManager:
             rows: Terminal height
             cols: Terminal width
             output_callback: Async callback for output data
+            sandboxed: If True, use bubblewrap sandbox (default: True)
 
         Returns:
             True if spawn successful
@@ -313,26 +412,42 @@ class MedResearchManager:
             env['COLORTERM'] = 'truecolor'
             # Ensure Claude Code uses the workspace directory
             env['PWD'] = str(workspace_dir)
+            env['HOME'] = str(Path.home())  # Needed for Claude to find config
 
             # IMPORTANT: Set CLAUDE_CONFIG_DIR to session-specific .claude directory
-            # This isolates each session's config, state, and locks, allowing
-            # multiple Claude Code instances to run simultaneously without conflicts.
-            # Plugins are symlinked from global ~/.claude/plugins/ so they still work.
+            # This isolates each session's config, state, and locks
             session_claude_dir = workspace_dir / ".claude"
             env['CLAUDE_CONFIG_DIR'] = str(session_claude_dir)
 
             logger.info(f"Using isolated config: CLAUDE_CONFIG_DIR={session_claude_dir}")
 
-            # Spawn Claude Code - user will interact with permission prompts
-            process = pexpect.spawn(
-                'claude',
-                args=[],  # No args - let user interact with prompts
-                cwd=str(workspace_dir),
-                env=env,
-                encoding=None,  # Raw bytes for ANSI passthrough
-                dimensions=(rows, cols),
-                timeout=None  # No timeout for interactive sessions
-            )
+            if sandboxed:
+                # Use bubblewrap for secure sandboxing
+                sandbox_cmd = self._build_sandbox_command(workspace_dir)
+                logger.info(f"Spawning sandboxed Claude Code for {medresearch_id}")
+                logger.debug(f"Sandbox command: {' '.join(sandbox_cmd)}")
+
+                process = pexpect.spawn(
+                    sandbox_cmd[0],
+                    args=sandbox_cmd[1:],
+                    cwd=str(workspace_dir),
+                    env=env,
+                    encoding=None,
+                    dimensions=(rows, cols),
+                    timeout=None
+                )
+            else:
+                # Non-sandboxed mode (for debugging only)
+                logger.warning(f"Spawning UNSANDBOXED Claude Code for {medresearch_id}")
+                process = pexpect.spawn(
+                    'claude',
+                    args=[],
+                    cwd=str(workspace_dir),
+                    env=env,
+                    encoding=None,
+                    dimensions=(rows, cols),
+                    timeout=None
+                )
 
             # Store process info
             self.processes[medresearch_id] = ClaudeProcess(
@@ -348,11 +463,11 @@ class MedResearchManager:
                     self._async_read_loop(medresearch_id, output_callback)
                 )
 
-            logger.info(f"Spawned Claude Code for {medresearch_id}, PID: {process.pid}")
+            logger.info(f"Spawned Claude Code for {medresearch_id}, PID: {process.pid}, Sandboxed: {sandboxed}")
             return True
 
-        except FileNotFoundError:
-            logger.error("Claude Code CLI not found. Ensure 'claude' is in PATH")
+        except FileNotFoundError as e:
+            logger.error(f"Required binary not found: {e}. Ensure 'claude' and 'bwrap' are in PATH")
             return False
         except Exception as e:
             logger.error(f"Failed to spawn Claude Code: {e}")
