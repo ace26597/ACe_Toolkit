@@ -213,13 +213,13 @@ class MedResearchManager:
 
         global_claude = Path.home() / ".claude"
 
-        # 1. Copy settings.json from global (main config)
+        # 1. Copy settings.json from global (main config with enabled plugins)
         global_settings = global_claude / "settings.json"
         if global_settings.exists():
             shutil.copy(global_settings, claude_dir / "settings.json")
             logger.debug(f"Copied global settings.json to {claude_dir}")
 
-        # 2. Symlink plugins directory (shared across sessions)
+        # 2. Symlink plugins directory (shared across sessions - contains installed plugins)
         global_plugins = global_claude / "plugins"
         session_plugins = claude_dir / "plugins"
         if global_plugins.exists() and not session_plugins.exists():
@@ -229,13 +229,43 @@ class MedResearchManager:
             except OSError as e:
                 logger.warning(f"Failed to symlink plugins: {e}")
 
-        # 3. Copy credentials.json if it exists (for API keys)
-        global_credentials = global_claude / "credentials.json"
-        if global_credentials.exists():
-            shutil.copy(global_credentials, claude_dir / "credentials.json")
-            logger.debug(f"Copied credentials.json to {claude_dir}")
+        # 3. Copy/symlink skills directory (custom user skills)
+        global_skills = global_claude / "skills"
+        session_skills = claude_dir / "skills"
+        if global_skills.exists() and not session_skills.exists():
+            try:
+                session_skills.symlink_to(global_skills)
+                logger.debug(f"Symlinked skills: {session_skills} -> {global_skills}")
+            except OSError as e:
+                logger.warning(f"Failed to symlink skills: {e}")
 
-        # 4. Write settings.local.json with session-specific permissions
+        # 4. Copy credentials (hidden file with API keys)
+        global_credentials = global_claude / ".credentials.json"
+        if global_credentials.exists():
+            shutil.copy(global_credentials, claude_dir / ".credentials.json")
+            logger.debug(f"Copied .credentials.json to {claude_dir}")
+
+        # 5. Symlink statsig directory (for feature flags/config)
+        global_statsig = global_claude / "statsig"
+        session_statsig = claude_dir / "statsig"
+        if global_statsig.exists() and not session_statsig.exists():
+            try:
+                session_statsig.symlink_to(global_statsig)
+                logger.debug(f"Symlinked statsig: {session_statsig} -> {global_statsig}")
+            except OSError as e:
+                logger.warning(f"Failed to symlink statsig: {e}")
+
+        # 6. Symlink cache directory (for plugin/marketplace caches)
+        global_cache = global_claude / "cache"
+        session_cache = claude_dir / "cache"
+        if global_cache.exists() and not session_cache.exists():
+            try:
+                session_cache.symlink_to(global_cache)
+                logger.debug(f"Symlinked cache: {session_cache} -> {global_cache}")
+            except OSError as e:
+                logger.warning(f"Failed to symlink cache: {e}")
+
+        # 7. Write settings.local.json with session-specific permissions
         settings_local_path = claude_dir / "settings.local.json"
         settings_local_path.write_text(json.dumps(CLAUDE_SETTINGS_TEMPLATE, indent=2))
 
@@ -694,18 +724,18 @@ class MedResearchManager:
             return None
 
     def _setup_claude_config(self, workspace: Path):
-        """Set up isolated .claude config for a workspace"""
+        """Set up isolated .claude config for a workspace with full plugin/skill support"""
         claude_dir = workspace / ".claude"
         claude_dir.mkdir(parents=True, exist_ok=True)
 
         global_claude = Path.home() / ".claude"
 
-        # Copy settings.json
+        # 1. Copy settings.json (main config with enabled plugins)
         global_settings = global_claude / "settings.json"
         if global_settings.exists():
             shutil.copy(global_settings, claude_dir / "settings.json")
 
-        # Symlink plugins
+        # 2. Symlink plugins directory (contains installed plugins and marketplaces)
         global_plugins = global_claude / "plugins"
         session_plugins = claude_dir / "plugins"
         if global_plugins.exists() and not session_plugins.exists():
@@ -714,12 +744,39 @@ class MedResearchManager:
             except OSError:
                 pass
 
-        # Copy credentials
-        global_credentials = global_claude / "credentials.json"
-        if global_credentials.exists():
-            shutil.copy(global_credentials, claude_dir / "credentials.json")
+        # 3. Symlink skills directory (custom user skills)
+        global_skills = global_claude / "skills"
+        session_skills = claude_dir / "skills"
+        if global_skills.exists() and not session_skills.exists():
+            try:
+                session_skills.symlink_to(global_skills)
+            except OSError:
+                pass
 
-        # Write settings.local.json
+        # 4. Copy credentials (hidden file with API keys)
+        global_credentials = global_claude / ".credentials.json"
+        if global_credentials.exists():
+            shutil.copy(global_credentials, claude_dir / ".credentials.json")
+
+        # 5. Symlink statsig directory (feature flags)
+        global_statsig = global_claude / "statsig"
+        session_statsig = claude_dir / "statsig"
+        if global_statsig.exists() and not session_statsig.exists():
+            try:
+                session_statsig.symlink_to(global_statsig)
+            except OSError:
+                pass
+
+        # 6. Symlink cache directory (plugin caches)
+        global_cache = global_claude / "cache"
+        session_cache = claude_dir / "cache"
+        if global_cache.exists() and not session_cache.exists():
+            try:
+                session_cache.symlink_to(global_cache)
+            except OSError:
+                pass
+
+        # 7. Write settings.local.json with session-specific permissions
         settings_local_path = claude_dir / "settings.local.json"
         settings_local_path.write_text(json.dumps(CLAUDE_SETTINGS_TEMPLATE, indent=2))
 
