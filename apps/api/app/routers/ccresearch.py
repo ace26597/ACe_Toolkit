@@ -443,6 +443,8 @@ async def list_files(
         raise HTTPException(status_code=400, detail="Path is not a directory")
 
     files = []
+    # Resolve workspace to handle symlinks (e.g., /data -> /media/ace/T7/dev)
+    workspace_resolved = workspace.resolve()
     for item in sorted(target_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
         # Skip hidden files starting with . except CLAUDE.md
         if item.name.startswith('.') and item.name != '.claude':
@@ -450,7 +452,7 @@ async def list_files(
 
         try:
             stat = item.stat()
-            rel_path = str(item.relative_to(workspace))
+            rel_path = str(item.resolve().relative_to(workspace_resolved))
             files.append(FileInfo(
                 name=item.name,
                 path=rel_path,
