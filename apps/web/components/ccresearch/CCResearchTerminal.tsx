@@ -6,10 +6,18 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 
+interface AutomationNotification {
+  type: 'automation';
+  description: string;
+  action: string;
+  value: string;
+}
+
 interface CCResearchTerminalProps {
   sessionId: string;
   onResize?: (rows: number, cols: number) => void;
   onStatusChange?: (connected: boolean) => void;
+  onAutomation?: (notification: AutomationNotification) => void;
   className?: string;
 }
 
@@ -27,6 +35,7 @@ export default function CCResearchTerminal({
   sessionId,
   onResize,
   onStatusChange,
+  onAutomation,
   className = ''
 }: CCResearchTerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -149,7 +158,24 @@ export default function CCResearchTerminal({
 
     // Connect to WebSocket
     const connectWebSocket = () => {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+      // Dynamic API URL based on current hostname
+      const getApiUrl = (): string => {
+        const hostname = window.location.hostname;
+        const protocol = window.location.protocol;
+
+        if (hostname === 'orpheuscore.uk' || hostname === 'www.orpheuscore.uk') {
+          return `${protocol}//api.orpheuscore.uk`;
+        }
+        if (hostname === 'ai.ultronsolar.in') {
+          return `${protocol}//api.ultronsolar.in`;
+        }
+        if (hostname === 'localhost' || hostname === '127.0.0.1') {
+          return 'http://localhost:8000';
+        }
+        return `${protocol}//api.${hostname}`;
+      };
+
+      const apiUrl = getApiUrl();
       const wsUrl = apiUrl.replace(/^https/, 'wss').replace(/^http/, 'ws');
       const ws = new WebSocket(`${wsUrl}/ccresearch/terminal/${sessionId}`);
 
@@ -195,6 +221,9 @@ export default function CCResearchTerminal({
               }
             } else if (msg.type === 'pong') {
               // Heartbeat response
+            } else if (msg.type === 'automation') {
+              // Automation rule triggered - notify parent component
+              onAutomation?.(msg as AutomationNotification);
             }
           } catch {
             // Plain text fallback

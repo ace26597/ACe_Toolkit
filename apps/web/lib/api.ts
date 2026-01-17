@@ -1,4 +1,30 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Dynamic API URL - works with multiple domains (orpheuscore.uk, ultronsolar.in, localhost)
+export const getApiUrl = (): string => {
+  if (typeof window === 'undefined') {
+    // Server-side - use env var
+    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  }
+
+  const hostname = window.location.hostname;
+  const protocol = window.location.protocol;
+
+  // Map frontend domains to API domains
+  if (hostname === 'orpheuscore.uk' || hostname === 'www.orpheuscore.uk') {
+    return `${protocol}//api.orpheuscore.uk`;
+  }
+  if (hostname === 'ai.ultronsolar.in') {
+    return `${protocol}//api.ultronsolar.in`;
+  }
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://localhost:8000';
+  }
+
+  // Fallback: try api subdomain of current host
+  return `${protocol}//api.${hostname}`;
+};
+
+// Legacy constant for backward compatibility - evaluates lazily
+const API_URL = typeof window !== 'undefined' ? getApiUrl() : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
 
 // Scientific Skills types (defined here to avoid import issues)
 export interface Skill {

@@ -48,6 +48,7 @@ class Settings(BaseSettings):
     CCRESEARCH_DATA_DIR: str = "/data/ccresearch-projects"
     CCRESEARCH_LOGS_DIR: str = "/data/ccresearch-logs"
     CCRESEARCH_SANDBOX_ENABLED: bool = True  # Set to False to disable bwrap sandbox (debugging only)
+    CCRESEARCH_ACCESS_CODE: Optional[str] = None  # Magic access code to bypass email requirement
 
     # Legacy aliases (for backward compatibility during migration)
     MEDRESEARCH_DATA_DIR: str = "/data/ccresearch-projects"

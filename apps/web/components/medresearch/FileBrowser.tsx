@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { getApiUrl } from '@/lib/api';
 import {
   Folder,
   File,
@@ -32,7 +33,7 @@ interface FileBrowserProps {
   workspaceDir: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_URL = typeof window !== 'undefined' ? getApiUrl() : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
 
 // File icon helper
 const getFileIcon = (name: string, isDir: boolean) => {

@@ -28,18 +28,18 @@ export default function ResearchPage() {
   const [currentReport, setCurrentReport] = useState<string | null>(null);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 p-2 sm:p-4 md:p-6">
       <div className="max-w-[2000px] mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold text-white mb-2">Research Assistant</h1>
-          <p className="text-gray-300">Multi-model AI research with LangGraph workflows, file analysis, and comprehensive reporting</p>
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-1 sm:mb-2">Research Assistant</h1>
+          <p className="text-xs sm:text-sm text-gray-300">Multi-model AI research with LangGraph workflows, file analysis, and reporting</p>
         </div>
 
-        {/* 3-Column Layout */}
-        <div className="grid grid-cols-12 gap-6">
+        {/* Responsive Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 md:gap-6">
           {/* Left Sidebar: Model Selector + File Upload + Workflow Visualizer */}
-          <div className="col-span-12 lg:col-span-3 space-y-6">
+          <div className="lg:col-span-3 space-y-3 sm:space-y-4 md:space-y-6">
             <ModelSelector
               value={modelConfig}
               onChange={setModelConfig}
@@ -56,7 +56,7 @@ export default function ResearchPage() {
           </div>
 
           {/* Center: Chat Interface */}
-          <div className="col-span-12 lg:col-span-6">
+          <div className="lg:col-span-6 order-first lg:order-none">
             <ResearchChatInterface
               sessionId={sessionId}
               conversationId={conversationId}
@@ -69,7 +69,7 @@ export default function ResearchPage() {
           </div>
 
           {/* Right Sidebar: Report Viewer */}
-          <div className="col-span-12 lg:col-span-3">
+          <div className="lg:col-span-3">
             <ReportViewer
               conversationId={conversationId}
               report={currentReport}

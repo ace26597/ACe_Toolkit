@@ -38,16 +38,18 @@ async def lifespan(app: FastAPI):
     from app.core.database import AsyncSessionLocal
 
     async def periodic_ccresearch_cleanup():
-        """Cleanup expired CCResearch sessions every hour"""
+        """Cleanup expired and idle CCResearch sessions every hour"""
         while True:
             try:
                 await asyncio.sleep(3600)  # Wait 1 hour
-                # Cleanup process manager (filesystem)
+                # Cleanup idle sessions (2+ hours inactive)
+                idle_terminated = await ccresearch_manager.cleanup_idle_sessions(max_idle_hours=2)
+                # Cleanup process manager (filesystem - 24h old)
                 deleted_fs = await ccresearch_manager.cleanup_old_sessions(max_age_hours=24)
                 # Cleanup database entries
                 async with AsyncSessionLocal() as db:
                     deleted_db = await ccresearch_cleanup(db)
-                logger.info(f"CCResearch cleanup: {deleted_fs} filesystem, {deleted_db} database entries")
+                logger.info(f"CCResearch cleanup: {idle_terminated} idle, {deleted_fs} filesystem, {deleted_db} database entries")
             except Exception as e:
                 logger.error(f"Error during CCResearch cleanup: {e}")
 
@@ -93,12 +95,20 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Configuration - Allow all origins for development (includes WebSocket support)
-# In production, restrict to specific domains
+# CORS Configuration - Restrict to allowed origins
+ALLOWED_ORIGINS = [
+    "https://orpheuscore.uk",        # Primary domain
+    "https://api.orpheuscore.uk",    # Primary API
+    "https://ai.ultronsolar.in",     # Legacy domain
+    "https://api.ultronsolar.in",    # Legacy API
+    "http://localhost:3000",         # Local development
+    "http://127.0.0.1:3000",
+    "http://192.168.1.190:3000",     # Local network
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all origins for development
-    allow_credentials=False,  # Must be False when allow_origins=["*"]
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"]

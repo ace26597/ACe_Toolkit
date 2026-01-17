@@ -1411,25 +1411,25 @@ export default function MermaidPage() {
                 </div>
             )}
 
-            {/* Header */}
-            <header className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
-                <div className="flex items-center gap-3">
-                    <button onClick={() => setShowSidebar(!showSidebar)} className="p-2 hover:bg-slate-800 rounded-lg">
+            {/* Header - Responsive */}
+            <header className="flex items-center justify-between px-2 sm:px-4 py-2 bg-slate-900 border-b border-slate-800">
+                <div className="flex items-center gap-1 sm:gap-3 min-w-0 flex-shrink">
+                    <button onClick={() => setShowSidebar(!showSidebar)} className="p-1.5 sm:p-2 hover:bg-slate-800 rounded-lg flex-shrink-0">
                         {showSidebar ? <PanelLeftClose size={18} /> : <PanelLeft size={18} />}
                     </button>
-                    <h1 className="text-lg font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
+                    <h1 className="text-sm sm:text-lg font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent whitespace-nowrap">
                         Mermaid Studio
                     </h1>
-                    {currentProject && <span className="text-sm text-slate-500">/ {currentProject.name}</span>}
-                    {currentChart && <span className="text-sm text-slate-400">/ {currentChart.name}</span>}
+                    {currentProject && <span className="text-xs sm:text-sm text-slate-500 truncate hidden sm:inline">/ {currentProject.name}</span>}
+                    {currentChart && <span className="text-xs sm:text-sm text-slate-400 truncate hidden md:inline">/ {currentChart.name}</span>}
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                     {/* Theme Selector */}
                     <div className="relative">
-                        <button onClick={() => setShowSettings(!showSettings)} className="flex items-center gap-1 px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 rounded-lg">
+                        <button onClick={() => setShowSettings(!showSettings)} className="flex items-center gap-1 px-1.5 sm:px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 rounded-lg">
                             <Settings size={14} />
-                            Options
+                            <span className="hidden sm:inline">Options</span>
                         </button>
                         {showSettings && (
                             <div className="absolute right-0 top-full mt-1 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 p-3 space-y-3">
@@ -1465,16 +1465,16 @@ export default function MermaidPage() {
                         )}
                     </div>
 
-                    <button onClick={exportCurrentChart} disabled={!currentChart} className="flex items-center gap-1 px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg">
-                        <Download size={14} /> Export
+                    <button onClick={exportCurrentChart} disabled={!currentChart} className="flex items-center gap-1 px-1.5 sm:px-2 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 disabled:opacity-50 rounded-lg">
+                        <Download size={14} /> <span className="hidden sm:inline">Export</span>
                     </button>
 
                     <button
                         onClick={() => { setShowDiskDialog(true); loadDiskProjects(); }}
-                        className="flex items-center gap-1 px-2 py-1.5 text-xs bg-slate-800 hover:bg-emerald-700 rounded-lg"
+                        className="flex items-center gap-1 px-1.5 sm:px-2 py-1.5 text-xs bg-slate-800 hover:bg-emerald-700 rounded-lg"
                         title="Save/Load from SSD"
                     >
-                        <HardDrive size={14} /> SSD
+                        <HardDrive size={14} /> <span className="hidden sm:inline">SSD</span>
                     </button>
 
                     {/* Sync Status Indicator */}

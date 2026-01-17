@@ -1,6 +1,6 @@
 # CLAUDE.md - AI Assistant Guide for ACe_Toolkit
 
-**Last Updated:** January 14, 2026
+**Last Updated:** January 16, 2026
 **Repository:** ACe_Toolkit
 **Status:** Active Development
 **Deployment:** Raspberry Pi (Cloudflare Tunnel Active)
@@ -40,9 +40,10 @@
 
 ### Quick Links
 
-- **Production:** https://ai.ultronsolar.in
-- **API:** https://api.ultronsolar.in
-- **API Docs:** https://api.ultronsolar.in/docs
+- **Production (Primary):** https://orpheuscore.uk
+- **Production (Legacy):** https://ai.ultronsolar.in
+- **API:** https://api.orpheuscore.uk (or https://api.ultronsolar.in)
+- **API Docs:** https://api.orpheuscore.uk/docs
 - **Local Dev:** http://localhost:3000 (frontend), http://localhost:8000 (backend)
 
 ---
@@ -132,8 +133,8 @@ Claude Code Research Platform - web-based terminal with email tracking and file 
 
 **Features:**
 - **Full PTY Terminal:** xterm.js with WebSocket bidirectional I/O
-- **Claude Code Integration:** Spawns Claude Code CLI via pexpect
-- **Email Tracking:** Required email for each session (tracked in database)
+- **Claude Code Integration:** Spawns Claude Code CLI directly via pexpect
+- **Email Whitelist Auth:** Only pre-approved emails can create sessions
 - **File Upload:** Upload data files when creating session (stored in `workspace/data/`)
 - **Scientific MCP Tools:** 140+ tools (PubMed, UniProt, RDKit, PyTorch, etc.)
 - **Isolated Workspaces:** Each session has dedicated directory with auto-generated CLAUDE.md
@@ -141,20 +142,59 @@ Claude Code Research Platform - web-based terminal with email tracking and file 
 - **Project Save/Restore:** Save sessions to SSD for permanent storage, restore anytime
 - **File Browser:** Navigate and download workspace files
 - **Session Management:** Create, list, delete research sessions
+- **Full Plugin Access:** All 12 plugins, 22+ skills, 9 MCP servers available
 
 **Session Creation:**
-1. User provides email address (required)
+1. Enter email address (must be in whitelist at `~/.ccresearch_allowed_emails.json`)
 2. Optional: Upload data files (CSV, PDF, images, etc.)
 3. Session created with isolated workspace
-4. CLAUDE.md auto-generated with user email and uploaded files info
+4. CLAUDE.md auto-generated with workspace boundary rules and session info
+5. Claude Code starts directly with full access to global config
 
-**Security (Bubblewrap Sandbox):**
-- Sessions run in isolated bubblewrap (bwrap) sandbox
-- Cannot access home directory (`/home/ace/dev/` blocked)
-- Cannot access other sessions (only own workspace visible)
-- Read-only access to system binaries and Claude installation
-- Network access allowed for API calls
-- Configurable via `CCRESEARCH_SANDBOX_ENABLED` env var
+**Plugins & Skills (Full Access):**
+
+Each CCResearch session has access to all installed Claude Code plugins, skills, and MCP servers:
+
+| Plugin | Description |
+|--------|-------------|
+| `scientific-skills` | 140+ scientific tools (PubMed, UniProt, RDKit, etc.) |
+| `context7` | Up-to-date documentation for any library |
+| `frontend-design` | Production-grade UI/UX design |
+| `code-simplifier` | Code refactoring and clarity |
+| `plugin-dev` | Plugin creation and validation |
+| `feature-dev` | Feature development workflows |
+| `document-skills` | Document processing (PDF, markdown) |
+| `agent-sdk-dev` | Claude Agent SDK development |
+| `ralph-loop` | Iterative refinement workflow |
+| `huggingface-skills` | HuggingFace model integration |
+| `ai` | AI/ML development utilities |
+| `backend` | Backend development patterns |
+
+**Custom Skills (User-Invocable):**
+- `/code-review` - Comprehensive code quality check and linting
+- `/update-docs` - Quick documentation refresh for CLAUDE.md/README
+
+**MCP Servers Available (9):**
+- Memory (knowledge graph)
+- Filesystem (sandboxed)
+- Git operations
+- SQLite database
+- Playwright browser automation
+- Fetch (web requests)
+- Time utilities
+- Sequential thinking
+- Context7 documentation lookup
+
+**Security (Soft Boundaries + Deny Rules):**
+- **Email Whitelist:** Only approved emails in `~/.ccresearch_allowed_emails.json` can create sessions
+- **Workspace CLAUDE.md:** Contains immutable boundary instructions (cannot be modified by users)
+- **Deny Rules:** Claude blocked from reading sensitive files via `.claude/settings.local.json`:
+  - `~/.ccresearch_allowed_emails.json` (whitelist)
+  - `~/.claude/CLAUDE.md` (global instructions)
+  - `~/dev/**` (ACe_Toolkit codebase)
+  - `~/.ssh/**`, `~/.bashrc`, `~/.bash_history`
+- **No Hard Sandbox:** Claude runs directly for full plugin/MCP access (soft security via instructions)
+- Network access allowed for API calls and MCP servers
 
 **Navbar Controls:**
 - Back button (arrow) - return to session list
@@ -166,6 +206,7 @@ Claude Code Research Platform - web-based terminal with email tracking and file 
 - Debounced resize handling (prevents flickering)
 - File upload/download from workspace
 - Auto-generated research CLAUDE.md per session
+- Access to /skills, /mcp, /plugin commands
 
 **Legacy:** MedResearch (`/medresearch`) remains available for backward compatibility
 
@@ -432,7 +473,7 @@ ACe_Toolkit/
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/sessions` | Create session (FormData: email, session_id, title?, files[]) |
+| POST | `/sessions` | Create session (FormData: session_id, email?, title?, files[]) |
 | POST | `/sessions/{id}/upload` | Upload files to session |
 | GET | `/sessions/{browser_id}` | List sessions |
 | GET | `/sessions/detail/{id}` | Get session details |
@@ -558,7 +599,7 @@ UploadedFile
 CCResearchSession
 ├── id: String (PK)
 ├── session_id: String (browser)
-├── email: String (required, indexed)
+├── email: String (required, must be in whitelist, indexed)
 ├── title: String
 ├── workspace_dir: String
 ├── uploaded_files: Text (JSON array of filenames)
@@ -778,6 +819,19 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 | Date | Change |
 |------|--------|
+| 2026-01-16 | **MAJOR:** Add email whitelist authentication for CCResearch access control |
+| 2026-01-16 | Add deny rules to block Claude from reading sensitive files (whitelist, ~/.claude/CLAUDE.md, ~/dev/) |
+| 2026-01-16 | Disable sandbox - run Claude Code directly for full plugin/skill/MCP access |
+| 2026-01-16 | Add immutable workspace boundary instructions in session CLAUDE.md |
+| 2026-01-16 | Simplify CCResearch - remove OAuth/access code, start Claude Code directly |
+| 2026-01-16 | Fix Cloudflare tunnel IPv6 issue (use 127.0.0.1 instead of localhost) |
+| 2026-01-16 | Update CCResearch landing page: 12 plugins, 22 skills, 9 MCP servers |
+| 2026-01-16 | Add 4 new plugins: ralph-loop, huggingface-skills, ai, backend |
+| 2026-01-16 | Add custom skills: code-review, update-docs |
+| 2026-01-16 | Add CORS support for orpheuscore.uk domain (primary production URL) |
+| 2026-01-16 | Configure Cloudflare DNS for orpheuscore.uk and api.orpheuscore.uk |
+| 2026-01-14 | Add new plugins: document-skills, agent-sdk-dev, feature-dev |
+| 2026-01-14 | Update CCResearch frontend with 8 active plugins and 10 installed skills |
 | 2026-01-14 | Rename to CCResearch (Claude Code Research Platform) at `/ccresearch` |
 | 2026-01-14 | Add email tracking requirement for CCResearch sessions |
 | 2026-01-14 | Add file upload on session creation (stored in `data/` directory) |

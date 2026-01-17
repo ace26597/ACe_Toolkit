@@ -69,3 +69,4 @@ tmp/
 temp/
 *.tmp
 .cache/
+apps/web/public/mcp-protocol-video.mp4

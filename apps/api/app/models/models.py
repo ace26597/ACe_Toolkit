@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Uuid, Integer
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Uuid, Integer, Boolean
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -288,6 +288,13 @@ class CCResearchSession(Base):
 
     # Usage tracking
     commands_executed = Column(Integer, default=0)
+
+    # Authentication mode: "oauth" (browser login, uses subscription) or "api_key" (headless, uses API credits)
+    auth_mode = Column(String, default="oauth")
+
+    # Admin mode: if True, session runs UNSANDBOXED (full system access)
+    # Only set when valid access code is provided
+    is_admin = Column(Boolean, default=False)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)

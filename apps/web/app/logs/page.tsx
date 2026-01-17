@@ -28,9 +28,26 @@ export default function LogsPage() {
   const logContainerRef = useRef<HTMLDivElement>(null);
   const autoScrollRef = useRef(true);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL ||
-                  process.env.NEXT_PUBLIC_API_BASE_URL ||
-                  'http://localhost:8000';
+  // Dynamic API URL - works with multiple domains
+  const getApiUrl = (): string => {
+    if (typeof window === 'undefined') {
+      return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    }
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    if (hostname === 'orpheuscore.uk' || hostname === 'www.orpheuscore.uk') {
+      return `${protocol}//api.orpheuscore.uk`;
+    }
+    if (hostname === 'ai.ultronsolar.in') {
+      return `${protocol}//api.ultronsolar.in`;
+    }
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:8000';
+    }
+    return `${protocol}//api.${hostname}`;
+  };
+
+  const API_URL = getApiUrl();
 
   // Fetch log content
   const fetchLogs = async (logType: LogType) => {
@@ -198,32 +215,32 @@ export default function LogsPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-2 sm:p-4 md:p-6">
       <div className="max-w-[2000px] mx-auto">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-4xl font-bold text-white mb-2">System Logs</h1>
-          <p className="text-gray-400">Monitor and analyze application logs in real-time</p>
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-1 sm:mb-2">System Logs</h1>
+          <p className="text-xs sm:text-sm text-gray-400">Monitor and analyze application logs in real-time</p>
         </div>
 
         {/* Controls */}
-        <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700 p-4 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-gray-800/50 backdrop-blur-sm rounded-lg border border-gray-700 p-3 sm:p-4 mb-4 sm:mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {/* Log Type Tabs */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-300 mb-2">Log Type</label>
-              <div className="flex gap-2 flex-wrap">
+            <div className="sm:col-span-2">
+              <label className="block text-xs sm:text-sm font-medium text-gray-300 mb-1 sm:mb-2">Log Type</label>
+              <div className="flex gap-1.5 sm:gap-2 flex-wrap">
                 {logTabs.map((tab) => (
                   <button
                     key={tab.value}
                     onClick={() => setSelectedLog(tab.value)}
-                    className={`px-3 py-2 rounded-lg font-medium transition-all text-sm ${
+                    className={`px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium transition-all text-xs sm:text-sm ${
                       selectedLog === tab.value
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                     }`}
                   >
-                    {tab.icon} {tab.label}
+                    <span className="hidden xs:inline">{tab.icon}</span> {tab.label}
                   </button>
                 ))}
               </div>

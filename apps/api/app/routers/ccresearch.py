@@ -31,6 +31,8 @@ import tempfile
 import zipfile
 import shutil
 import aiofiles
+import asyncio
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List
@@ -45,9 +47,61 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.core.ccresearch_manager import ccresearch_manager
 from app.models.models import CCResearchSession
+from collections import defaultdict
+import time
+
+# Simple in-memory rate limiter
+class RateLimiter:
+    """Simple rate limiter using token bucket algorithm"""
+    def __init__(self, requests_per_minute: int = 60):
+        self.requests_per_minute = requests_per_minute
+        self.requests: dict = defaultdict(list)
+
+    def is_allowed(self, key: str) -> bool:
+        """Check if request is allowed for given key (e.g., session_id)"""
+        now = time.time()
+        minute_ago = now - 60
+
+        # Clean old entries
+        self.requests[key] = [t for t in self.requests[key] if t > minute_ago]
+
+        if len(self.requests[key]) >= self.requests_per_minute:
+            return False
+
+        self.requests[key].append(now)
+        return True
+
+# Rate limiters for different endpoints
+file_rate_limiter = RateLimiter(requests_per_minute=60)  # 60 file operations per minute
+upload_rate_limiter = RateLimiter(requests_per_minute=10)  # 10 uploads per minute
 
 logger = logging.getLogger("ccresearch")
 router = APIRouter()
+
+# Path to allowed emails whitelist (protected from Claude Code via deny rules)
+ALLOWED_EMAILS_FILE = Path.home() / ".ccresearch_allowed_emails.json"
+
+
+def load_allowed_emails() -> set:
+    """Load allowed emails from whitelist file."""
+    try:
+        if ALLOWED_EMAILS_FILE.exists():
+            with open(ALLOWED_EMAILS_FILE, 'r') as f:
+                data = json.load(f)
+                emails = set(e.lower() for e in data.get("allowed_emails", []))
+                logger.debug(f"Loaded {len(emails)} allowed emails")
+                return emails
+    except Exception as e:
+        logger.error(f"Failed to load allowed emails: {e}")
+    return set()
+
+
+def is_email_allowed(email: str) -> bool:
+    """Check if email is in the whitelist."""
+    if not email:
+        return False
+    allowed = load_allowed_emails()
+    return email.lower() in allowed
 
 
 # ============ Pydantic Schemas ============
@@ -77,6 +131,7 @@ class SessionResponse(BaseModel):
     last_activity_at: datetime
     expires_at: datetime
     uploaded_files: Optional[List[str]] = None
+    is_admin: bool = False  # Admin sessions are unsandboxed
 
     class Config:
         from_attributes = True
@@ -126,17 +181,42 @@ class UploadResponse(BaseModel):
     data_dir: str
 
 
+class GitCloneRequest(BaseModel):
+    repo_url: str  # GitHub URL (https://github.com/user/repo or git@github.com:user/repo)
+    target_path: Optional[str] = None  # Relative path within workspace (default: data/)
+    branch: Optional[str] = None  # Specific branch to clone
+
+
+class GitCloneResponse(BaseModel):
+    success: bool
+    repo_name: str
+    clone_path: str
+    message: str
+
+
 # ============ REST Endpoints ============
 
 @router.post("/sessions", response_model=SessionResponse)
 async def create_session(
     session_id: str = Form(...),
-    email: str = Form(...),
+    email: str = Form(...),  # Email is now required for whitelist validation
     title: Optional[str] = Form(None),
     files: List[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new CCResearch session with workspace directory and optional file uploads"""
+    """Create a new CCResearch session with workspace directory and optional file uploads.
+
+    Starts Claude Code directly - users can use any skills, MCP servers, or plugins.
+    Email must be in the allowed whitelist.
+    """
+    # Validate email against whitelist
+    if not is_email_allowed(email):
+        logger.warning(f"Access denied for email: {email}")
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied. Your email is not authorized to use CCResearch. Please contact the administrator."
+        )
+
     ccresearch_id = str(uuid.uuid4())
 
     # Process uploaded files info
@@ -185,6 +265,8 @@ async def create_session(
         workspace_dir=str(workspace_dir),
         status="created",
         uploaded_files=json.dumps(uploaded_files_list) if uploaded_files_list else None,
+        auth_mode="oauth",  # Keep for database compatibility
+        is_admin=False,  # Keep for database compatibility
         expires_at=datetime.utcnow() + timedelta(hours=24)
     )
 
@@ -208,7 +290,8 @@ async def create_session(
         created_at=session.created_at,
         last_activity_at=session.last_activity_at,
         expires_at=session.expires_at,
-        uploaded_files=uploaded_files_list
+        uploaded_files=uploaded_files_list,
+        is_admin=session.is_admin
     )
     return response
 
@@ -217,9 +300,22 @@ async def create_session(
 async def upload_files_to_session(
     ccresearch_id: str,
     files: List[UploadFile] = File(...),
+    target_path: Optional[str] = Form(None),  # Relative path within workspace (e.g., "data" or "data/subdir")
+    extract_zip: bool = Form(True),  # Auto-extract ZIP files
     db: AsyncSession = Depends(get_db)
 ):
-    """Upload additional files to an existing session"""
+    """Upload files to an existing session.
+
+    Supports:
+    - Individual files
+    - Directory uploads (files with paths like "folder/file.txt")
+    - ZIP files (auto-extracted if extract_zip=True)
+    - Target directory selection
+    """
+    # Rate limiting
+    if not upload_rate_limiter.is_allowed(ccresearch_id):
+        raise HTTPException(status_code=429, detail="Too many upload requests. Please wait a moment.")
+
     result = await db.execute(
         select(CCResearchSession)
         .where(CCResearchSession.id == ccresearch_id)
@@ -230,24 +326,121 @@ async def upload_files_to_session(
         raise HTTPException(status_code=404, detail="Session not found")
 
     workspace = Path(session.workspace_dir)
-    data_dir = workspace / "data"
-    data_dir.mkdir(exist_ok=True)
+
+    # Determine target directory
+    if target_path:
+        # Sanitize and validate target path (prevent directory traversal)
+        target_dir = (workspace / target_path).resolve()
+        if not str(target_dir).startswith(str(workspace.resolve())):
+            raise HTTPException(status_code=403, detail="Invalid target path")
+    else:
+        target_dir = workspace / "data"
+
+    target_dir.mkdir(parents=True, exist_ok=True)
 
     uploaded_files_list = []
     existing_files = json.loads(session.uploaded_files) if session.uploaded_files else []
 
+    # File size limits
+    MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB per file
+    MAX_TOTAL_SIZE = 500 * 1024 * 1024  # 500MB total per upload request
+    total_size = 0
+
     for file in files:
-        if file.filename:
-            safe_filename = Path(file.filename).name
-            file_path = data_dir / safe_filename
+        if not file.filename:
+            continue
+
+        content = await file.read()
+
+        # Check file size
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File '{file.filename}' exceeds {MAX_FILE_SIZE // (1024*1024)}MB limit"
+            )
+        total_size += len(content)
+        if total_size > MAX_TOTAL_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Total upload size exceeds {MAX_TOTAL_SIZE // (1024*1024)}MB limit"
+            )
+
+        # Check if it's a ZIP file and should be extracted
+        if extract_zip and file.filename.lower().endswith('.zip'):
+            try:
+                # Extract ZIP contents with security checks
+                import io
+                MAX_ZIP_SIZE = 500 * 1024 * 1024  # 500MB max total extracted size
+                MAX_ZIP_FILES = 1000  # Max files in ZIP
+                MAX_COMPRESSION_RATIO = 100  # Detect zip bombs
+
+                with zipfile.ZipFile(io.BytesIO(content), 'r') as zip_ref:
+                    # Check for zip bomb (excessive compression ratio)
+                    total_uncompressed = sum(info.file_size for info in zip_ref.infolist())
+                    if len(content) > 0 and total_uncompressed / len(content) > MAX_COMPRESSION_RATIO:
+                        raise HTTPException(status_code=400, detail="ZIP file rejected: suspicious compression ratio (possible zip bomb)")
+
+                    if total_uncompressed > MAX_ZIP_SIZE:
+                        raise HTTPException(status_code=400, detail=f"ZIP contents too large: {total_uncompressed // (1024*1024)}MB exceeds {MAX_ZIP_SIZE // (1024*1024)}MB limit")
+
+                    if len(zip_ref.infolist()) > MAX_ZIP_FILES:
+                        raise HTTPException(status_code=400, detail=f"ZIP has too many files: {len(zip_ref.infolist())} exceeds {MAX_ZIP_FILES} limit")
+
+                    for zip_info in zip_ref.infolist():
+                        if zip_info.is_dir():
+                            continue
+
+                        # Security: Check for path traversal attacks
+                        if '..' in zip_info.filename or zip_info.filename.startswith('/'):
+                            logger.warning(f"Skipping suspicious path in ZIP: {zip_info.filename}")
+                            continue
+
+                        # Sanitize and validate path
+                        rel_path = Path(zip_info.filename)
+                        extracted_path = (target_dir / rel_path).resolve()
+
+                        # Ensure extracted path is within target directory
+                        if not str(extracted_path).startswith(str(target_dir.resolve())):
+                            logger.warning(f"Skipping path traversal attempt in ZIP: {zip_info.filename}")
+                            continue
+
+                        extracted_path.parent.mkdir(parents=True, exist_ok=True)
+
+                        # Extract file
+                        with zip_ref.open(zip_info) as src:
+                            async with aiofiles.open(extracted_path, 'wb') as dst:
+                                await dst.write(src.read())
+
+                        uploaded_files_list.append(str(extracted_path.relative_to(workspace)))
+                logger.info(f"Extracted ZIP {file.filename} to {target_dir}")
+            except zipfile.BadZipFile:
+                # Not a valid ZIP, save as-is
+                safe_filename = Path(file.filename).name
+                file_path = target_dir / safe_filename
+                async with aiofiles.open(file_path, 'wb') as f:
+                    await f.write(content)
+                uploaded_files_list.append(safe_filename)
+        else:
+            # Handle regular files (including directory uploads with paths)
+            # Browser sends directory files as "folder/subfolder/file.txt"
+            if '/' in file.filename:
+                # Preserve directory structure
+                rel_path = Path(file.filename)
+                file_path = target_dir / rel_path
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+            else:
+                safe_filename = Path(file.filename).name
+                file_path = target_dir / safe_filename
 
             async with aiofiles.open(file_path, 'wb') as f:
-                content = await file.read()
                 await f.write(content)
 
-            uploaded_files_list.append(safe_filename)
-            if safe_filename not in existing_files:
-                existing_files.append(safe_filename)
+            uploaded_files_list.append(str(file_path.relative_to(workspace)))
+
+        # Track in existing files list
+        for uf in uploaded_files_list:
+            if uf not in existing_files:
+                existing_files.append(uf)
 
     # Update database
     session.uploaded_files = json.dumps(existing_files)
@@ -267,6 +460,128 @@ async def upload_files_to_session(
         uploaded_files=uploaded_files_list,
         data_dir=str(data_dir)
     )
+
+
+@router.post("/sessions/{ccresearch_id}/clone-repo", response_model=GitCloneResponse)
+async def clone_github_repo(
+    ccresearch_id: str,
+    request: GitCloneRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Clone a GitHub repository into the session workspace.
+
+    Supports HTTPS URLs like https://github.com/user/repo
+    Clones into data/ directory by default, or specified target_path.
+    """
+    # Get session
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    workspace = Path(session.workspace_dir)
+
+    # Validate and parse GitHub URL
+    repo_url = request.repo_url.strip()
+
+    # Extract repo name from URL
+    # Supports: https://github.com/user/repo, https://github.com/user/repo.git, git@github.com:user/repo.git
+    repo_name_match = re.search(r'[/:]([^/:]+/[^/.]+)(?:\.git)?$', repo_url)
+    if not repo_name_match:
+        raise HTTPException(status_code=400, detail="Invalid repository URL format")
+
+    repo_full_name = repo_name_match.group(1)  # e.g., "user/repo"
+    repo_name = repo_full_name.split('/')[-1]  # Just the repo name
+
+    # Ensure HTTPS URL for cloning (more reliable without SSH keys)
+    if repo_url.startswith('git@'):
+        # Convert SSH to HTTPS
+        repo_url = re.sub(r'^git@github\.com:', 'https://github.com/', repo_url)
+    if not repo_url.endswith('.git'):
+        repo_url = repo_url + '.git'
+
+    # Determine target directory
+    target_path = request.target_path or "data"
+    target_dir = workspace / target_path
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    clone_dir = target_dir / repo_name
+
+    # Check if directory already exists
+    if clone_dir.exists():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Directory '{repo_name}' already exists in {target_path}/"
+        )
+
+    # Build git clone command
+    cmd = ['git', 'clone', '--depth', '1']  # Shallow clone for speed
+    if request.branch:
+        # Validate branch name - only allow safe characters
+        import re
+        if not re.match(r'^[a-zA-Z0-9._/-]+$', request.branch):
+            raise HTTPException(status_code=400, detail="Invalid branch name - only alphanumeric, dots, underscores, slashes and dashes allowed")
+        if request.branch.startswith('-'):
+            raise HTTPException(status_code=400, detail="Branch name cannot start with dash")
+        cmd.extend(['--branch', request.branch])
+    cmd.extend([repo_url, str(clone_dir)])
+
+    try:
+        # Run git clone
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(target_dir)
+        )
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=120)
+
+        if process.returncode != 0:
+            error_msg = stderr.decode().strip() or "Unknown error"
+            logger.error(f"Git clone failed for {repo_url}: {error_msg}")
+            raise HTTPException(status_code=400, detail=f"Clone failed: {error_msg}")
+
+        # Update uploaded_files in database
+        existing_files = json.loads(session.uploaded_files) if session.uploaded_files else []
+        clone_rel_path = f"{target_path}/{repo_name}"
+        if clone_rel_path not in existing_files:
+            existing_files.append(clone_rel_path)
+        session.uploaded_files = json.dumps(existing_files)
+        await db.commit()
+
+        # Update CLAUDE.md
+        ccresearch_manager.update_workspace_claude_md(
+            ccresearch_id,
+            session.workspace_dir,
+            email=session.email,
+            uploaded_files=existing_files
+        )
+
+        logger.info(f"Cloned {repo_url} to {clone_dir}")
+
+        return GitCloneResponse(
+            success=True,
+            repo_name=repo_name,
+            clone_path=clone_rel_path,
+            message=f"Successfully cloned {repo_full_name}"
+        )
+
+    except asyncio.TimeoutError:
+        # Clean up partial clone
+        if clone_dir.exists():
+            shutil.rmtree(clone_dir, ignore_errors=True)
+        raise HTTPException(status_code=408, detail="Clone timed out (max 120s)")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"Error cloning repo: {e}")
+        if clone_dir.exists():
+            shutil.rmtree(clone_dir, ignore_errors=True)
+        raise HTTPException(status_code=500, detail=f"Clone failed: {str(e)}")
 
 
 @router.get("/sessions/{browser_session_id}", response_model=list[SessionResponse])
@@ -298,7 +613,8 @@ async def list_sessions(
             created_at=s.created_at,
             last_activity_at=s.last_activity_at,
             expires_at=s.expires_at,
-            uploaded_files=json.loads(s.uploaded_files) if s.uploaded_files else None
+            uploaded_files=json.loads(s.uploaded_files) if s.uploaded_files else None,
+            is_admin=s.is_admin
         ))
     return response_list
 
@@ -339,7 +655,8 @@ async def get_session(
         created_at=session.created_at,
         last_activity_at=session.last_activity_at,
         expires_at=session.expires_at,
-        uploaded_files=json.loads(session.uploaded_files) if session.uploaded_files else None
+        uploaded_files=json.loads(session.uploaded_files) if session.uploaded_files else None,
+        is_admin=session.is_admin
     )
 
 
@@ -373,6 +690,40 @@ async def delete_session(
 
     logger.info(f"Deleted session {ccresearch_id}")
     return {"status": "deleted", "id": ccresearch_id}
+
+
+@router.post("/sessions/{ccresearch_id}/terminate")
+async def terminate_session(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Terminate a running session process (but keep the session record).
+
+    Used for cleanup when user closes tab/browser - terminates the sandbox
+    process without deleting workspace files.
+
+    This endpoint is designed for navigator.sendBeacon() calls during page unload.
+    """
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        # Still return 200 for sendBeacon compatibility (fire and forget)
+        return {"status": "not_found", "id": ccresearch_id}
+
+    # Terminate process if running
+    terminated = await ccresearch_manager.terminate_session(ccresearch_id)
+
+    # Update session status
+    session.status = "terminated"
+    await db.commit()
+
+    logger.info(f"Terminated session {ccresearch_id} (process killed: {terminated})")
+    return {"status": "terminated", "id": ccresearch_id, "process_killed": terminated}
 
 
 @router.post("/sessions/{ccresearch_id}/resize")
@@ -416,6 +767,10 @@ async def list_files(
     db: AsyncSession = Depends(get_db)
 ):
     """List files in session workspace directory"""
+    # Rate limiting
+    if not file_rate_limiter.is_allowed(ccresearch_id):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait a moment.")
+
     result = await db.execute(
         select(CCResearchSession)
         .where(CCResearchSession.id == ccresearch_id)
@@ -445,9 +800,14 @@ async def list_files(
     files = []
     # Resolve workspace to handle symlinks (e.g., /data -> /media/ace/T7/dev)
     workspace_resolved = workspace.resolve()
+    # Block sensitive files from listing
+    BLOCKED_FILES = {'.credentials.json', 'credentials.json', '.env', '.secrets'}
     for item in sorted(target_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
-        # Skip hidden files starting with . except CLAUDE.md
+        # Skip hidden files starting with . except .claude directory
         if item.name.startswith('.') and item.name != '.claude':
+            continue
+        # Skip sensitive credential files
+        if item.name in BLOCKED_FILES:
             continue
 
         try:
@@ -477,6 +837,10 @@ async def download_file(
     db: AsyncSession = Depends(get_db)
 ):
     """Download a file from session workspace"""
+    # Rate limiting
+    if not file_rate_limiter.is_allowed(ccresearch_id):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait a moment.")
+
     result = await db.execute(
         select(CCResearchSession)
         .where(CCResearchSession.id == ccresearch_id)
@@ -494,6 +858,11 @@ async def download_file(
     # Ensure target is within workspace
     if not str(target_path).startswith(str(workspace.resolve())):
         raise HTTPException(status_code=403, detail="Access denied")
+
+    # Block access to sensitive credential files
+    BLOCKED_FILES = {'.credentials.json', 'credentials.json', '.env', '.secrets'}
+    if target_path.name in BLOCKED_FILES:
+        raise HTTPException(status_code=403, detail="Access to credential files is not allowed")
 
     if not target_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
@@ -520,6 +889,10 @@ async def read_file_content(
     db: AsyncSession = Depends(get_db)
 ):
     """Read text content of a file (for preview)"""
+    # Rate limiting
+    if not file_rate_limiter.is_allowed(ccresearch_id):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait a moment.")
+
     result = await db.execute(
         select(CCResearchSession)
         .where(CCResearchSession.id == ccresearch_id)
@@ -537,6 +910,11 @@ async def read_file_content(
     # Ensure target is within workspace
     if not str(target_path).startswith(str(workspace.resolve())):
         raise HTTPException(status_code=403, detail="Access denied")
+
+    # Block access to sensitive credential files
+    BLOCKED_FILES = {'.credentials.json', 'credentials.json', '.env', '.secrets'}
+    if target_path.name in BLOCKED_FILES:
+        raise HTTPException(status_code=403, detail="Access to credential files is not allowed")
 
     if not target_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
@@ -663,6 +1041,14 @@ async def create_session_from_project(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new session by restoring a saved project"""
+    # Validate email against whitelist
+    if not is_email_allowed(request.email):
+        logger.warning(f"Access denied for email: {request.email}")
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied. Your email is not authorized to use CCResearch. Please contact the administrator."
+        )
+
     ccresearch_id = str(uuid.uuid4())
 
     # Restore project files to new workspace
@@ -707,7 +1093,8 @@ async def create_session_from_project(
         created_at=session.created_at,
         last_activity_at=session.last_activity_at,
         expires_at=session.expires_at,
-        uploaded_files=None
+        uploaded_files=None,
+        is_admin=session.is_admin
     )
 
 
@@ -721,6 +1108,114 @@ async def delete_project(project_name: str):
 
     logger.info(f"Deleted project '{project_name}'")
     return {"status": "deleted", "name": project_name}
+
+
+# ============ Session Monitoring Endpoints ============
+
+@router.get("/sessions/{ccresearch_id}/log")
+async def get_session_log(
+    ccresearch_id: str,
+    lines: int = 200,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get the terminal log for a session.
+
+    This returns the raw terminal output captured during the session,
+    useful for debugging and monitoring what Claude is doing.
+
+    Args:
+        ccresearch_id: Session ID
+        lines: Number of lines to return (default 200)
+
+    Returns:
+        Log content or error
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Get log content
+    log_content = ccresearch_manager.read_session_log(ccresearch_id, lines)
+
+    if log_content is None:
+        # Try to find the log file path
+        log_path = ccresearch_manager.get_session_log_path(ccresearch_id)
+        if log_path:
+            return {"log": f"Log file exists but couldn't be read: {log_path}", "lines": 0}
+        return {"log": "No log file found for this session", "lines": 0}
+
+    return {
+        "log": log_content,
+        "lines": len(log_content.splitlines()),
+        "session_id": ccresearch_id
+    }
+
+
+@router.get("/sessions/{ccresearch_id}/buffer")
+async def get_session_buffer(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get the current output buffer for a session (live monitoring).
+
+    This returns the recent terminal output used for automation pattern matching.
+    Only works for active sessions.
+
+    Args:
+        ccresearch_id: Session ID
+
+    Returns:
+        Current output buffer content
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Get buffer content
+    buffer_content = ccresearch_manager.get_output_buffer(ccresearch_id)
+
+    if buffer_content is None:
+        return {
+            "buffer": "",
+            "active": False,
+            "message": "Session not active or no buffer available"
+        }
+
+    return {
+        "buffer": buffer_content,
+        "active": True,
+        "length": len(buffer_content),
+        "session_id": ccresearch_id
+    }
+
+
+@router.get("/automation/rules")
+async def get_automation_rules():
+    """
+    Get the current automation rules configuration.
+
+    Returns the list of patterns that trigger automatic responses.
+    """
+    from app.core.ccresearch_manager import AUTOMATION_RULES
+
+    return {
+        "rules": AUTOMATION_RULES,
+        "count": len(AUTOMATION_RULES)
+    }
 
 
 # ============ WebSocket Endpoint ============
@@ -771,6 +1266,18 @@ async def terminal_websocket(
                 except Exception as e:
                     logger.error(f"Failed to send output: {e}")
 
+            # Define automation callback to notify client of triggered rules
+            async def send_automation_notification(notification: dict):
+                try:
+                    await websocket.send_json(notification)
+                    logger.info(f"Sent automation notification: {notification.get('description')}")
+                except Exception as e:
+                    logger.error(f"Failed to send automation notification: {e}")
+
+            # OAuth mode - no API key needed, uses server's Claude subscription
+            # NOTE: is_admin column exists for future use but currently all sessions use global sandbox setting
+            # TODO: Enable admin bypass when ready: use_sandbox = settings.CCRESEARCH_SANDBOX_ENABLED and not session.is_admin
+
             # Spawn or reconnect to Claude process
             success = await ccresearch_manager.spawn_claude(
                 ccresearch_id,
@@ -778,7 +1285,8 @@ async def terminal_websocket(
                 session.terminal_rows,
                 session.terminal_cols,
                 send_output,
-                sandboxed=settings.CCRESEARCH_SANDBOX_ENABLED
+                sandboxed=settings.CCRESEARCH_SANDBOX_ENABLED,
+                automation_callback=send_automation_notification
             )
 
             if not success:
