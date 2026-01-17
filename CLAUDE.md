@@ -185,16 +185,41 @@ Each CCResearch session has access to all installed Claude Code plugins, skills,
 - Sequential thinking
 - Context7 documentation lookup
 
-**Security (Soft Boundaries + Deny Rules):**
+**Security (Comprehensive Deny Rules):**
+
+*Authentication:*
 - **Email Whitelist:** Only approved emails in `~/.ccresearch_allowed_emails.json` can create sessions
+
+*Workspace Isolation:*
 - **Workspace CLAUDE.md:** Contains immutable boundary instructions (cannot be modified by users)
-- **Deny Rules:** Claude blocked from reading sensitive files via `.claude/settings.local.json`:
-  - `~/.ccresearch_allowed_emails.json` (whitelist)
-  - `~/.claude/CLAUDE.md` (global instructions)
-  - `~/dev/**` (ACe_Toolkit codebase)
-  - `~/.ssh/**`, `~/.bashrc`, `~/.bash_history`
-- **No Hard Sandbox:** Claude runs directly for full plugin/MCP access (soft security via instructions)
-- Network access allowed for API calls and MCP servers
+- **No Hard Sandbox:** Claude runs directly for full plugin/MCP access (soft security via deny rules)
+
+*File Access Deny Rules (via `.claude/settings.local.json`):*
+- `~/.ccresearch_allowed_emails.json` (whitelist - security critical)
+- `~/.claude/CLAUDE.md` (global instructions)
+- `~/dev/**` (ACe_Toolkit and other projects - read/write/edit blocked)
+- `~/.ssh/**`, `~/.gnupg/**` (cryptographic keys)
+- `~/.bashrc`, `~/.bash_history`, `~/.zsh_history` (shell config/history)
+- `~/.aws/**`, `~/.config/gcloud/**`, `~/.kube/**` (cloud credentials)
+- `~/.cloudflared/**`, `/etc/cloudflared/**` (tunnel credentials)
+- `/etc/shadow`, `/etc/passwd`, `/etc/sudoers` (system auth files)
+
+*Bash Command Deny Rules (protect server):*
+- **Process mgmt:** `kill`, `pkill`, `killall`, `fuser` (protect running services)
+- **Service mgmt:** `systemctl`, `service`, `journalctl` (protect Cloudflare tunnel)
+- **Privilege escalation:** `sudo`, `su`, `doas`, `pkexec`
+- **File permissions:** `chmod`, `chown`, `chgrp`
+- **Disk operations:** `dd`, `fdisk`, `mount`, `mkfs`
+- **System control:** `shutdown`, `reboot`, `crontab`, `at`
+- **Network/firewall:** `iptables`, `ufw`, `nft`, `nc -l`
+- **Containers:** `docker`, `podman`, `lxc`
+- **Package managers:** `apt`, `dpkg`, `yum` (pip in venv is allowed)
+- **Kernel/system:** `sysctl`, `modprobe`, `useradd`, `passwd`
+
+*Allowed:*
+- Network access for API calls and MCP servers
+- pip install in workspace virtual environment
+- All file operations within workspace directory
 
 **Navbar Controls:**
 - Back button (arrow) - return to session list
@@ -819,6 +844,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 
 | Date | Change |
 |------|--------|
+| 2026-01-16 | **SECURITY:** Add comprehensive bash command deny rules (kill, systemctl, sudo, docker, etc.) |
 | 2026-01-16 | **MAJOR:** Add email whitelist authentication for CCResearch access control |
 | 2026-01-16 | Add deny rules to block Claude from reading sensitive files (whitelist, ~/.claude/CLAUDE.md, ~/dev/) |
 | 2026-01-16 | Disable sandbox - run Claude Code directly for full plugin/skill/MCP access |
