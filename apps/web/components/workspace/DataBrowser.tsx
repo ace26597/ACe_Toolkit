@@ -52,10 +52,36 @@ const isArchive = (name: string) => {
   return ['zip', 'tar', 'gz', 'rar', '7z', 'tgz', 'bz2'].includes(ext || '');
 };
 
-// Check if file is a note type (markdown or mermaid)
+// Check if file is previewable (markdown, mermaid, code, text)
 const isNoteFile = (name: string) => {
   const ext = name.split('.').pop()?.toLowerCase();
-  return ['md', 'markdown', 'mmd', 'txt'].includes(ext || '');
+  const previewable = [
+    // Markdown & Mermaid
+    'md', 'markdown', 'mmd',
+    // Text
+    'txt', 'log', 'csv',
+    // Code files
+    'js', 'jsx', 'ts', 'tsx', 'py', 'java', 'cpp', 'c', 'h', 'hpp',
+    'go', 'rs', 'rb', 'php', 'sh', 'bash', 'zsh',
+    // Config & data
+    'json', 'jsonl', 'yaml', 'yml', 'xml', 'toml', 'ini', 'env',
+    // Web
+    'html', 'htm', 'css', 'scss', 'sass', 'less',
+    // SQL
+    'sql',
+  ];
+  return previewable.includes(ext || '');
+};
+
+// Check if file is a code file (for syntax highlighting hint)
+const isCodeFile = (name: string) => {
+  const ext = name.split('.').pop()?.toLowerCase();
+  const codeExts = [
+    'js', 'jsx', 'ts', 'tsx', 'py', 'java', 'cpp', 'c', 'h', 'hpp',
+    'go', 'rs', 'rb', 'php', 'sh', 'bash', 'zsh', 'sql',
+    'json', 'jsonl', 'yaml', 'yml', 'xml', 'toml', 'html', 'htm', 'css', 'scss',
+  ];
+  return codeExts.includes(ext || '');
 };
 
 // Get icon based on file extension

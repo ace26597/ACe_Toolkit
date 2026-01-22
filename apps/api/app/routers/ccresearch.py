@@ -786,6 +786,206 @@ async def clone_github_repo(
         raise HTTPException(status_code=500, detail=f"Clone failed: {str(e)}")
 
 
+class WebFetchRequest(BaseModel):
+    url: str
+
+
+class WebFetchResponse(BaseModel):
+    success: bool
+    filename: str
+    path: str
+    message: str
+
+
+@router.post("/sessions/{ccresearch_id}/fetch-url", response_model=WebFetchResponse)
+async def fetch_web_url(
+    ccresearch_id: str,
+    request: WebFetchRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Fetch a web URL and save content as markdown file.
+
+    Converts HTML to a clean markdown format and saves to data/ directory.
+    """
+    import httpx
+    from bs4 import BeautifulSoup
+    from urllib.parse import urlparse, urljoin
+
+    # Get session
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    workspace = Path(session.workspace_dir)
+    url = request.url.strip()
+
+    # Validate URL
+    try:
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            raise ValueError("Invalid URL")
+        if parsed.scheme not in ('http', 'https'):
+            raise ValueError("Only HTTP/HTTPS URLs allowed")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid URL format")
+
+    # Fetch the URL
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as client:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (compatible; ACeToolkit/1.0; Research Bot)'
+            }
+            response = await client.get(url, headers=headers)
+            response.raise_for_status()
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=408, detail="Request timed out")
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=400, detail=f"HTTP error: {e.response.status_code}")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {str(e)}")
+
+    content_type = response.headers.get('content-type', '')
+
+    # Convert HTML to markdown
+    if 'text/html' in content_type:
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        # Remove scripts, styles, and navigation
+        for tag in soup.find_all(['script', 'style', 'nav', 'header', 'footer', 'aside', 'noscript']):
+            tag.decompose()
+
+        # Get title
+        title = soup.title.string if soup.title else parsed.netloc
+        title = title.strip() if title else 'Untitled'
+
+        # Get main content (try various selectors)
+        main_content = soup.find('main') or soup.find('article') or soup.find(class_='content') or soup.find('body')
+
+        # Build markdown
+        markdown_lines = [
+            f"# {title}",
+            "",
+            f"> Source: {url}",
+            f"> Fetched: {datetime.utcnow().isoformat()}Z",
+            "",
+            "---",
+            "",
+        ]
+
+        if main_content:
+            # Convert common HTML elements to markdown
+            for elem in main_content.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'pre', 'code', 'blockquote', 'a', 'img']):
+                if elem.name.startswith('h'):
+                    level = int(elem.name[1])
+                    text = elem.get_text(strip=True)
+                    if text:
+                        markdown_lines.append(f"{'#' * level} {text}")
+                        markdown_lines.append("")
+                elif elem.name == 'p':
+                    text = elem.get_text(strip=True)
+                    if text:
+                        markdown_lines.append(text)
+                        markdown_lines.append("")
+                elif elem.name == 'li':
+                    text = elem.get_text(strip=True)
+                    if text:
+                        markdown_lines.append(f"- {text}")
+                elif elem.name == 'pre' or elem.name == 'code':
+                    code = elem.get_text()
+                    if code.strip():
+                        markdown_lines.append("```")
+                        markdown_lines.append(code)
+                        markdown_lines.append("```")
+                        markdown_lines.append("")
+                elif elem.name == 'blockquote':
+                    text = elem.get_text(strip=True)
+                    if text:
+                        markdown_lines.append(f"> {text}")
+                        markdown_lines.append("")
+                elif elem.name == 'a':
+                    href = elem.get('href')
+                    text = elem.get_text(strip=True)
+                    if href and text:
+                        # Make relative URLs absolute
+                        if not href.startswith(('http://', 'https://')):
+                            href = urljoin(url, href)
+                        markdown_lines.append(f"[{text}]({href})")
+                elif elem.name == 'img':
+                    src = elem.get('src')
+                    alt = elem.get('alt', 'image')
+                    if src:
+                        if not src.startswith(('http://', 'https://')):
+                            src = urljoin(url, src)
+                        markdown_lines.append(f"![{alt}]({src})")
+                        markdown_lines.append("")
+
+        markdown_content = '\n'.join(markdown_lines)
+    else:
+        # For non-HTML content, save as plain text with metadata
+        markdown_content = f"""# Content from {parsed.netloc}
+
+> Source: {url}
+> Content-Type: {content_type}
+> Fetched: {datetime.utcnow().isoformat()}Z
+
+---
+
+```
+{response.text[:50000]}
+```
+"""
+
+    # Generate filename from URL
+    safe_title = re.sub(r'[^\w\s-]', '', parsed.netloc + '_' + (parsed.path or 'index'))
+    safe_title = re.sub(r'[-\s]+', '-', safe_title).strip('-')[:50]
+    filename = f"{safe_title}.md"
+
+    # Save to data directory
+    data_dir = workspace / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    file_path = data_dir / filename
+
+    # Ensure unique filename
+    counter = 1
+    while file_path.exists():
+        filename = f"{safe_title}_{counter}.md"
+        file_path = data_dir / filename
+        counter += 1
+
+    async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
+        await f.write(markdown_content)
+
+    # Update uploaded_files in database
+    existing_files = json.loads(session.uploaded_files) if session.uploaded_files else []
+    rel_path = f"data/{filename}"
+    if rel_path not in existing_files:
+        existing_files.append(rel_path)
+    session.uploaded_files = json.dumps(existing_files)
+    await db.commit()
+
+    # Update CLAUDE.md
+    ccresearch_manager.update_workspace_claude_md(
+        ccresearch_id,
+        session.workspace_dir,
+        email=session.email,
+        uploaded_files=existing_files
+    )
+
+    logger.info(f"Fetched {url} and saved to {file_path}")
+
+    return WebFetchResponse(
+        success=True,
+        filename=filename,
+        path=rel_path,
+        message=f"Saved content from {parsed.netloc}"
+    )
+
+
 @router.get("/sessions/by-email", response_model=list[SessionResponse])
 async def list_sessions_by_email(
     email: str,

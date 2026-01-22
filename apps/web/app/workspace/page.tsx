@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, Clock, Download, Terminal, Plus, FileCode, FileJson, Image, Video, Music, FileType, Upload, Table, FileSpreadsheet, Loader2, Lightbulb, Play, Power } from 'lucide-react';
+import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, Clock, Download, Terminal, Plus, FileCode, FileJson, Image, Video, Music, FileType, Upload, Table, FileSpreadsheet, Loader2, Lightbulb, Play, Power, Github, Globe, Link as LinkIcon } from 'lucide-react';
 import Link from 'next/link';
 import { ProtectedRoute, useAuth } from '@/components/auth';
 import ProjectSidebar from '@/components/workspace/ProjectSidebar';
 import DataBrowser from '@/components/workspace/DataBrowser';
+import FileBrowser from '@/components/ccresearch/FileBrowser';
 import { workspaceApi, WorkspaceProject, WorkspaceDataItem, getApiUrl } from '@/lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -505,11 +506,20 @@ export default function WorkspacePage() {
   // Terminal state
   const { user } = useAuth();
   const [terminalSessionId, setTerminalSessionId] = useState<string | null>(null);
+  const [terminalWorkspaceDir, setTerminalWorkspaceDir] = useState<string>('');
   const [terminalConnected, setTerminalConnected] = useState(false);
   const [isStartingTerminal, setIsStartingTerminal] = useState(false);
   const [browserSessionId, setBrowserSessionId] = useState('');
   const [projectSessions, setProjectSessions] = useState<any[]>([]);
   const [loadingProjectSessions, setLoadingProjectSessions] = useState(false);
+  const [showFileBrowser, setShowFileBrowser] = useState(true);
+
+  // Import data modal state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importType, setImportType] = useState<'github' | 'web'>('github');
+  const [importUrl, setImportUrl] = useState('');
+  const [importBranch, setImportBranch] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -566,6 +576,7 @@ export default function WorkspacePage() {
 
       const session = await res.json();
       setTerminalSessionId(session.id);
+      setTerminalWorkspaceDir(session.workspace_dir || '');
       showToast('Terminal started', 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to start terminal', 'error');
@@ -583,10 +594,82 @@ export default function WorkspacePage() {
         method: 'POST',
       });
       setTerminalSessionId(null);
+      setTerminalWorkspaceDir('');
       setTerminalConnected(false);
       showToast('Terminal stopped', 'success');
     } catch (error) {
       // Ignore termination errors
+    }
+  };
+
+  // Import data from GitHub
+  const importFromGitHub = async () => {
+    if (!terminalSessionId || !importUrl.trim()) return;
+
+    setIsImporting(true);
+    try {
+      const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/clone-repo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repo_url: importUrl.trim(),
+          branch: importBranch.trim() || undefined,
+          target_path: 'data',
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ detail: 'Clone failed' }));
+        throw new Error(error.detail || 'Failed to clone repository');
+      }
+
+      const result = await res.json();
+      showToast(`Cloned ${result.repo_name} successfully`, 'success');
+      setShowImportModal(false);
+      setImportUrl('');
+      setImportBranch('');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to clone repository', 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Import data from Web URL
+  const importFromWeb = async () => {
+    if (!terminalSessionId || !importUrl.trim()) return;
+
+    setIsImporting(true);
+    try {
+      const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/fetch-url`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: importUrl.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ detail: 'Fetch failed' }));
+        throw new Error(error.detail || 'Failed to fetch URL');
+      }
+
+      const result = await res.json();
+      showToast(`Saved ${result.filename}`, 'success');
+      setShowImportModal(false);
+      setImportUrl('');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to fetch URL', 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleImport = () => {
+    if (importType === 'github') {
+      importFromGitHub();
+    } else {
+      importFromWeb();
     }
   };
 
@@ -617,6 +700,7 @@ export default function WorkspacePage() {
   // Reset terminal when project changes
   useEffect(() => {
     setTerminalSessionId(null);
+    setTerminalWorkspaceDir('');
     setTerminalConnected(false);
     setProjectSessions([]);
   }, [selectedProject]);
@@ -1422,6 +1506,30 @@ export default function WorkspacePage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {terminalSessionId && (
+                    <>
+                      <button
+                        onClick={() => setShowImportModal(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 rounded text-sm transition-colors"
+                        title="Import data from GitHub or Web"
+                      >
+                        <Download size={14} />
+                        Import Data
+                      </button>
+                      <button
+                        onClick={() => setShowFileBrowser(!showFileBrowser)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors ${
+                          showFileBrowser
+                            ? 'bg-slate-600 text-white'
+                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        }`}
+                        title="Toggle file browser"
+                      >
+                        <FolderOpen size={14} />
+                        Files
+                      </button>
+                    </>
+                  )}
                   {terminalSessionId ? (
                     <button
                       onClick={stopTerminalSession}
@@ -1444,24 +1552,31 @@ export default function WorkspacePage() {
                       Start Terminal
                     </button>
                   )}
-                  <button
-                    onClick={() => setViewMode('data')}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors"
-                    title="View project files"
-                  >
-                    <FolderOpen size={14} />
-                    File View
-                  </button>
                 </div>
               </div>
 
               {/* Terminal Content */}
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-hidden flex">
                 {terminalSessionId ? (
-                  <CCResearchTerminal
-                    sessionId={terminalSessionId}
-                    onStatusChange={(connected) => setTerminalConnected(connected)}
-                  />
+                  <>
+                    {/* Terminal */}
+                    <div className={`${showFileBrowser ? 'flex-1' : 'w-full'} h-full`}>
+                      <CCResearchTerminal
+                        sessionId={terminalSessionId}
+                        onStatusChange={(connected) => setTerminalConnected(connected)}
+                      />
+                    </div>
+                    {/* File Browser Sidebar */}
+                    {showFileBrowser && (
+                      <div className="w-80 border-l border-slate-700 bg-slate-900/50 flex-shrink-0 overflow-hidden">
+                        <FileBrowser
+                          sessionId={terminalSessionId}
+                          workspaceDir={terminalWorkspaceDir}
+                          autoRefreshInterval={5000}
+                        />
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="h-full flex flex-col bg-slate-900/50 overflow-y-auto">
                     {/* Start New Session Section */}
@@ -1523,7 +1638,10 @@ export default function WorkspacePage() {
                           {projectSessions.map(session => (
                             <button
                               key={session.id}
-                              onClick={() => setTerminalSessionId(session.id)}
+                              onClick={() => {
+                                setTerminalSessionId(session.id);
+                                setTerminalWorkspaceDir(session.workspace_dir || '');
+                              }}
                               className="w-full flex items-center gap-3 p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg text-left transition-colors group"
                             >
                               <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
@@ -1556,6 +1674,142 @@ export default function WorkspacePage() {
         </main>
       </div>
     </div>
+
+    {/* Import Data Modal */}
+    {showImportModal && (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+        <div className="bg-slate-800 rounded-xl w-full max-w-md border border-slate-700 shadow-2xl">
+          <div className="flex items-center justify-between p-4 border-b border-slate-700">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+              <Download size={20} className="text-indigo-400" />
+              Import Data
+            </h3>
+            <button
+              onClick={() => {
+                setShowImportModal(false);
+                setImportUrl('');
+                setImportBranch('');
+              }}
+              className="text-slate-400 hover:text-white p-1"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          <div className="p-4 space-y-4">
+            {/* Import Type Tabs */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setImportType('github')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  importType === 'github'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                <Github size={16} />
+                GitHub
+              </button>
+              <button
+                onClick={() => setImportType('web')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                  importType === 'web'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                <Globe size={16} />
+                Web URL
+              </button>
+            </div>
+
+            {/* GitHub Import */}
+            {importType === 'github' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Repository URL
+                  </label>
+                  <input
+                    type="text"
+                    value={importUrl}
+                    onChange={(e) => setImportUrl(e.target.value)}
+                    placeholder="https://github.com/user/repo"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Branch (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={importBranch}
+                    onChange={(e) => setImportBranch(e.target.value)}
+                    placeholder="main"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                <p className="text-xs text-slate-500">
+                  Repository will be cloned into the data/ folder
+                </p>
+              </div>
+            )}
+
+            {/* Web URL Import */}
+            {importType === 'web' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Web URL
+                  </label>
+                  <input
+                    type="text"
+                    value={importUrl}
+                    onChange={(e) => setImportUrl(e.target.value)}
+                    placeholder="https://example.com/page"
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                <p className="text-xs text-slate-500">
+                  Page content will be saved as a markdown file
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 p-4 border-t border-slate-700">
+            <button
+              onClick={() => {
+                setShowImportModal(false);
+                setImportUrl('');
+                setImportBranch('');
+              }}
+              className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleImport}
+              disabled={isImporting || !importUrl.trim()}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-600 text-white rounded-lg transition-colors"
+            >
+              {isImporting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Download size={16} />
+                  Import
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </ProtectedRoute>
   );
 }

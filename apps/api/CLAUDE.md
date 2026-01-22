@@ -84,6 +84,8 @@ apps/api/
 | WS | `/terminal/{id}` | Bidirectional terminal I/O |
 | POST | `/sessions/{id}/share` | Create share link |
 | DELETE | `/sessions/{id}/share` | Revoke share link |
+| POST | `/sessions/{id}/clone-repo` | Clone GitHub repo to workspace |
+| POST | `/sessions/{id}/fetch-url` | Fetch web URL and save as markdown |
 | GET | `/share/{token}` | Public: Get shared session |
 | GET | `/share/{token}/files` | Public: List files |
 | GET | `/share/{token}/log` | Public: Get terminal log |

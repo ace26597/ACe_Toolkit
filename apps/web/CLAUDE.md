@@ -108,17 +108,21 @@ Project-based file management with notes.
 
 **Views:**
 - **Notes:** Markdown notes with "New Note" button for manual creation
-- **Files:** Full file explorer with navigation
-- **Terminal:** Embedded Claude Code terminal (CCResearchTerminal component)
+- **Files:** Full file explorer with navigation, click to preview any file
+- **Terminal:** Embedded Claude Code terminal with file sidebar
+  - File browser sidebar (same as CCResearch)
+  - Import Data button (GitHub clone, Web URL fetch)
   - Shows existing project sessions with Resume option
   - Start new session button
-  - "File View" button to switch to Files tab
   - Real-time connection status indicator
 
 **File Preview Support:**
 | Type | Features |
 |------|----------|
-| Markdown | Full rendering, inline edit |
+| Markdown | Full rendering with GFM, inline edit |
+| Mermaid | Rendered diagrams + source code |
+| Code (JS, TS, Python, etc.) | Syntax preview, inline edit |
+| JSON, YAML, XML | Preview with editing |
 | Images | PNG, JPG, GIF, WebP, SVG |
 | Videos | MP4, WebM with controls |
 | Audio | MP3, WAV, FLAC player |
