@@ -219,13 +219,15 @@ function ChatPanel({
     isConnected,
     onSendMessage,
     onPinCode,
-    onRunCode
+    onRunCode,
+    dataFiles
 }: {
     messages: ChatMessage[];
     isConnected: boolean;
     onSendMessage: (content: string) => void;
     onPinCode: (code: string, language: string) => void;
     onRunCode: (code: string) => void;
+    dataFiles?: Array<{ name: string; path: string; type: string }>;
 }) {
     const [input, setInput] = useState('');
 
@@ -237,15 +239,56 @@ function ChatPanel({
         }
     };
 
+    const quickActions = [
+        { label: "List all files", prompt: "What data files do I have? List them with their sizes and types." },
+        { label: "Data overview", prompt: "Give me a quick overview of all the data files - structure, row counts, and key columns." },
+        { label: "Find patterns", prompt: "Analyze the data and identify any interesting patterns, trends, or anomalies." },
+        { label: "Create chart", prompt: "Create a visualization that best represents the main insights from this data." },
+    ];
+
     return (
         <div className="flex flex-col h-full">
             {/* Messages */}
             <div className="flex-1 overflow-auto p-4">
                 {messages.length === 0 ? (
-                    <div className="text-center text-gray-500 mt-8">
+                    <div className="text-center text-gray-500 mt-4">
                         <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p>Ask Claude to analyze your data</p>
-                        <p className="text-sm mt-2">Try: "What files do I have?" or "Analyze the CSV file"</p>
+                        <p className="font-medium text-gray-300">Ask Claude to analyze your data</p>
+                        <p className="text-sm mt-2 mb-6">Click a file on the left or try a quick action below</p>
+
+                        {/* Quick actions */}
+                        <div className="grid grid-cols-2 gap-2 max-w-sm mx-auto">
+                            {quickActions.map((action, idx) => (
+                                <button
+                                    key={idx}
+                                    onClick={() => isConnected && onSendMessage(action.prompt)}
+                                    disabled={!isConnected}
+                                    className="text-xs text-left p-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-800/50 disabled:text-gray-600 border border-gray-700 hover:border-cyan-600 rounded transition-colors"
+                                >
+                                    {action.label}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* File suggestions if available */}
+                        {dataFiles && dataFiles.length > 0 && (
+                            <div className="mt-6 text-left max-w-sm mx-auto">
+                                <p className="text-xs text-gray-500 mb-2">Or analyze a specific file:</p>
+                                <div className="space-y-1">
+                                    {dataFiles.slice(0, 3).map((file, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => isConnected && onSendMessage(`Analyze the file "${file.path}" - show me the structure, statistics, and key insights.`)}
+                                            disabled={!isConnected}
+                                            className="w-full text-xs text-left p-2 bg-gray-800/50 hover:bg-gray-700 disabled:text-gray-600 border border-gray-700 hover:border-cyan-600 rounded flex items-center gap-2 transition-colors"
+                                        >
+                                            <FileSpreadsheet className="w-3 h-3 text-cyan-500" />
+                                            <span className="truncate">{file.name}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : (
                     messages.map(message => (
@@ -346,7 +389,15 @@ function DashboardCanvas({
     );
 }
 
-function DataFilesList({ files }: { files: Array<{ name: string; path: string; size: number; type: string }> }) {
+function DataFilesList({
+    files,
+    onAnalyze,
+    onPreview
+}: {
+    files: Array<{ name: string; path: string; size: number; type: string }>;
+    onAnalyze?: (file: { name: string; path: string; type: string }) => void;
+    onPreview?: (file: { name: string; path: string; type: string }) => void;
+}) {
     if (files.length === 0) {
         return (
             <div className="text-gray-500 text-sm p-2">
@@ -361,16 +412,49 @@ function DataFilesList({ files }: { files: Array<{ name: string; path: string; s
         return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
     };
 
+    const getFileIcon = (type: string) => {
+        switch (type) {
+            case 'csv':
+            case 'tsv':
+                return <Table className="w-4 h-4 text-green-500" />;
+            case 'xlsx':
+            case 'xls':
+                return <FileSpreadsheet className="w-4 h-4 text-emerald-500" />;
+            case 'json':
+            case 'jsonl':
+                return <Code className="w-4 h-4 text-yellow-500" />;
+            case 'parquet':
+            case 'feather':
+                return <Database className="w-4 h-4 text-purple-500" />;
+            default:
+                return <FileSpreadsheet className="w-4 h-4 text-cyan-500" />;
+        }
+    };
+
     return (
-        <div className="space-y-1">
+        <div className="space-y-1 p-2">
             {files.map(file => (
                 <div
                     key={file.path}
-                    className="flex items-center gap-2 p-2 hover:bg-gray-800 rounded text-sm"
+                    className="group flex items-center gap-2 p-2 hover:bg-gray-800 rounded text-sm cursor-pointer transition-colors"
+                    onClick={() => onAnalyze?.(file)}
+                    title={`Click to analyze ${file.name}`}
                 >
-                    <FileSpreadsheet className="w-4 h-4 text-cyan-500" />
-                    <span className="text-gray-300 flex-1 truncate">{file.name}</span>
-                    <span className="text-gray-500 text-xs">{formatSize(file.size)}</span>
+                    {getFileIcon(file.type)}
+                    <div className="flex-1 min-w-0">
+                        <span className="text-gray-300 truncate block">{file.name}</span>
+                        <span className="text-gray-500 text-xs">{formatSize(file.size)}</span>
+                    </div>
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onAnalyze?.(file);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-cyan-400 hover:text-cyan-300 p-1"
+                        title="Analyze this file"
+                    >
+                        <BarChart3 className="w-3 h-3" />
+                    </button>
                 </div>
             ))}
         </div>
@@ -482,11 +566,34 @@ function DataStudioContent() {
             {/* Main content */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Left sidebar - Data files */}
-                <div className="w-48 border-r border-gray-800 bg-gray-950 flex-shrink-0 overflow-auto">
+                <div className="w-56 border-r border-gray-800 bg-gray-950 flex-shrink-0 overflow-auto">
                     <div className="p-3 border-b border-gray-800">
                         <h3 className="text-sm font-medium text-gray-400">Data Files</h3>
+                        <p className="text-xs text-gray-500 mt-1">Click to analyze</p>
                     </div>
-                    <DataFilesList files={dataFiles} />
+                    <DataFilesList
+                        files={dataFiles}
+                        onAnalyze={(file) => {
+                            if (isConnected) {
+                                sendMessage(`Analyze the file "${file.path}" - show me the structure, basic statistics, and any interesting patterns.`);
+                            }
+                        }}
+                    />
+                    {dataFiles.length > 0 && (
+                        <div className="p-2 border-t border-gray-800">
+                            <button
+                                onClick={() => {
+                                    if (isConnected) {
+                                        sendMessage("List all data files and give me a brief summary of each one.");
+                                    }
+                                }}
+                                disabled={!isConnected}
+                                className="w-full text-xs text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 p-2 hover:bg-gray-800 rounded transition-colors"
+                            >
+                                Analyze All Files
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Chat panel */}
@@ -497,6 +604,7 @@ function DataStudioContent() {
                         onSendMessage={sendMessage}
                         onPinCode={handlePinCode}
                         onRunCode={runCode}
+                        dataFiles={dataFiles}
                     />
                 </div>
 
