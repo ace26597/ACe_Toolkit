@@ -12,6 +12,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { getApiUrl, WorkspaceSession } from '@/lib/api';
+import { useAuth } from '@/components/auth';
 
 // App icons and colors
 const APP_CONFIG: Record<string, { icon: typeof Terminal; color: string; bgColor: string; route: string }> = {
@@ -34,6 +35,19 @@ const APP_CONFIG: Record<string, { icon: typeof Terminal; color: string; bgColor
     route: '/analyst'
   }
 };
+
+// CCResearch session interface (from DB)
+interface CCResearchSession {
+  id: string;
+  session_id: string;
+  email: string;
+  session_number: number;
+  title: string;
+  workspace_dir: string;
+  status: string;
+  created_at: string;
+  last_activity_at: string;
+}
 
 // Format relative time
 function formatRelativeTime(dateStr: string): string {
@@ -67,32 +81,64 @@ interface RecentSessionsProps {
 }
 
 export function RecentSessions({ maxSessions = 5 }: RecentSessionsProps) {
+  const { user } = useAuth();
   const [sessions, setSessions] = useState<WorkspaceSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchSessions = async () => {
+    if (!user?.email) {
+      setSessions([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
 
-      const res = await fetch(`${getApiUrl()}/workspace/sessions`, {
-        credentials: 'include'
-      });
+      // Fetch from both sources in parallel
+      const [workspaceRes, ccresearchRes] = await Promise.all([
+        fetch(`${getApiUrl()}/workspace/sessions`, {
+          credentials: 'include'
+        }).catch(() => null),
+        fetch(`${getApiUrl()}/ccresearch/sessions/by-email?email=${encodeURIComponent(user.email)}`, {
+          credentials: 'include'
+        }).catch(() => null)
+      ]);
 
-      if (!res.ok) {
-        if (res.status === 401) {
-          // Not authenticated - don't show error, just empty
-          setSessions([]);
-          return;
-        }
-        throw new Error('Failed to fetch sessions');
+      const allSessions: WorkspaceSession[] = [];
+
+      // Process workspace sessions
+      if (workspaceRes?.ok) {
+        const workspaceData = await workspaceRes.json();
+        allSessions.push(...workspaceData);
       }
 
-      const data = await res.json();
-      // Sort by last_accessed and take top N
-      const sorted = data
-        .sort((a: WorkspaceSession, b: WorkspaceSession) =>
+      // Process CCResearch sessions (convert to WorkspaceSession format)
+      if (ccresearchRes?.ok) {
+        const ccresearchData: CCResearchSession[] = await ccresearchRes.json();
+        const mappedSessions: WorkspaceSession[] = ccresearchData.map(s => ({
+          id: s.id,
+          title: s.title,
+          created_by: 'ccresearch',
+          created_at: s.created_at,
+          last_accessed: s.last_activity_at,
+          tags: [],
+          terminal_enabled: true,
+          email: s.email,
+          status: s.status
+        }));
+        allSessions.push(...mappedSessions);
+      }
+
+      // Deduplicate by ID and sort by last_accessed
+      const uniqueSessions = Array.from(
+        new Map(allSessions.map(s => [s.id, s])).values()
+      );
+
+      const sorted = uniqueSessions
+        .sort((a, b) =>
           new Date(b.last_accessed).getTime() - new Date(a.last_accessed).getTime()
         )
         .slice(0, maxSessions);
@@ -107,7 +153,7 @@ export function RecentSessions({ maxSessions = 5 }: RecentSessionsProps) {
 
   useEffect(() => {
     fetchSessions();
-  }, [maxSessions]);
+  }, [maxSessions, user?.email]);
 
   // Don't render anything if not authenticated or no sessions
   if (!loading && sessions.length === 0 && !error) {

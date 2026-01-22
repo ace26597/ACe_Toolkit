@@ -148,25 +148,6 @@ export default function Home() {
             </Link>
 
             <Link
-              href="/analyst"
-              className="group rounded-lg border border-blue-200 dark:border-blue-700 px-4 sm:px-6 py-4 sm:py-5 transition-all hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:shadow-lg md:col-span-2 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/10 dark:to-purple-900/10"
-            >
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                  Data Analyst
-                  <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
-                </h2>
-                <span className="text-[10px] sm:text-xs bg-blue-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-medium">AUTH</span>
-              </div>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
-                AI-powered data analysis and visualization. Connect to any data source - CSV, Excel, PostgreSQL, or AACT clinical trials.
-              </p>
-              <p className="text-[10px] sm:text-xs text-blue-600 dark:text-blue-400 font-medium">
-                Requires login - per-user data isolation
-              </p>
-            </Link>
-
-            <Link
               href="/video-factory"
               className="group rounded-lg border border-purple-200 dark:border-purple-700 px-4 sm:px-6 py-4 sm:py-5 transition-all hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:shadow-lg md:col-span-2 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/10 dark:to-pink-900/10"
             >
