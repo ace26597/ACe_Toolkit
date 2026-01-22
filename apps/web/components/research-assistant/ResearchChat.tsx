@@ -67,6 +67,9 @@ export default function ResearchChat({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Use ref to track accumulated streaming content (avoids closure issues)
+  const streamingContentRef = useRef<string>('');
+
   // Convert saved messages to local format
   useEffect(() => {
     if (savedMessages.length > 0) {
@@ -102,6 +105,87 @@ export default function ResearchChat({
     }
   }, [session?.id]);
 
+  // Handle WebSocket messages - separate from other state to prevent stale closures
+  useEffect(() => {
+    const ws = wsRef.current;
+    if (!ws) return;
+
+    const handleMessage = (event: MessageEvent) => {
+      try {
+        const data: ResearchStreamEvent = JSON.parse(event.data);
+
+        // Log for debugging
+        console.log('WS Event:', data.type, data);
+
+        // Forward to terminal for all events
+        onTerminalEvent(data);
+
+        switch (data.type) {
+          case 'connected':
+            console.log('WebSocket session connected:', data.session_id);
+            break;
+
+          case 'system':
+            console.log('System event:', data);
+            break;
+
+          case 'thinking':
+            // Show thinking in terminal only, mark as running
+            setIsRunning(true);
+            break;
+
+          case 'tool_use':
+            // Show tool use in terminal only
+            setIsRunning(true);
+            break;
+
+          case 'tool_result':
+            // Tool results go to terminal
+            break;
+
+          case 'text':
+            // Accumulate text response
+            const text = data.content || '';
+            streamingContentRef.current += text;
+            setStreamingMessage(streamingContentRef.current);
+            break;
+
+          case 'complete':
+            // Finalize the assistant message using the complete response
+            const finalContent = data.response || streamingContentRef.current;
+            if (finalContent) {
+              const assistantMessage: Message = {
+                id: `assistant-${Date.now()}`,
+                role: 'assistant',
+                content: finalContent,
+                format: responseFormat,
+                timestamp: new Date().toISOString(),
+              };
+              setLocalMessages((prev) => [...prev, assistantMessage]);
+            }
+            // Reset streaming state
+            streamingContentRef.current = '';
+            setStreamingMessage('');
+            setIsRunning(false);
+            onNewMessage();
+            break;
+
+          case 'error':
+            setError(data.error || 'An error occurred');
+            streamingContentRef.current = '';
+            setStreamingMessage('');
+            setIsRunning(false);
+            break;
+        }
+      } catch (err) {
+        console.error('Failed to parse WebSocket message:', err, event.data);
+      }
+    };
+
+    ws.addEventListener('message', handleMessage);
+    return () => ws.removeEventListener('message', handleMessage);
+  }, [wsRef.current, onTerminalEvent, onNewMessage, responseFormat]);
+
   const handleSendMessage = useCallback(async () => {
     if (!input.trim() || !session || isRunning || !wsRef.current) return;
 
@@ -117,6 +201,9 @@ export default function ResearchChat({
     setInput('');
     setIsRunning(true);
     setError(null);
+
+    // Reset streaming refs
+    streamingContentRef.current = '';
     setStreamingMessage('');
 
     try {
@@ -127,65 +214,18 @@ export default function ResearchChat({
       }
 
       // Send query via WebSocket
-      wsRef.current.send(
-        JSON.stringify({
-          type: 'query',
-          prompt: userMessage.content,
-          response_format: responseFormat,
-        })
-      );
+      const payload = {
+        type: 'query',
+        prompt: userMessage.content,
+        response_format: responseFormat,
+      };
+      console.log('Sending WS query:', payload);
+      wsRef.current.send(JSON.stringify(payload));
     } catch (err: any) {
       setError(err.message || 'Failed to send message');
       setIsRunning(false);
     }
   }, [input, session, isRunning, responseFormat, pendingFiles, wsRef]);
-
-  // Handle WebSocket messages
-  useEffect(() => {
-    const ws = wsRef.current;
-    if (!ws) return;
-
-    const handleMessage = (event: MessageEvent) => {
-      try {
-        const data: ResearchStreamEvent = JSON.parse(event.data);
-
-        // Forward to terminal
-        onTerminalEvent(data);
-
-        switch (data.type) {
-          case 'text':
-            setStreamingMessage((prev) => prev + (data.content || ''));
-            break;
-
-          case 'complete':
-            // Finalize the assistant message
-            const assistantMessage: Message = {
-              id: `assistant-${Date.now()}`,
-              role: 'assistant',
-              content: data.response || streamingMessage,
-              format: responseFormat,
-              timestamp: new Date().toISOString(),
-            };
-            setLocalMessages((prev) => [...prev, assistantMessage]);
-            setStreamingMessage('');
-            setIsRunning(false);
-            onNewMessage();
-            break;
-
-          case 'error':
-            setError(data.error || 'An error occurred');
-            setIsRunning(false);
-            setStreamingMessage('');
-            break;
-        }
-      } catch (err) {
-        console.error('Failed to parse WebSocket message:', err);
-      }
-    };
-
-    ws.addEventListener('message', handleMessage);
-    return () => ws.removeEventListener('message', handleMessage);
-  }, [wsRef, onTerminalEvent, onNewMessage, responseFormat, streamingMessage]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -227,6 +267,9 @@ export default function ResearchChat({
             {session.uploaded_files && session.uploaded_files.length > 0 && (
               <> &bull; {session.uploaded_files.length} files</>
             )}
+            {session.claude_session_id && (
+              <> &bull; Resumable</>
+            )}
           </p>
         </div>
         <FormatSelector
@@ -267,6 +310,13 @@ export default function ResearchChat({
                 format={responseFormat}
                 isStreaming={true}
               />
+            )}
+            {/* Show running indicator when waiting for first output */}
+            {isRunning && !streamingMessage && (
+              <div className="flex items-center gap-3 px-4 py-3 bg-gray-800/50 rounded-lg text-gray-400 text-sm">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Claude is thinking...</span>
+              </div>
             )}
           </>
         )}

@@ -1228,6 +1228,14 @@ export const researchAssistantApi = {
         return `${getApiUrl()}/research-assistant/sessions/${sessionId}/files/download?path=${encodeURIComponent(path)}`;
     },
 
+    downloadFile: async (sessionId: string, path: string): Promise<Blob> => {
+        const res = await fetch(`${getApiUrl()}/research-assistant/sessions/${sessionId}/files/download?path=${encodeURIComponent(path)}`, {
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to download file');
+        return res.blob();
+    },
+
     // WebSocket
     connectWebSocket: (sessionId: string): WebSocket => {
         const wsUrl = getApiUrl().replace(/^http/, 'ws') + `/research-assistant/sessions/${sessionId}/stream`;
