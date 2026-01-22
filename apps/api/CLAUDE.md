@@ -69,6 +69,8 @@ apps/api/
 
 ### CCResearch Terminal (`/ccresearch`)
 
+**Note:** Frontend `/ccresearch` redirects to `/workspace?tab=terminal`. These endpoints are used by both.
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/sessions` | Create session (FormData: email, title, files[]) |

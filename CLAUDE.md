@@ -37,15 +37,19 @@ lsof -i :3000 -i :8000  # Check our ports
 
 | App | Route | Description |
 |-----|-------|-------------|
-| **CCResearch** | `/ccresearch` | Claude Code terminal with 140+ scientific MCP tools - "Create Project" flow |
-| **Workspace** | `/workspace` | Project-based file management with notes + Terminal tab |
+| **Workspace** | `/workspace` | Full project workspace with Claude Code terminal, notes, and files |
 | **Video Factory** | `/video-factory` | AI video production pipeline |
+
+**CCResearch Merged into Workspace:**
+- `/ccresearch` redirects to `/workspace?tab=terminal`
+- All terminal functionality is now in the Workspace Terminal tab
+- Supports Claude Code mode (default) and SSH mode (with access key)
+- 140+ scientific skills, 26 MCP servers, 13 plugins, 566K+ clinical trials data
 
 **Unified Project Architecture:**
 - Projects live at `/data/users/{user-id}/projects/{project-name}/`
-- Same project accessible from both CCResearch and Workspace
-- Terminal tab in Workspace links to CCResearch
-- `--continue` works across sessions (same project directory)
+- Terminal uses same project directory for `--continue` support
+- Files, notes, and terminal all share the same project context
 
 **For detailed app documentation, see:**
 - `apps/web/CLAUDE.md` - Frontend details
@@ -201,8 +205,10 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
-| 2026-01-22 | **MAJOR: Unified Project Architecture** - Projects shared between CCResearch and Workspace |
-| 2026-01-22 | **CCResearch:** "Create Project" flow replaces "New Session" |
+| 2026-01-22 | **MAJOR: CCResearch merged into Workspace** - /ccresearch redirects to /workspace?tab=terminal |
+| 2026-01-22 | **Terminal Tab:** Claude Code or SSH mode with stats bar (140+ skills, 26 MCP servers, etc.) |
+| 2026-01-22 | **Import Data:** GitHub clone and web URL fetch in Workspace terminal |
+| 2026-01-22 | **Unified Project Architecture** - Projects shared across all apps |
 | 2026-01-22 | **Workspace:** Terminal tab links to CCResearch (replaces Import Research) |
 | 2026-01-22 | **Removed Apps:** Data Analyst, Logs Viewer, Notes, Import Research |
 | 2026-01-22 | **Backend Cleanup:** Removed analyst, notes, logs, projects, research routers |

@@ -65,55 +65,36 @@ apps/web/
 
 ## Applications
 
-### CCResearch Terminal (`/ccresearch`)
+### CCResearch (`/ccresearch`) - REDIRECTS TO WORKSPACE
 
-Claude Code Research Platform with 140+ scientific MCP tools.
+**Status:** Merged into Workspace. Route redirects to `/workspace?tab=terminal`.
 
-**Features:**
-- Full PTY terminal (xterm.js + WebSocket)
-- **SessionPicker:** Project list shown first (not form) - select existing or create new
-- Email whitelist authentication
-- File upload on session creation
-- Session sharing (public read-only links)
-- Date-grouped session list (Today, Yesterday, This Week)
-- Inline session renaming
-- Collapsible file browser panel
-
-**Key Components:**
-- `app/ccresearch/page.tsx` - Main terminal page
-- `components/ccresearch/SessionPicker.tsx` - Session list/create view
-- `components/ccresearch/FileBrowser.tsx` - File browser panel
-- `app/ccresearch/share/[token]/page.tsx` - Public share view
-
-**Session Lifecycle:**
-1. See existing sessions OR create new (SessionPicker)
-2. For new: Enter access key (optional), upload files (optional)
-3. Session created with isolated workspace
-4. Claude Code or bash terminal starts
-5. Sessions persist until deleted (24h auto-cleanup)
-
-**Plugins Available:** 13 plugins, 26 MCP servers, 140+ skills
+The CCResearch terminal functionality has been fully integrated into the Workspace Terminal tab.
+Legacy share links still work at `/ccresearch/share/[token]`.
 
 ### Workspace (`/workspace`)
 
-Project-based file management with notes.
+Full project workspace with Claude Code terminal, notes, and file management.
 
 **Features:**
-- Project organization
+- Project organization with unified storage
 - Markdown notes with live preview (GFM tables, Mermaid)
 - File browser with sort by name/date/size
-- File preview (markdown, images, CSV, Excel, DOCX, PDF)
+- File preview (markdown, images, CSV, Excel, DOCX, PDF, code files)
 - Inline file editing
 - Auto-refresh every 10s
 
 **Views:**
 - **Notes:** Markdown notes with "New Note" button for manual creation
 - **Files:** Full file explorer with navigation, click to preview any file
-- **Terminal:** Embedded Claude Code terminal with file sidebar
-  - File browser sidebar (same as CCResearch)
-  - Import Data button (GitHub clone, Web URL fetch)
-  - Shows existing project sessions with Resume option
-  - Start new session button
+- **Terminal:** Full Claude Code terminal (merged from CCResearch)
+  - Terminal mode selection: Claude Code (default) or SSH mode
+  - SSH mode requires access key
+  - Stats bar: 140+ skills, 26 MCP servers, 13 plugins, 566K+ clinical trials
+  - File browser sidebar with upload and refresh
+  - Import Data modal (GitHub clone, Web URL fetch)
+  - Session list with Resume option
+  - Use Cases and Tips buttons
   - Real-time connection status indicator
 
 **File Preview Support:**

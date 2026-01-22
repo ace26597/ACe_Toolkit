@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, Clock, Download, Terminal, Plus, FileCode, FileJson, Image, Video, Music, FileType, Upload, Table, FileSpreadsheet, Loader2, Lightbulb, Play, Power, Github, Globe, Link as LinkIcon } from 'lucide-react';
+import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, Clock, Download, Terminal, Plus, FileCode, FileJson, Image, Video, Music, FileType, Upload, Table, FileSpreadsheet, Loader2, Lightbulb, Play, Power, Github, Globe, Link as LinkIcon, Key } from 'lucide-react';
 import Link from 'next/link';
 import { ProtectedRoute, useAuth } from '@/components/auth';
 import ProjectSidebar from '@/components/workspace/ProjectSidebar';
@@ -521,6 +521,12 @@ export default function WorkspacePage() {
   const [importBranch, setImportBranch] = useState('');
   const [isImporting, setIsImporting] = useState(false);
 
+  // Terminal mode state
+  const [terminalMode, setTerminalMode] = useState<'claude' | 'ssh'>('claude');
+  const [accessKey, setAccessKey] = useState('');
+  const [showUseCases, setShowUseCases] = useState(false);
+  const [showTips, setShowTips] = useState(false);
+
   // Search
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -553,8 +559,14 @@ export default function WorkspacePage() {
   }, []);
 
   // Start terminal session for current project
-  const startTerminalSession = async () => {
+  const startTerminalSession = async (mode: 'claude' | 'ssh' = 'claude', key?: string) => {
     if (!selectedProject || !user?.email || !browserSessionId) return;
+
+    // SSH mode requires access key
+    if (mode === 'ssh' && !key?.trim()) {
+      showToast('Access key is required for SSH terminal', 'error');
+      return;
+    }
 
     setIsStartingTerminal(true);
     try {
@@ -563,6 +575,11 @@ export default function WorkspacePage() {
       formData.append('email', user.email);
       formData.append('project_name', selectedProject);
       formData.append('title', selectedProject);
+
+      // Add access key for SSH mode
+      if (mode === 'ssh' && key) {
+        formData.append('access_key', key);
+      }
 
       const res = await fetch(`${getApiUrl()}/ccresearch/sessions`, {
         method: 'POST',
@@ -577,7 +594,8 @@ export default function WorkspacePage() {
       const session = await res.json();
       setTerminalSessionId(session.id);
       setTerminalWorkspaceDir(session.workspace_dir || '');
-      showToast('Terminal started', 'success');
+      setAccessKey(''); // Clear access key after successful start
+      showToast(`${mode === 'ssh' ? 'SSH' : 'Claude Code'} terminal started`, 'success');
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to start terminal', 'error');
     } finally {
@@ -670,6 +688,63 @@ export default function WorkspacePage() {
       importFromGitHub();
     } else {
       importFromWeb();
+    }
+  };
+
+  // Upload files to terminal session
+  const handleTerminalUpload = async (files: File[], targetPath: string) => {
+    if (!terminalSessionId) return;
+
+    const formData = new FormData();
+    files.forEach(file => {
+      formData.append('files', file);
+    });
+    formData.append('target_path', targetPath || 'data');
+
+    try {
+      const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ detail: 'Upload failed' }));
+        throw new Error(error.detail || 'Failed to upload files');
+      }
+
+      const result = await res.json();
+      showToast(`Uploaded ${result.uploaded_files?.length || files.length} file(s)`, 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to upload files', 'error');
+      throw error;
+    }
+  };
+
+  // Clone GitHub repo to terminal session
+  const handleTerminalCloneRepo = async (repoUrl: string, targetPath: string, branch?: string) => {
+    if (!terminalSessionId) return;
+
+    try {
+      const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/clone-repo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repo_url: repoUrl,
+          target_path: targetPath || 'data',
+          branch: branch || undefined,
+        }),
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ detail: 'Clone failed' }));
+        throw new Error(error.detail || 'Failed to clone repository');
+      }
+
+      const result = await res.json();
+      showToast(`Cloned ${result.repo_name}`, 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to clone repository', 'error');
+      throw error;
     }
   };
 
@@ -1540,7 +1615,7 @@ export default function WorkspacePage() {
                     </button>
                   ) : (
                     <button
-                      onClick={startTerminalSession}
+                      onClick={() => startTerminalSession(terminalMode, accessKey)}
                       disabled={isStartingTerminal || !user?.email}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 text-white rounded text-sm transition-colors"
                     >
@@ -1573,23 +1648,95 @@ export default function WorkspacePage() {
                           sessionId={terminalSessionId}
                           workspaceDir={terminalWorkspaceDir}
                           autoRefreshInterval={5000}
+                          onUpload={handleTerminalUpload}
+                          onCloneRepo={handleTerminalCloneRepo}
                         />
                       </div>
                     )}
                   </>
                 ) : (
                   <div className="h-full flex flex-col bg-slate-900/50 overflow-y-auto">
+                    {/* Stats Bar */}
+                    <div className="flex-shrink-0 grid grid-cols-4 gap-2 p-4 border-b border-slate-800">
+                      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2.5 text-center">
+                        <div className="text-lg font-bold text-emerald-400">140+</div>
+                        <div className="text-xs text-slate-500">Skills</div>
+                      </div>
+                      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2.5 text-center">
+                        <div className="text-lg font-bold text-blue-400">26</div>
+                        <div className="text-xs text-slate-500">MCP Servers</div>
+                      </div>
+                      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2.5 text-center">
+                        <div className="text-lg font-bold text-purple-400">13</div>
+                        <div className="text-xs text-slate-500">Plugins</div>
+                      </div>
+                      <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2.5 text-center">
+                        <div className="text-lg font-bold text-amber-400">566K+</div>
+                        <div className="text-xs text-slate-500">Trials</div>
+                      </div>
+                    </div>
+
                     {/* Start New Session Section */}
-                    <div className="flex flex-col items-center justify-center py-8 px-4 border-b border-slate-800">
-                      <Terminal size={40} className="mb-3 text-emerald-400 opacity-50" />
-                      <h3 className="text-lg font-medium text-white mb-2">Claude Code Terminal</h3>
-                      <p className="text-sm text-slate-500 mb-4 text-center max-w-md">
-                        Start a terminal session with 140+ skills and 26 MCP servers.
-                      </p>
+                    <div className="flex-shrink-0 p-4 border-b border-slate-800">
+                      <div className="flex items-center justify-center gap-2 mb-4">
+                        <Terminal size={24} className="text-emerald-400" />
+                        <h3 className="text-lg font-medium text-white">Start Terminal</h3>
+                      </div>
+
+                      {/* Terminal Mode Selection */}
+                      <div className="flex gap-2 mb-4">
+                        <button
+                          onClick={() => setTerminalMode('claude')}
+                          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
+                            terminalMode === 'claude'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          <Terminal size={16} />
+                          Claude Code
+                        </button>
+                        <button
+                          onClick={() => setTerminalMode('ssh')}
+                          className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-sm font-medium transition-colors ${
+                            terminalMode === 'ssh'
+                              ? 'bg-amber-600 text-white'
+                              : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                          }`}
+                        >
+                          <Key size={16} />
+                          SSH Terminal
+                        </button>
+                      </div>
+
+                      {/* Access Key Input (SSH mode only) */}
+                      {terminalMode === 'ssh' && (
+                        <div className="mb-4">
+                          <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                            Access Key
+                          </label>
+                          <input
+                            type="password"
+                            value={accessKey}
+                            onChange={(e) => setAccessKey(e.target.value)}
+                            placeholder="Enter access key for SSH terminal"
+                            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                          />
+                          <p className="text-xs text-slate-500 mt-1">
+                            SSH mode provides direct bash access without Claude
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Start Button */}
                       <button
-                        onClick={startTerminalSession}
-                        disabled={isStartingTerminal || !user?.email}
-                        className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-slate-600 disabled:to-slate-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-all shadow-lg shadow-emerald-500/25"
+                        onClick={() => startTerminalSession(terminalMode, accessKey)}
+                        disabled={isStartingTerminal || !user?.email || (terminalMode === 'ssh' && !accessKey.trim())}
+                        className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all shadow-lg ${
+                          terminalMode === 'ssh'
+                            ? 'bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 shadow-amber-500/25'
+                            : 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 shadow-emerald-500/25'
+                        } disabled:from-slate-600 disabled:to-slate-600 disabled:shadow-none text-white`}
                       >
                         {isStartingTerminal ? (
                           <>
@@ -1598,16 +1745,34 @@ export default function WorkspacePage() {
                           </>
                         ) : (
                           <>
-                            <Plus size={16} />
-                            New Session
+                            <Play size={16} />
+                            Start {terminalMode === 'ssh' ? 'SSH' : 'Claude Code'} Terminal
                           </>
                         )}
                       </button>
                       {!user?.email && (
-                        <p className="text-xs text-red-400 mt-3">
+                        <p className="text-xs text-red-400 mt-2 text-center">
                           Please log in to use the terminal
                         </p>
                       )}
+
+                      {/* Use Cases & Tips Buttons */}
+                      <div className="flex gap-2 mt-4">
+                        <Link
+                          href="/ccresearch/use-cases"
+                          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
+                        >
+                          <Lightbulb size={14} />
+                          Use Cases
+                        </Link>
+                        <Link
+                          href="/ccresearch/tips"
+                          className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded-lg text-sm transition-colors"
+                        >
+                          <FileText size={14} />
+                          Tips
+                        </Link>
+                      </div>
                     </div>
 
                     {/* Existing Sessions Section */}

@@ -108,43 +108,26 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 w-full max-w-2xl">
             <Link
-              href="/ccresearch"
-              className="group rounded-lg border border-emerald-200 dark:border-emerald-700 px-4 sm:px-6 py-4 sm:py-5 transition-all hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:shadow-lg md:col-span-2 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10"
-            >
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                  CCResearch Terminal
-                  <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
-                </h2>
-                <span className="text-[10px] sm:text-xs bg-emerald-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-medium">AUTH</span>
-              </div>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
-                Claude Code Research Platform with web-based terminal.
-                140+ scientific skills, 26 MCP servers, 13 plugins.
-              </p>
-              <p className="text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                Email auto-filled from login - per-user session tracking
-              </p>
-            </Link>
-
-            <Link
               href="/workspace"
-              className="group rounded-lg border border-indigo-200 dark:border-indigo-700 px-4 sm:px-6 py-4 sm:py-5 transition-all hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:shadow-lg md:col-span-2 bg-gradient-to-r from-indigo-50 to-violet-50 dark:from-indigo-900/10 dark:to-violet-900/10"
+              className="group rounded-lg border border-emerald-200 dark:border-emerald-700 px-4 sm:px-6 py-4 sm:py-5 transition-all hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:shadow-lg md:col-span-2 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/10 dark:to-teal-900/10"
             >
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
                   Workspace
                   <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
                 </h2>
-                <span className="text-[10px] sm:text-xs bg-indigo-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-medium">AUTH</span>
+                <span className="text-[10px] sm:text-xs bg-emerald-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-medium">AUTH</span>
               </div>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
-                Notes and file storage organized by projects.
-                Markdown editor with Mermaid diagram support.
+                Project-based workspace with Claude Code terminal, notes, and file management.
+                140+ scientific skills, 26 MCP servers, 13 plugins.
               </p>
-              <p className="text-[10px] sm:text-xs text-indigo-600 dark:text-indigo-400 font-medium">
-                Requires login - per-user data isolation
-              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <span className="text-[10px] sm:text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded">Terminal</span>
+                <span className="text-[10px] sm:text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded">Notes</span>
+                <span className="text-[10px] sm:text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-2 py-0.5 rounded">Files</span>
+                <span className="text-[10px] sm:text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded">SSH Mode</span>
+              </div>
             </Link>
 
             <Link
