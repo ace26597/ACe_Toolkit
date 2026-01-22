@@ -37,14 +37,16 @@ lsof -i :3000 -i :8000  # Check our ports
 
 | App | Route | Description |
 |-----|-------|-------------|
-| **Workspace** | `/workspace` | Full project workspace with Claude Code terminal, notes, and files |
+| **C3 Researcher Workspace** | `/workspace` | Claude Code Custom Researcher - AI-powered research terminal |
 | **Video Factory** | `/video-factory` | AI video production pipeline |
 
-**CCResearch Merged into Workspace:**
+**C3 Researcher Workspace Features:**
+- 145+ scientific skills, 26 MCP servers, 14 plugins
+- Access to 30+ databases: PubMed, ChEMBL, AACT (566K+ trials), UniProt, etc.
+- Claude Code terminal with SSH mode option
+- Project-based workspace with notes and file management
+- Welcome page shows all capabilities when no project selected
 - `/ccresearch` redirects to `/workspace?tab=terminal`
-- All terminal functionality is now in the Workspace Terminal tab
-- Supports Claude Code mode (default) and SSH mode (with access key)
-- 140+ scientific skills, 26 MCP servers, 13 plugins, 566K+ clinical trials data
 
 **Unified Project Architecture:**
 - Projects live at `/data/users/{user-id}/projects/{project-name}/`
@@ -205,8 +207,11 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
+| 2026-01-22 | **RENAME: C3 Researcher Workspace** - Claude Code Custom Researcher |
+| 2026-01-22 | **Welcome Page:** Comprehensive capabilities view when no project selected |
+| 2026-01-22 | **No Auto-Select:** User must explicitly choose/create project to start |
 | 2026-01-22 | **MAJOR: CCResearch merged into Workspace** - /ccresearch redirects to /workspace?tab=terminal |
-| 2026-01-22 | **Terminal Tab:** Claude Code or SSH mode with stats bar (140+ skills, 26 MCP servers, etc.) |
+| 2026-01-22 | **Terminal Tab:** Claude Code or SSH mode with stats bar (145+ skills, 26 MCP servers, etc.) |
 | 2026-01-22 | **Import Data:** GitHub clone and web URL fetch in Workspace terminal |
 | 2026-01-22 | **Unified Project Architecture** - Projects shared across all apps |
 | 2026-01-22 | **Workspace:** Terminal tab links to CCResearch (replaces Import Research) |

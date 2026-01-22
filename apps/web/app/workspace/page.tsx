@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, Clock, Download, Terminal, Plus, FileCode, FileJson, Image, Video, Music, FileType, Upload, Table, FileSpreadsheet, Loader2, Lightbulb, Play, Power, Github, Globe, Link as LinkIcon, Key } from 'lucide-react';
+import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, ChevronDown, Clock, Download, Terminal, Plus, FileCode, FileJson, Image, Video, Music, FileType, Upload, Table, FileSpreadsheet, Loader2, Lightbulb, Play, Power, Github, Globe, Link as LinkIcon, Key, Database, Server, Sparkles, Wrench, Dna, Pill, Brain, BarChart3, BookOpen, Zap, Copy, Check, ExternalLink, Beaker } from 'lucide-react';
 import Link from 'next/link';
 import { ProtectedRoute, useAuth } from '@/components/auth';
 import ProjectSidebar from '@/components/workspace/ProjectSidebar';
@@ -16,6 +16,10 @@ import mermaid from 'mermaid';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
+
+// Import capabilities data for welcome view
+import capabilitiesData from '@/data/ccresearch/capabilities.json';
+import useCasesData from '@/data/ccresearch/use-cases.json';
 
 // Dynamic import for CCResearchTerminal (client-only, xterm.js requires DOM)
 const CCResearchTerminal = dynamic(
@@ -162,6 +166,425 @@ function JsonViewer({ content }: { content: string }) {
       className="text-sm font-mono leading-relaxed whitespace-pre-wrap"
       dangerouslySetInnerHTML={{ __html: highlighted }}
     />
+  );
+}
+
+// Welcome Content Component - shows when no project selected
+function WelcomeContent() {
+  const [expandedSection, setExpandedSection] = useState<string | null>('getting-started');
+  const [copiedPrompt, setCopiedPrompt] = useState<string | null>(null);
+
+  const stats = capabilitiesData.stats;
+  const plugins = capabilitiesData.plugins;
+  const mcpServers = capabilitiesData.mcpServers;
+  const scientificCategories = capabilitiesData.scientificCategories;
+
+  const copyPrompt = (prompt: string, id: string) => {
+    navigator.clipboard.writeText(prompt);
+    setCopiedPrompt(id);
+    setTimeout(() => setCopiedPrompt(null), 2000);
+  };
+
+  const toggleSection = (section: string) => {
+    setExpandedSection(expandedSection === section ? null : section);
+  };
+
+  return (
+    <div className="h-full overflow-y-auto bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-r from-emerald-900/30 via-teal-900/20 to-cyan-900/30 border-b border-emerald-700/30 px-6 py-8">
+        <div className="max-w-4xl mx-auto text-center">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="p-3 bg-emerald-600/20 rounded-xl">
+              <Beaker className="w-10 h-10 text-emerald-400" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-3">
+            C3 Researcher Workspace
+          </h1>
+          <p className="text-lg text-slate-300 mb-2">
+            Claude Code Custom Researcher
+          </p>
+          <p className="text-slate-400 max-w-2xl mx-auto">
+            AI-powered research terminal with {stats.totalSkills}+ scientific skills, {stats.totalMcpServers} MCP servers,
+            and access to {stats.totalDatabases}+ scientific databases including PubMed, ChEMBL, AACT, and more.
+          </p>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="max-w-6xl mx-auto px-6 py-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-center">
+            <Sparkles className="w-6 h-6 text-purple-400 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-white">{stats.totalSkills}+</div>
+            <div className="text-sm text-slate-400">Scientific Skills</div>
+          </div>
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-center">
+            <Server className="w-6 h-6 text-blue-400 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-white">{stats.totalMcpServers}</div>
+            <div className="text-sm text-slate-400">MCP Servers</div>
+          </div>
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-center">
+            <Wrench className="w-6 h-6 text-amber-400 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-white">{stats.totalPlugins}</div>
+            <div className="text-sm text-slate-400">Plugins</div>
+          </div>
+          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-center">
+            <Database className="w-6 h-6 text-emerald-400 mx-auto mb-2" />
+            <div className="text-2xl font-bold text-white">{stats.totalDatabases}+</div>
+            <div className="text-sm text-slate-400">Databases</div>
+          </div>
+        </div>
+
+        {/* Getting Started Section */}
+        <div className="mb-6">
+          <button
+            onClick={() => toggleSection('getting-started')}
+            className="w-full flex items-center justify-between p-4 bg-emerald-900/30 border border-emerald-700/50 rounded-xl hover:bg-emerald-900/40 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Zap className="w-5 h-5 text-emerald-400" />
+              <span className="text-lg font-semibold text-white">Getting Started</span>
+            </div>
+            {expandedSection === 'getting-started' ? (
+              <ChevronDown className="w-5 h-5 text-slate-400" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-slate-400" />
+            )}
+          </button>
+          {expandedSection === 'getting-started' && (
+            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="bg-slate-900/50 rounded-lg p-4">
+                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
+                    <span className="w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-sm">1</span>
+                    Create a Project
+                  </h4>
+                  <p className="text-sm text-slate-400">Click "New Project" in the sidebar to create a workspace for your research.</p>
+                </div>
+                <div className="bg-slate-900/50 rounded-lg p-4">
+                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
+                    <span className="w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-sm">2</span>
+                    Start Terminal
+                  </h4>
+                  <p className="text-sm text-slate-400">Open the Terminal tab and click "Start Terminal" to launch Claude Code.</p>
+                </div>
+                <div className="bg-slate-900/50 rounded-lg p-4">
+                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
+                    <span className="w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-sm">3</span>
+                    Ask Questions
+                  </h4>
+                  <p className="text-sm text-slate-400">Type natural language queries - search PubMed, analyze data, or run code.</p>
+                </div>
+                <div className="bg-slate-900/50 rounded-lg p-4">
+                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
+                    <span className="w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-sm">4</span>
+                    Review Results
+                  </h4>
+                  <p className="text-sm text-slate-400">View outputs in Notes and Files tabs. Export reports and data.</p>
+                </div>
+              </div>
+              <div className="bg-amber-900/20 border border-amber-700/50 rounded-lg p-4">
+                <h4 className="font-medium text-amber-300 mb-2 flex items-center gap-2">
+                  <Key className="w-4 h-4" />
+                  SSH Mode (Advanced)
+                </h4>
+                <p className="text-sm text-slate-400">
+                  Select "SSH Terminal" mode and enter the access key for direct bash terminal access.
+                  This bypasses Claude Code for manual operations.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Claude Commands Section */}
+        <div className="mb-6">
+          <button
+            onClick={() => toggleSection('commands')}
+            className="w-full flex items-center justify-between p-4 bg-blue-900/30 border border-blue-700/50 rounded-xl hover:bg-blue-900/40 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Terminal className="w-5 h-5 text-blue-400" />
+              <span className="text-lg font-semibold text-white">Claude Commands & Tips</span>
+            </div>
+            {expandedSection === 'commands' ? (
+              <ChevronDown className="w-5 h-5 text-slate-400" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-slate-400" />
+            )}
+          </button>
+          {expandedSection === 'commands' && (
+            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl">
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <h4 className="font-medium text-white mb-3">Slash Commands</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
+                      <code className="text-emerald-400">/help</code>
+                      <span className="text-slate-400">Show available commands</span>
+                    </div>
+                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
+                      <code className="text-emerald-400">/clear</code>
+                      <span className="text-slate-400">Clear conversation</span>
+                    </div>
+                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
+                      <code className="text-emerald-400">/compact</code>
+                      <span className="text-slate-400">Toggle compact mode</span>
+                    </div>
+                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
+                      <code className="text-emerald-400">/model</code>
+                      <span className="text-slate-400">Switch AI model</span>
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="font-medium text-white mb-3">Keyboard Shortcuts</h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
+                      <code className="text-blue-400">Ctrl+C</code>
+                      <span className="text-slate-400">Cancel current operation</span>
+                    </div>
+                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
+                      <code className="text-blue-400">Ctrl+L</code>
+                      <span className="text-slate-400">Clear terminal</span>
+                    </div>
+                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
+                      <code className="text-blue-400">↑/↓</code>
+                      <span className="text-slate-400">History navigation</span>
+                    </div>
+                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
+                      <code className="text-blue-400">Tab</code>
+                      <span className="text-slate-400">Auto-complete</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-slate-900/50 rounded-lg p-4">
+                <h4 className="font-medium text-white mb-2">Pro Tips</h4>
+                <ul className="text-sm text-slate-400 space-y-1 list-disc list-inside">
+                  <li>Be specific about file formats and output locations</li>
+                  <li>Ask for plots to be saved to <code className="text-emerald-400">output/</code> folder</li>
+                  <li>Use <code className="text-emerald-400">data/</code> folder for uploaded files</li>
+                  <li>Request markdown reports for structured analysis</li>
+                  <li>Specify database names when querying (e.g., "search PubMed for...")</li>
+                </ul>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Scientific Capabilities Section */}
+        <div className="mb-6">
+          <button
+            onClick={() => toggleSection('scientific')}
+            className="w-full flex items-center justify-between p-4 bg-purple-900/30 border border-purple-700/50 rounded-xl hover:bg-purple-900/40 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Dna className="w-5 h-5 text-purple-400" />
+              <span className="text-lg font-semibold text-white">Scientific Capabilities ({stats.totalSkills}+ Skills)</span>
+            </div>
+            {expandedSection === 'scientific' ? (
+              <ChevronDown className="w-5 h-5 text-slate-400" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-slate-400" />
+            )}
+          </button>
+          {expandedSection === 'scientific' && (
+            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {scientificCategories.map((cat: any) => (
+                  <div key={cat.id} className="bg-slate-900/50 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      {cat.id === 'databases' && <Database className="w-4 h-4 text-blue-400" />}
+                      {cat.id === 'bioinformatics' && <Dna className="w-4 h-4 text-green-400" />}
+                      {cat.id === 'cheminformatics' && <Pill className="w-4 h-4 text-pink-400" />}
+                      {cat.id === 'ml' && <Brain className="w-4 h-4 text-purple-400" />}
+                      {cat.id === 'visualization' && <BarChart3 className="w-4 h-4 text-amber-400" />}
+                      {cat.id === 'documents' && <FileText className="w-4 h-4 text-cyan-400" />}
+                      {cat.id === 'medical' && <Beaker className="w-4 h-4 text-red-400" />}
+                      {cat.id === 'integrations' && <Server className="w-4 h-4 text-indigo-400" />}
+                      <span className="font-medium text-white">{cat.name}</span>
+                      <span className="text-xs bg-slate-700 px-1.5 py-0.5 rounded text-slate-400">{cat.count}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {cat.examples.slice(0, 5).map((ex: string) => (
+                        <span key={ex} className="text-xs bg-slate-800 px-2 py-0.5 rounded text-slate-400">{ex}</span>
+                      ))}
+                      {cat.examples.length > 5 && (
+                        <span className="text-xs text-slate-500">+{cat.examples.length - 5} more</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* MCP Servers Section */}
+        <div className="mb-6">
+          <button
+            onClick={() => toggleSection('mcp')}
+            className="w-full flex items-center justify-between p-4 bg-cyan-900/30 border border-cyan-700/50 rounded-xl hover:bg-cyan-900/40 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Server className="w-5 h-5 text-cyan-400" />
+              <span className="text-lg font-semibold text-white">MCP Servers ({mcpServers.length})</span>
+            </div>
+            {expandedSection === 'mcp' ? (
+              <ChevronDown className="w-5 h-5 text-slate-400" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-slate-400" />
+            )}
+          </button>
+          {expandedSection === 'mcp' && (
+            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {mcpServers.map((server: any) => (
+                  <div key={server.id} className="bg-slate-900/50 rounded-lg p-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className={`w-2 h-2 rounded-full ${server.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`} />
+                      <span className="font-medium text-white text-sm">{server.name}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${
+                        server.category === 'scientific' ? 'bg-purple-500/20 text-purple-300' :
+                        server.category === 'ai' ? 'bg-blue-500/20 text-blue-300' :
+                        'bg-slate-600/50 text-slate-300'
+                      }`}>{server.category}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 line-clamp-2">{server.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Plugins Section */}
+        <div className="mb-6">
+          <button
+            onClick={() => toggleSection('plugins')}
+            className="w-full flex items-center justify-between p-4 bg-amber-900/30 border border-amber-700/50 rounded-xl hover:bg-amber-900/40 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Wrench className="w-5 h-5 text-amber-400" />
+              <span className="text-lg font-semibold text-white">Plugins ({plugins.length})</span>
+            </div>
+            {expandedSection === 'plugins' ? (
+              <ChevronDown className="w-5 h-5 text-slate-400" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-slate-400" />
+            )}
+          </button>
+          {expandedSection === 'plugins' && (
+            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl">
+              <div className="grid md:grid-cols-2 gap-3">
+                {plugins.map((plugin: any) => (
+                  <div key={plugin.id} className="bg-slate-900/50 rounded-lg p-3 flex items-start gap-3">
+                    <div className={`w-2 h-2 mt-1.5 rounded-full ${plugin.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`} />
+                    <div>
+                      <div className="font-medium text-white text-sm">{plugin.name}</div>
+                      <p className="text-xs text-slate-400">{plugin.description}</p>
+                      {plugin.skillsCount && (
+                        <span className="text-xs text-purple-400">{plugin.skillsCount} skills</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Example Prompts Section */}
+        <div className="mb-6">
+          <button
+            onClick={() => toggleSection('examples')}
+            className="w-full flex items-center justify-between p-4 bg-indigo-900/30 border border-indigo-700/50 rounded-xl hover:bg-indigo-900/40 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <BookOpen className="w-5 h-5 text-indigo-400" />
+              <span className="text-lg font-semibold text-white">Example Prompts</span>
+            </div>
+            {expandedSection === 'examples' ? (
+              <ChevronDown className="w-5 h-5 text-slate-400" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-slate-400" />
+            )}
+          </button>
+          {expandedSection === 'examples' && (
+            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl space-y-4">
+              {useCasesData.categories.slice(0, 4).map((category: any) => (
+                <div key={category.id}>
+                  <h4 className="text-sm font-medium text-slate-300 mb-2">{category.title}</h4>
+                  <div className="space-y-2">
+                    {category.examples.slice(0, 2).map((example: any) => (
+                      <div key={example.id} className="bg-slate-900/50 rounded-lg p-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-medium text-white">{example.title}</span>
+                              {example.verified && (
+                                <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">Verified</span>
+                              )}
+                            </div>
+                            <code className="text-xs text-emerald-400 block bg-slate-950 rounded p-2 mt-1">
+                              {example.prompt.length > 120 ? example.prompt.substring(0, 120) + '...' : example.prompt}
+                            </code>
+                          </div>
+                          <button
+                            onClick={() => copyPrompt(example.prompt, example.id)}
+                            className="p-1.5 hover:bg-slate-700 rounded transition-colors"
+                            title="Copy prompt"
+                          >
+                            {copiedPrompt === example.id ? (
+                              <Check className="w-4 h-4 text-green-400" />
+                            ) : (
+                              <Copy className="w-4 h-4 text-slate-400" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <Link
+                href="/ccresearch/use-cases"
+                className="flex items-center justify-center gap-2 text-indigo-400 hover:text-indigo-300 text-sm py-2"
+              >
+                View all {useCasesData.categories.reduce((sum: number, cat: any) => sum + cat.examples.length, 0)} examples
+                <ExternalLink className="w-4 h-4" />
+              </Link>
+            </div>
+          )}
+        </div>
+
+        {/* Call to Action */}
+        <div className="text-center py-8">
+          <p className="text-slate-400 mb-4">
+            Select or create a project from the sidebar to begin your research
+          </p>
+          <div className="flex items-center justify-center gap-4">
+            <Link
+              href="/ccresearch/use-cases"
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+            >
+              <BookOpen className="w-4 h-4" />
+              Browse Use Cases
+            </Link>
+            <Link
+              href="/ccresearch/tips"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+            >
+              <Lightbulb className="w-4 h-4" />
+              View Tips
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -801,18 +1224,9 @@ export default function WorkspacePage() {
       const data = await workspaceApi.listProjects();
       setProjects(data);
 
-      // Check if saved project exists, otherwise use first project
-      if (typeof window !== 'undefined') {
-        const savedProject = localStorage.getItem(LAST_PROJECT_KEY);
-        if (savedProject && data.some(p => p.name === savedProject)) {
-          setSelectedProject(savedProject);
-          return; // Don't fall through
-        }
-      }
-      // No saved project or it doesn't exist - select first
-      if (data.length > 0) {
-        setSelectedProject(data[0].name);
-      }
+      // Don't auto-select any project - show welcome screen instead
+      // User must explicitly select a project
+      setSelectedProject(null);
     } catch (error) {
       showToast('Failed to load projects', 'error');
       console.error('Failed to load projects:', error);
@@ -1102,7 +1516,7 @@ export default function WorkspacePage() {
             <Link href="/" className="text-slate-400 hover:text-white transition-colors">
               <Home size={20} />
             </Link>
-            <h1 className="text-xl font-bold text-white">Workspace</h1>
+            <h1 className="text-xl font-bold text-white">C3 Researcher Workspace</h1>
           </div>
 
           <div className="flex items-center gap-3">
@@ -1196,10 +1610,7 @@ export default function WorkspacePage() {
         {/* Content Area */}
         <main className="flex-1 overflow-hidden">
           {!selectedProject ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400">
-              <FolderOpen size={48} className="mb-4 opacity-50" />
-              <p className="text-lg">Select or create a project to get started</p>
-            </div>
+            <WelcomeContent />
           ) : viewMode === 'notes' ? (
             <div className="h-full flex">
               {/* Text Files List */}

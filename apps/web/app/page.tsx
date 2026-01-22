@@ -113,19 +113,19 @@ export default function Home() {
             >
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                  Workspace
+                  C3 Researcher Workspace
                   <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
                 </h2>
                 <span className="text-[10px] sm:text-xs bg-emerald-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-medium">AUTH</span>
               </div>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
-                Project-based workspace with Claude Code terminal, notes, and file management.
-                140+ scientific skills, 26 MCP servers, 13 plugins.
+                Claude Code Custom Researcher - AI-powered research terminal with 145+ scientific skills,
+                26 MCP servers, and access to 30+ databases including PubMed, ChEMBL, AACT, and more.
               </p>
               <div className="flex flex-wrap gap-2 mt-2">
-                <span className="text-[10px] sm:text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded">Terminal</span>
-                <span className="text-[10px] sm:text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded">Notes</span>
-                <span className="text-[10px] sm:text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-2 py-0.5 rounded">Files</span>
+                <span className="text-[10px] sm:text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-2 py-0.5 rounded">Claude Code</span>
+                <span className="text-[10px] sm:text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-2 py-0.5 rounded">145+ Skills</span>
+                <span className="text-[10px] sm:text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded">26 MCP Servers</span>
                 <span className="text-[10px] sm:text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded">SSH Mode</span>
               </div>
             </Link>

@@ -67,16 +67,18 @@ apps/web/
 
 ### CCResearch (`/ccresearch`) - REDIRECTS TO WORKSPACE
 
-**Status:** Merged into Workspace. Route redirects to `/workspace?tab=terminal`.
+**Status:** Merged into C3 Researcher Workspace. Route redirects to `/workspace?tab=terminal`.
 
 The CCResearch terminal functionality has been fully integrated into the Workspace Terminal tab.
 Legacy share links still work at `/ccresearch/share/[token]`.
 
-### Workspace (`/workspace`)
+### C3 Researcher Workspace (`/workspace`)
 
-Full project workspace with Claude Code terminal, notes, and file management.
+Claude Code Custom Researcher - AI-powered research terminal with comprehensive scientific capabilities.
 
 **Features:**
+- 145+ scientific skills, 26 MCP servers, 14 plugins
+- Access to 30+ databases: PubMed, ChEMBL, AACT (566K+ trials), UniProt, etc.
 - Project organization with unified storage
 - Markdown notes with live preview (GFM tables, Mermaid)
 - File browser with sort by name/date/size
@@ -84,13 +86,24 @@ Full project workspace with Claude Code terminal, notes, and file management.
 - Inline file editing
 - Auto-refresh every 10s
 
+**Welcome Page (No Project Selected):**
+When no project is selected, displays comprehensive capabilities overview:
+- Stats grid (skills, MCP servers, plugins, databases)
+- Getting Started guide
+- Claude Commands & Keyboard Shortcuts
+- Scientific Capabilities by category
+- MCP Servers list with status
+- Plugins list with descriptions
+- Example prompts with copy functionality
+- Links to Use Cases and Tips pages
+
 **Views:**
 - **Notes:** Markdown notes with "New Note" button for manual creation
 - **Files:** Full file explorer with navigation, click to preview any file
 - **Terminal:** Full Claude Code terminal (merged from CCResearch)
   - Terminal mode selection: Claude Code (default) or SSH mode
   - SSH mode requires access key
-  - Stats bar: 140+ skills, 26 MCP servers, 13 plugins, 566K+ clinical trials
+  - Stats bar: 145+ skills, 26 MCP servers, 14 plugins, 566K+ clinical trials
   - File browser sidebar with upload and refresh
   - Import Data modal (GitHub clone, Web URL fetch)
   - Session list with Resume option
