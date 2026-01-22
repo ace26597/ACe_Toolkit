@@ -1,5 +1,5 @@
 #!/bin/bash
-# Status check script for ACe_Toolkit
+# Status check script for BlestLabs
 # Shows running status, URLs, IPs, and recent errors
 
 set -e
@@ -18,7 +18,7 @@ BOLD='\033[1m'
 clear
 
 echo -e "${BOLD}╔════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BOLD}║         ACe_Toolkit - System Status Dashboard             ║${NC}"
+echo -e "${BOLD}║           BlestLabs - System Status Dashboard             ║${NC}"
 echo -e "${BOLD}╚════════════════════════════════════════════════════════════╝${NC}"
 echo ""
 echo -e "${BOLD}📅 Date:${NC} $(date '+%Y-%m-%d %H:%M:%S')"
@@ -213,7 +213,7 @@ echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "  ${BLUE}./infra/scripts/start_all.sh${NC}       - Start all services"
 echo -e "  ${BLUE}./infra/scripts/stop_all.sh${NC}        - Stop all services"
 echo -e "  ${BLUE}./infra/scripts/status.sh${NC}          - Show this status"
-echo -e "  ${BLUE}tmux attach -t acetoolkit${NC}          - Attach to tmux session"
+echo -e "  ${BLUE}tmux attach -t blestlabs${NC}           - Attach to tmux session"
 echo -e "  ${BLUE}sudo systemctl restart cloudflared${NC} - Restart tunnel"
 echo ""
 

@@ -35,3 +35,15 @@ markdown>=3.5.0
 
 # MedResearch - Claude Code Terminal
 pexpect>=4.9.0
+
+# Public API dependencies
+httpx>=0.27.0
+aiofiles>=24.1.0
+
+# Import Research - Web Crawling
+beautifulsoup4>=4.12.0
+
+# Data Analyst - Charts & SQL
+plotly>=5.18.0
+pandasql>=0.7.3
+tabulate>=0.9.0

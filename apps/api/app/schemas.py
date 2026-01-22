@@ -17,10 +17,30 @@ class UserResponse(BaseModel):
     id: uuid.UUID
     name: str
     email: EmailStr
+    is_admin: bool
+    is_approved: bool
+    trial_expires_at: Optional[datetime] = None
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
+
+
+class UserAdminResponse(BaseModel):
+    """Admin view of user with more details"""
+    id: uuid.UUID
+    name: str
+    email: EmailStr
+    is_admin: bool
+    is_approved: bool
+    approved_at: Optional[datetime] = None
+    trial_expires_at: Optional[datetime] = None
+    last_login_at: Optional[datetime] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
 
 class Token(BaseModel):
     access_token: str

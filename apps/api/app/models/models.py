@@ -12,8 +12,16 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
+
+    # Auth system fields
+    is_admin = Column(Boolean, default=False, nullable=False)
+    is_approved = Column(Boolean, default=False, nullable=False)
+    approved_at = Column(DateTime, nullable=True)
+    trial_expires_at = Column(DateTime, nullable=True)  # 24h from signup for non-approved users
+    last_login_at = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     diagrams = relationship("Diagram", back_populates="owner")
     notes = relationship("Note", back_populates="owner")
     refresh_tokens = relationship("RefreshToken", back_populates="user")
@@ -270,9 +278,13 @@ class CCResearchSession(Base):
     id = Column(String, primary_key=True)  # UUID
     session_id = Column(String, nullable=False, index=True)  # Browser session
     email = Column(String, nullable=False, index=True)  # User's email address
+    session_number = Column(Integer, nullable=False, default=1)  # Auto-incremented per user
     title = Column(String, nullable=False, default="New Research Session")
 
-    # Session workspace: /data/claude-workspaces/{id}/
+    # Optional link to Workspace project (files sync to Workspace)
+    workspace_project = Column(String, nullable=True, index=True)
+
+    # Session workspace: /data/claude-workspaces/{id}/ OR project's data/ directory
     workspace_dir = Column(String, nullable=False)
 
     # Uploaded files (JSON array of filenames in data/ directory)
@@ -281,6 +293,7 @@ class CCResearchSession(Base):
     # Process state
     pid = Column(Integer, nullable=True)  # pexpect process ID
     status = Column(String, nullable=False, default="created")  # created|active|disconnected|terminated|error
+    session_mode = Column(String, nullable=False, default="claude")  # "claude" or "terminal" (direct Pi access)
 
     # Terminal dimensions (for PTY)
     terminal_rows = Column(Integer, default=24)
@@ -296,6 +309,10 @@ class CCResearchSession(Base):
     # Only set when valid access code is provided
     is_admin = Column(Boolean, default=False)
 
+    # Sharing - public read-only access via token
+    share_token = Column(String, nullable=True, unique=True, index=True)  # Random token for public sharing
+    shared_at = Column(DateTime, nullable=True)  # When sharing was enabled
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     last_activity_at = Column(DateTime, default=datetime.utcnow)
@@ -309,10 +326,14 @@ class MedResearchSession(Base):
 
     id = Column(String, primary_key=True)  # UUID
     session_id = Column(String, nullable=False, index=True)  # Browser session
+    email = Column(String, nullable=True, index=True)  # User email for tracking
     title = Column(String, nullable=False, default="New Research Session")
 
     # Session workspace: /home/ace/medresearch_sessions/{id}/
     workspace_dir = Column(String, nullable=False)
+
+    # Optional link to Workspace project (for integrated research)
+    workspace_project = Column(String, nullable=True, index=True)  # Project name in Workspace app
 
     # Process state
     pid = Column(Integer, nullable=True)  # pexpect process ID
@@ -329,3 +350,56 @@ class MedResearchSession(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     last_activity_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=False)  # 24 hours from creation
+
+
+# Research Assistant - Claude Code Headless QA Interface
+class ResearchAssistantSession(Base):
+    """Research Assistant session using Claude Code headless mode"""
+    __tablename__ = "research_assistant_sessions"
+
+    id = Column(String, primary_key=True)  # UUID
+    user_id = Column(Uuid, ForeignKey("users.id"), nullable=False, index=True)
+    claude_session_id = Column(String, nullable=True)  # Claude's session ID for --resume
+    title = Column(String, nullable=False, default="New Research")
+    workspace_dir = Column(String, nullable=False)  # /data/users/{user-uuid}/research/{id}
+    response_format = Column(String, default="markdown")  # markdown, plain, json
+    status = Column(String, default="ready")  # ready, running, error
+    turn_count = Column(Integer, default=0)  # Number of conversation turns
+
+    # Public sharing
+    share_id = Column(String, nullable=True, unique=True, index=True)  # Random share token
+    shared_at = Column(DateTime, nullable=True)
+
+    # Uploaded files (JSON array of filenames)
+    uploaded_files = Column(Text, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_activity = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User")
+    messages = relationship("ResearchAssistantMessage", back_populates="session", cascade="all, delete-orphan")
+
+
+class ResearchAssistantMessage(Base):
+    """Individual message in Research Assistant conversation"""
+    __tablename__ = "research_assistant_messages"
+
+    id = Column(String, primary_key=True)  # UUID
+    session_id = Column(String, ForeignKey("research_assistant_sessions.id"), nullable=False)
+    role = Column(String, nullable=False)  # user, assistant
+    content = Column(Text, nullable=False)
+    response_format = Column(String, default="markdown")
+
+    # Tool usage tracking (for terminal display)
+    tool_calls_json = Column(Text, nullable=True)  # JSON array of tool calls
+    thinking_json = Column(Text, nullable=True)  # JSON array of thinking blocks
+
+    # Token usage
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    session = relationship("ResearchAssistantSession", back_populates="messages")

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Stop script for ACe_Toolkit
+# Stop script for BlestLabs
 # Stops both backend and frontend services
 
 set -e
@@ -11,7 +11,7 @@ mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/shutdown-$(date +%Y%m%d).log"
 
 echo "========================================" | tee -a "$LOG_FILE"
-echo "$(date): ACe_Toolkit Shutdown Initiated" | tee -a "$LOG_FILE"
+echo "$(date): BlestLabs Shutdown Initiated" | tee -a "$LOG_FILE"
 echo "========================================" | tee -a "$LOG_FILE"
 
 # Stop Backend (check both dev and prod PID files)
@@ -50,5 +50,5 @@ pkill -f "uvicorn app.main:app" 2>/dev/null || true
 pkill -f "next-server" 2>/dev/null || true
 
 echo "========================================" | tee -a "$LOG_FILE"
-echo "$(date): ACe_Toolkit Shutdown Complete" | tee -a "$LOG_FILE"
+echo "$(date): BlestLabs Shutdown Complete" | tee -a "$LOG_FILE"
 echo "========================================" | tee -a "$LOG_FILE"

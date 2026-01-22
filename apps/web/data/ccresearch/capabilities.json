@@ -1,0 +1,375 @@
+{
+  "version": "2.2.0",
+  "lastUpdated": "2026-01-21",
+  "plugins": [
+    {
+      "id": "scientific-skills",
+      "name": "Scientific Skills",
+      "description": "145+ scientific tools (PubMed, UniProt, RDKit, PyTorch, Plotly, etc.)",
+      "skillsCount": 145,
+      "status": "active"
+    },
+    {
+      "id": "context7",
+      "name": "Context7",
+      "description": "Up-to-date documentation lookup for any library",
+      "status": "active",
+      "mcpRequired": true
+    },
+    {
+      "id": "frontend-design",
+      "name": "Frontend Design",
+      "description": "Production-grade UI/UX component design",
+      "status": "active"
+    },
+    {
+      "id": "feature-dev",
+      "name": "Feature Development",
+      "description": "Guided feature implementation workflows",
+      "status": "active"
+    },
+    {
+      "id": "code-simplifier",
+      "name": "Code Simplifier",
+      "description": "Code refactoring and clarity improvements",
+      "status": "active"
+    },
+    {
+      "id": "plugin-dev",
+      "name": "Plugin Development",
+      "description": "Plugin creation and validation tools",
+      "status": "active"
+    },
+    {
+      "id": "document-skills",
+      "name": "Document Skills",
+      "description": "PDF, markdown, and document processing",
+      "status": "active"
+    },
+    {
+      "id": "agent-sdk-dev",
+      "name": "Agent SDK Dev",
+      "description": "Claude Agent SDK development tools",
+      "status": "active"
+    },
+    {
+      "id": "ralph-loop",
+      "name": "Ralph Loop",
+      "description": "Iterative refinement workflow",
+      "status": "active"
+    },
+    {
+      "id": "huggingface-skills",
+      "name": "HuggingFace Skills",
+      "description": "HuggingFace model and dataset integration",
+      "status": "active"
+    },
+    {
+      "id": "ai",
+      "name": "AI Skills",
+      "description": "AI/ML development utilities",
+      "status": "active"
+    },
+    {
+      "id": "backend",
+      "name": "Backend Skills",
+      "description": "Backend development patterns and tools",
+      "status": "active"
+    },
+    {
+      "id": "aact-clinical-trials",
+      "name": "AACT Clinical Trials",
+      "description": "Query AACT Clinical Trials database (566K+ studies) via SQL",
+      "status": "active"
+    }
+  ],
+  "mcpServers": [
+    {
+      "id": "pubmed",
+      "name": "PubMed",
+      "description": "Search biomedical literature, articles, and citations",
+      "status": "active",
+      "category": "scientific",
+      "tools": ["search_articles", "get_article_metadata", "find_related_articles", "get_full_text_article", "lookup_article_by_citation"]
+    },
+    {
+      "id": "biorxiv",
+      "name": "bioRxiv / medRxiv",
+      "description": "Preprint server for biological and medical sciences",
+      "status": "active",
+      "category": "scientific",
+      "tools": ["search_preprints", "get_preprint", "get_categories", "search_published_preprints", "search_by_funder", "get_statistics"]
+    },
+    {
+      "id": "chembl",
+      "name": "ChEMBL",
+      "description": "Bioactive compounds and drug data (EMBL-EBI)",
+      "status": "active",
+      "category": "scientific",
+      "tools": ["compound_search", "get_bioactivity", "target_search", "get_mechanism", "drug_search", "get_admet"]
+    },
+    {
+      "id": "clinical-trials",
+      "name": "ClinicalTrials.gov",
+      "description": "NIH clinical trial registry (API v2)",
+      "status": "active",
+      "category": "scientific",
+      "tools": ["search_trials", "get_trial_details", "search_by_sponsor", "search_investigators", "analyze_endpoints", "search_by_eligibility"]
+    },
+    {
+      "id": "aact",
+      "name": "AACT Database",
+      "description": "ClinicalTrials.gov PostgreSQL database (566K+ studies)",
+      "status": "active",
+      "category": "scientific",
+      "tools": ["list_tables", "describe_table", "read_query"]
+    },
+    {
+      "id": "cms-coverage",
+      "name": "CMS Medicare Coverage",
+      "description": "Medicare Coverage Database (NCDs, LCDs)",
+      "status": "active",
+      "category": "scientific",
+      "tools": ["search_national_coverage", "search_local_coverage", "get_coverage_document", "get_contractors", "get_whats_new_report"]
+    },
+    {
+      "id": "npi-registry",
+      "name": "NPI Registry",
+      "description": "US National Provider Identifier lookup",
+      "status": "active",
+      "category": "scientific",
+      "tools": ["npi_validate", "npi_lookup", "npi_search"]
+    },
+    {
+      "id": "icd-10-codes",
+      "name": "ICD-10 Codes",
+      "description": "ICD-10-CM/PCS diagnosis and procedure codes (2026)",
+      "status": "active",
+      "category": "scientific",
+      "tools": ["lookup_code", "search_codes", "validate_code", "get_hierarchy", "get_by_category", "get_by_body_system"]
+    },
+    {
+      "id": "scholar-gateway",
+      "name": "Scholar Gateway",
+      "description": "Semantic search across academic literature",
+      "status": "active",
+      "category": "scientific",
+      "tools": ["semanticSearch"]
+    },
+    {
+      "id": "hf-mcp-server",
+      "name": "HuggingFace Hub",
+      "description": "Access HuggingFace models, datasets, Spaces, and papers",
+      "status": "active",
+      "category": "ai",
+      "tools": ["model_search", "dataset_search", "paper_search", "space_search", "hub_repo_details", "hf_doc_search", "use_space"]
+    },
+    {
+      "id": "memory",
+      "name": "Memory",
+      "description": "Knowledge graph for storing and retrieving information",
+      "status": "active",
+      "category": "utility",
+      "tools": ["create_entities", "search_nodes", "read_graph", "add_observations", "create_relations"]
+    },
+    {
+      "id": "context7",
+      "name": "Context7",
+      "description": "Up-to-date documentation lookup for any library",
+      "status": "active",
+      "category": "utility",
+      "tools": ["resolve-library-id", "query-docs"]
+    },
+    {
+      "id": "filesystem",
+      "name": "Filesystem",
+      "description": "Sandboxed file operations within workspace",
+      "status": "active",
+      "category": "utility",
+      "tools": ["read_file", "write_file", "list_directory", "search_files", "directory_tree"]
+    },
+    {
+      "id": "git",
+      "name": "Git",
+      "description": "Version control operations",
+      "status": "active",
+      "category": "utility",
+      "tools": ["git_status", "git_diff", "git_log", "git_commit", "git_add", "git_branch"]
+    },
+    {
+      "id": "sqlite",
+      "name": "SQLite",
+      "description": "Database queries and analytics",
+      "status": "active",
+      "category": "utility",
+      "tools": ["read_query", "write_query", "list_tables", "describe_table", "create_table"]
+    },
+    {
+      "id": "playwright",
+      "name": "Playwright",
+      "description": "Browser automation and web scraping",
+      "status": "active",
+      "category": "utility",
+      "tools": ["browser_navigate", "browser_snapshot", "browser_click", "browser_type", "browser_take_screenshot"]
+    },
+    {
+      "id": "fetch",
+      "name": "Fetch",
+      "description": "HTTP requests and web content retrieval",
+      "status": "active",
+      "category": "utility",
+      "tools": ["fetch"]
+    },
+    {
+      "id": "time",
+      "name": "Time",
+      "description": "Timezone conversions and time utilities",
+      "status": "active",
+      "category": "utility",
+      "tools": ["get_current_time", "convert_time"]
+    },
+    {
+      "id": "sequential-thinking",
+      "name": "Sequential Thinking",
+      "description": "Complex multi-step reasoning and problem solving",
+      "status": "active",
+      "category": "utility",
+      "tools": ["sequentialthinking"]
+    },
+    {
+      "id": "open-targets",
+      "name": "Open Targets",
+      "description": "Drug target identification and validation platform",
+      "status": "active",
+      "category": "scientific",
+      "tools": ["search_targets", "get_associations", "get_evidence"]
+    },
+    {
+      "id": "medidata",
+      "name": "Medidata",
+      "description": "Clinical trial data management platform",
+      "status": "active",
+      "category": "scientific",
+      "tools": ["query_trials", "get_study_data"]
+    },
+    {
+      "id": "MotherDuck",
+      "name": "MotherDuck",
+      "description": "Cloud DuckDB analytics platform",
+      "status": "active",
+      "category": "utility",
+      "tools": ["run_query", "list_databases"]
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare",
+      "description": "Cloudflare services (DNS, analytics, workers)",
+      "status": "active",
+      "category": "utility",
+      "tools": ["manage_dns", "get_analytics"]
+    },
+    {
+      "id": "bitly",
+      "name": "Bitly",
+      "description": "URL shortening and link analytics",
+      "status": "active",
+      "category": "utility",
+      "tools": ["shorten_url", "get_clicks"]
+    },
+    {
+      "id": "lunarcrush",
+      "name": "LunarCrush",
+      "description": "Crypto and social media analytics",
+      "status": "active",
+      "category": "utility",
+      "tools": ["get_coin_data", "search_assets"]
+    },
+    {
+      "id": "mercury",
+      "name": "Mercury",
+      "description": "Business banking API",
+      "status": "active",
+      "category": "utility",
+      "tools": ["get_accounts", "get_transactions"]
+    }
+  ],
+  "scientificCategories": [
+    {
+      "id": "databases",
+      "name": "Scientific Databases",
+      "count": 28,
+      "examples": ["PubMed", "UniProt", "ChEMBL", "PDB", "AACT", "ClinicalTrials", "KEGG", "Reactome", "bioRxiv"]
+    },
+    {
+      "id": "bioinformatics",
+      "name": "Bioinformatics & Genomics",
+      "count": 20,
+      "examples": ["BioPython", "Scanpy", "AnnData", "pysam", "gget", "scvi-tools"]
+    },
+    {
+      "id": "cheminformatics",
+      "name": "Drug Discovery & Chemistry",
+      "count": 15,
+      "examples": ["RDKit", "DeepChem", "DiffDock", "Datamol", "MedChem", "PyTDC"]
+    },
+    {
+      "id": "ml",
+      "name": "Machine Learning & AI",
+      "count": 25,
+      "examples": ["scikit-learn", "PyTorch", "Transformers", "SHAP", "statsmodels"]
+    },
+    {
+      "id": "visualization",
+      "name": "Data Analysis & Visualization",
+      "count": 17,
+      "examples": ["Polars", "Plotly", "Seaborn", "matplotlib", "NetworkX", "EDA 200+ formats"]
+    },
+    {
+      "id": "documents",
+      "name": "Document Processing",
+      "count": 14,
+      "examples": ["PDF Pro (forms, OCR)", "Excel/XLSX", "Word/DOCX", "Markdown", "LaTeX"]
+    },
+    {
+      "id": "medical",
+      "name": "Medical & Clinical",
+      "count": 15,
+      "examples": ["PyHealth", "NeuroKit2", "pydicom", "histolab", "PathML", "ICD-10", "NPI"]
+    },
+    {
+      "id": "integrations",
+      "name": "Lab & Platform Integrations",
+      "count": 10,
+      "examples": ["Benchling", "DNAnexus", "Opentrons", "LatchBio", "LabArchives"]
+    }
+  ],
+  "stats": {
+    "totalSkills": 145,
+    "totalPlugins": 14,
+    "totalMcpServers": 26,
+    "scientificMcpServers": 11,
+    "aiMcpServers": 2,
+    "utilityMcpServers": 13,
+    "totalDatabases": 30,
+    "installedSkills": 15,
+    "installedAgents": 1
+  },
+  "agents": [
+    {
+      "id": "prompt-engineer",
+      "name": "Prompt Engineer",
+      "description": "AI specialist for prompt engineering and optimization",
+      "status": "active"
+    }
+  ],
+  "installedSkills": [
+    { "id": "code-review", "name": "Code Review", "description": "Comprehensive code quality check and linting" },
+    { "id": "update-docs", "name": "Update Docs", "description": "Quick documentation refresh for CLAUDE.md/README" },
+    { "id": "aact-clinical-trials", "name": "AACT Clinical Trials", "description": "Query AACT database (566K+ studies)" },
+    { "id": "pdf-processing-pro", "name": "PDF Processing Pro", "description": "Production PDF: forms, tables, OCR, validation, batch ops" },
+    { "id": "xlsx", "name": "Excel Spreadsheets", "description": "Excel creation, editing, formulas, charts" },
+    { "id": "docx", "name": "Word Documents", "description": "DOCX with tracked changes, comments, formatting" },
+    { "id": "exploratory-data-analysis", "name": "Exploratory Data Analysis", "description": "EDA on 200+ scientific file formats with reports" },
+    { "id": "plotly", "name": "Plotly Charts", "description": "Interactive charts, plots, dashboards (Express + Graph Objects)" }
+  ]
+}

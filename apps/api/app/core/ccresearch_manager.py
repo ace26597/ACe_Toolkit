@@ -340,7 +340,9 @@ If a user asks you to run any of these commands, politely explain that they are 
 - **ai** - AI/ML development utilities
 - **backend** - Backend development patterns
 
-### MCP Servers (9 Active)
+### MCP Servers (26 Active)
+
+**Core Tools:**
 - **memory** - Knowledge graph persistence
 - **filesystem** - File operations
 - **git** - Git repository operations
@@ -349,9 +351,33 @@ If a user asks you to run any of these commands, politely explain that they are 
 - **fetch** - Web content fetching
 - **time** - Time/timezone utilities
 - **sequential-thinking** - Dynamic problem-solving
-- **context7** - Library documentation lookup
+
+**Medical/Clinical:**
+- **aact** - AACT Clinical Trials Database (566K+ studies)
+- **biorxiv** - bioRxiv/medRxiv preprint search
+- **chembl** - ChEMBL drug/compound database
+- **clinical-trials** - ClinicalTrials.gov API
+- **cms-coverage** - Medicare coverage policies
+- **icd-10-codes** - ICD-10 diagnosis/procedure codes
+- **npi-registry** - NPI provider lookup
+- **pubmed** - PubMed article search
+- **medidata** - Clinical trial data
+- **open-targets** - Drug target platform
+
+**Research/Data:**
+- **scholar-gateway** - Academic paper search
+- **hugging-face** - HuggingFace models/datasets
+- **hf-mcp-server** - HuggingFace Hub
+- **MotherDuck** - Cloud DuckDB analytics
+
+**Utilities:**
+- **cloudflare** - Cloudflare services
+- **bitly** - URL shortening
+- **lunarcrush** - Crypto social analytics
+- **mercury** - Banking API
 
 ### Custom Skills
+- `/aact` - **Query AACT Clinical Trials Database** (566K+ studies from ClinicalTrials.gov)
 - `/code-review` - Comprehensive code quality check
 - `/update-docs` - Quick documentation refresh
 
@@ -396,6 +422,18 @@ ls -la data/
 import pandas as pd
 df = pd.read_csv('data/your_file.csv')
 print(df.head())
+```
+
+### Accessing Credentials (API keys, database logins):
+```python
+import json
+with open('/home/ace/.credentials/credentials.json') as f:
+    creds = json.load(f)
+
+# Example: AACT Clinical Trials Database
+aact_creds = creds['databases']['aact']
+print(f"Host: {{aact_creds['host']}}")
+print(f"Connection: {{aact_creds['connection_string']}}")
 ```
 
 ### Save outputs:
@@ -878,19 +916,109 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
                 logger.error(f"[AUTOMATION] Failed to send: {e}")
 
     def get_session_log_path(self, ccresearch_id: str) -> Optional[Path]:
-        """Get the log file path for a session"""
-        # Find the log file for this session
-        for log_file in self.LOGS_DIR.glob(f"{ccresearch_id}_*.log"):
-            return log_file
+        """Get the most recent log file path for a session"""
+        # Find all log files for this session and return the most recent
+        log_files = sorted(self.LOGS_DIR.glob(f"{ccresearch_id}_*.log"))
+        if log_files:
+            return log_files[-1]  # Return most recent (sorted by timestamp in filename)
         return None
 
-    def read_session_log(self, ccresearch_id: str, lines: int = 100) -> Optional[str]:
+    def get_all_session_log_paths(self, ccresearch_id: str) -> List[Path]:
+        """Get ALL log file paths for a session, sorted chronologically"""
+        return sorted(self.LOGS_DIR.glob(f"{ccresearch_id}_*.log"))
+
+    def _clean_log_for_display(self, content: str) -> str:
         """
-        Read the last N lines from a session's log file.
+        Clean terminal log for human-readable display.
+
+        Removes:
+        - ANSI escape sequences (colors, cursor movement, etc.)
+        - Terminal control sequences
+        - Box-drawing characters (used for UI borders)
+        - Carriage returns
+        - Excessive blank lines
+        - [INPUT] markers
+        - Lines that are purely decorative (only box chars/spaces)
+
+        Args:
+            content: Raw terminal log content
+
+        Returns:
+            Cleaned, human-readable log
+        """
+        import re
+
+        # Remove ANSI escape sequences (colors, cursor, etc.)
+        # Matches: ESC[ ... m (SGR), ESC[ ... H (cursor), ESC[ ... J (clear), etc.
+        ansi_escape = re.compile(r'\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[<>=].')
+        content = ansi_escape.sub('', content)
+
+        # Remove other escape sequences (like ESC?)
+        content = re.sub(r'\x1b[^a-zA-Z]*[a-zA-Z]', '', content)
+        content = re.sub(r'\x1b.', '', content)
+
+        # Remove carriage returns
+        content = content.replace('\r', '')
+
+        # Remove [INPUT] markers
+        content = re.sub(r'\[INPUT\]\s*', '', content)
+
+        # Remove null bytes and other control characters (except newlines and tabs)
+        content = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', content)
+
+        # Remove box-drawing characters (Unicode block 2500-257F)
+        # These are used for terminal UI borders and don't add content value
+        content = re.sub(r'[\u2500-\u257F]+', '', content)
+
+        # Remove block elements (Unicode 2580-259F) - these are fill characters
+        content = re.sub(r'[\u2580-\u259F]+', '', content)
+
+        # Remove other decorative Unicode (bullets, arrows, symbols in common ranges)
+        # Keep useful ones like checkmarks and crosses
+        content = re.sub(r'[\u25A0-\u25FF]', '', content)  # Geometric shapes (squares, circles used as decorations)
+
+        # Process lines
+        lines = content.split('\n')
+        cleaned_lines = []
+        prev_blank = False
+        prev_line_content = ""
+
+        for line in lines:
+            # Strip whitespace
+            stripped = line.strip()
+
+            # Skip empty lines if previous was also empty
+            is_blank = stripped == ''
+            if is_blank and prev_blank:
+                continue
+
+            # Skip lines that are just decorative (very short with no alphanumeric)
+            if stripped and len(stripped) < 5 and not re.search(r'[a-zA-Z0-9]', stripped):
+                continue
+
+            # Skip duplicate consecutive lines (terminal often redraws)
+            if stripped == prev_line_content and stripped:
+                continue
+
+            cleaned_lines.append(line.rstrip())
+            prev_blank = is_blank
+            if stripped:
+                prev_line_content = stripped
+
+        # Collapse multiple consecutive blank lines
+        result = '\n'.join(cleaned_lines)
+        result = re.sub(r'\n{3,}', '\n\n', result)
+
+        return result
+
+    def read_session_log(self, ccresearch_id: str, lines: int = 100, clean: bool = False) -> Optional[str]:
+        """
+        Read the last N lines from a session's most recent log file.
 
         Args:
             ccresearch_id: Session ID
             lines: Number of lines to return (default 100)
+            clean: If True, clean the log for human-readable display
 
         Returns:
             Log content or None if not found
@@ -902,9 +1030,58 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
         try:
             with open(log_path, 'r', encoding='utf-8', errors='replace') as f:
                 all_lines = f.readlines()
-                return ''.join(all_lines[-lines:])
+                content = ''.join(all_lines[-lines:])
+
+                if clean:
+                    content = self._clean_log_for_display(content)
+
+                return content
         except Exception as e:
             logger.error(f"Error reading session log: {e}")
+            return None
+
+    def read_full_session_log(self, ccresearch_id: str, max_lines: int = 2000, clean: bool = True) -> Optional[str]:
+        """
+        Read ALL log files for a session concatenated chronologically.
+        Used for sharing feature to show complete session history.
+
+        Args:
+            ccresearch_id: Session ID
+            max_lines: Maximum total lines to return (default 2000)
+            clean: If True, clean the log for human-readable display
+
+        Returns:
+            Concatenated log content or None if not found
+        """
+        log_paths = self.get_all_session_log_paths(ccresearch_id)
+        if not log_paths:
+            return None
+
+        all_content = []
+        total_lines = 0
+
+        try:
+            for log_path in log_paths:
+                with open(log_path, 'r', encoding='utf-8', errors='replace') as f:
+                    lines = f.readlines()
+                    # Skip the header (first 10 lines) for all but the first log
+                    if all_content and len(lines) > 10:
+                        lines = lines[10:]
+                    all_content.extend(lines)
+                    total_lines += len(lines)
+
+            # Take last max_lines if too long
+            if len(all_content) > max_lines:
+                all_content = all_content[-max_lines:]
+
+            content = ''.join(all_content)
+
+            if clean:
+                content = self._clean_log_for_display(content)
+
+            return content
+        except Exception as e:
+            logger.error(f"Error reading full session log: {e}")
             return None
 
     def get_output_buffer(self, ccresearch_id: str) -> Optional[str]:
@@ -923,7 +1100,8 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
         output_callback: Optional[Callable[[bytes], Any]] = None,
         sandboxed: bool = False,  # DISABLED - sandbox was blocking plugins/MCP
         api_key: Optional[str] = None,
-        automation_callback: Optional[Callable[[dict], Any]] = None
+        automation_callback: Optional[Callable[[dict], Any]] = None,
+        continue_session: bool = False
     ) -> bool:
         """
         Spawn Claude Code CLI process in workspace directory.
@@ -940,6 +1118,7 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             sandboxed: DEPRECATED - always runs unsandboxed now
             api_key: Optional Anthropic API key for headless auth (skips OAuth login)
             automation_callback: Async callback for automation notifications (sent to WebSocket)
+            continue_session: If True, uses --continue flag to resume previous conversation
 
         Returns:
             True if spawn successful
@@ -984,6 +1163,9 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             # Ensure Claude Code uses the workspace directory
             env['PWD'] = str(workspace_dir)
             env['HOME'] = str(Path.home())  # Needed for Claude to find config
+            # Add global node_modules to NODE_PATH so sessions can use globally installed packages
+            # (pptxgenjs, playwright, etc.)
+            env['NODE_PATH'] = '/usr/lib/node_modules'
 
             # Set API key for headless authentication (skips OAuth browser login)
             # Only use user-provided API key - server's API key is NOT used for ccresearch
@@ -993,10 +1175,12 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
 
             # Run Claude Code directly (no sandbox) for full plugin/skill/MCP access
             # Claude uses global ~/.claude and ~/.claude.json for all configuration
-            logger.info(f"Spawning Claude Code for {ccresearch_id} in {workspace_dir}")
+            # Use --continue flag to resume previous conversation for existing sessions
+            claude_args = ['--continue'] if continue_session else []
+            logger.info(f"Spawning Claude Code for {ccresearch_id} in {workspace_dir} (continue={continue_session})")
             process = pexpect.spawn(
                 'claude',
-                args=[],
+                args=claude_args,
                 cwd=str(workspace_dir),
                 env=env,
                 encoding=None,
@@ -1031,6 +1215,105 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             return False
         except Exception as e:
             logger.error(f"Failed to spawn Claude Code: {e}")
+            return False
+
+    async def spawn_shell(
+        self,
+        ccresearch_id: str,
+        workspace_dir: Path,
+        rows: int = 24,
+        cols: int = 80,
+        output_callback: Optional[Callable[[bytes], Any]] = None
+    ) -> bool:
+        """
+        Spawn a direct bash shell for terminal access (admin mode).
+
+        This provides unrestricted terminal access to the Pi, starting in the
+        SSD data directory. Used when valid access key is provided.
+
+        Args:
+            ccresearch_id: Session ID
+            workspace_dir: Working directory (usually SSD path)
+            rows: Terminal height
+            cols: Terminal width
+            output_callback: Async callback for output data
+
+        Returns:
+            True if spawn successful
+        """
+        if pexpect is None:
+            logger.error("pexpect not installed. Install with: pip install pexpect")
+            return False
+
+        if ccresearch_id in self.processes:
+            proc = self.processes[ccresearch_id]
+            if proc.process.isalive():
+                logger.info(f"Shell process already exists for {ccresearch_id}, reconnecting")
+                if proc.read_task:
+                    proc.read_task.cancel()
+                    try:
+                        await proc.read_task
+                    except asyncio.CancelledError:
+                        pass
+
+                if output_callback:
+                    proc.read_task = asyncio.create_task(
+                        self._async_read_loop(ccresearch_id, output_callback)
+                    )
+                return True
+            else:
+                await self.terminate_session(ccresearch_id)
+
+        try:
+            env = os.environ.copy()
+            env['TERM'] = 'xterm-256color'
+            env['FORCE_COLOR'] = '1'
+            env['COLORTERM'] = 'truecolor'
+            env['PWD'] = str(workspace_dir)
+            # Add global node_modules to NODE_PATH
+            env['NODE_PATH'] = '/usr/lib/node_modules'
+
+            # Use SSD data directory as default working directory
+            ssd_data_dir = Path("/data")
+            if ssd_data_dir.exists():
+                working_dir = ssd_data_dir
+            else:
+                working_dir = workspace_dir
+
+            logger.info(f"Spawning bash shell for {ccresearch_id} in {working_dir}")
+            process = pexpect.spawn(
+                '/bin/bash',
+                args=['--login'],
+                cwd=str(working_dir),
+                env=env,
+                encoding=None,
+                dimensions=(rows, cols),
+                timeout=None
+            )
+
+            # Create session log file
+            log_file = self._create_session_log(ccresearch_id, working_dir)
+
+            # Store process info
+            self.processes[ccresearch_id] = ClaudeProcess(
+                process=process,
+                workspace_dir=working_dir,
+                ccresearch_id=ccresearch_id,
+                created_at=datetime.utcnow(),
+                log_file=log_file
+            )
+
+            # Start async read task if callback provided
+            if output_callback:
+                self.processes[ccresearch_id].read_task = asyncio.create_task(
+                    self._async_read_loop(ccresearch_id, output_callback)
+                )
+
+            logger.info(f"Spawned bash shell for {ccresearch_id}, PID: {process.pid}")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to spawn bash shell: {e}")
             return False
 
     async def _async_read_loop(
@@ -1292,16 +1575,86 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
 
     async def shutdown(self):
         """Shutdown all processes gracefully"""
-        logger.info("Shutting down MedResearchManager...")
+        logger.info("Shutting down CCResearchManager...")
         for session_id in list(self.processes.keys()):
             await self.terminate_session(session_id)
-        logger.info("MedResearchManager shutdown complete")
+        logger.info("CCResearchManager shutdown complete")
+
+    def _get_claude_project_path(self, workspace_dir: Path) -> Optional[Path]:
+        """
+        Get the Claude Code project directory for a workspace.
+
+        Claude stores conversation history in ~/.claude/projects/ with directories
+        named after the workspace path (slashes replaced with dashes).
+
+        Args:
+            workspace_dir: Workspace directory path
+
+        Returns:
+            Path to Claude's project directory, or None if not found
+        """
+        # Resolve workspace to handle symlinks (e.g., /data -> /media/ace/T7/dev)
+        resolved = workspace_dir.resolve()
+        # Convert path to Claude's project directory name format
+        # /media/ace/T7/dev/claude-workspaces/abc -> -media-ace-T7-dev-claude-workspaces-abc
+        project_name = str(resolved).replace('/', '-')
+        if project_name.startswith('-'):
+            project_name = project_name  # Keep leading dash
+        else:
+            project_name = '-' + project_name
+
+        claude_projects_dir = Path.home() / ".claude" / "projects"
+        project_path = claude_projects_dir / project_name
+
+        if project_path.exists():
+            return project_path
+        return None
+
+    def _copy_conversation_history(self, source_workspace: Path, dest_workspace: Path) -> bool:
+        """
+        Copy Claude conversation history from source to destination workspace.
+
+        This allows restoring conversation context when loading a saved project.
+
+        Args:
+            source_workspace: Original workspace path (or saved project with .claude_history/)
+            dest_workspace: New workspace path
+
+        Returns:
+            True if history was copied successfully
+        """
+        try:
+            # Check if source has saved history (in saved project)
+            saved_history = source_workspace / ".claude_history"
+            if saved_history.exists():
+                # Get destination's Claude project path
+                dest_resolved = dest_workspace.resolve()
+                dest_project_name = str(dest_resolved).replace('/', '-')
+                if not dest_project_name.startswith('-'):
+                    dest_project_name = '-' + dest_project_name
+
+                claude_projects_dir = Path.home() / ".claude" / "projects"
+                dest_project_path = claude_projects_dir / dest_project_name
+                dest_project_path.mkdir(parents=True, exist_ok=True)
+
+                # Copy history files
+                for history_file in saved_history.glob("*.jsonl"):
+                    shutil.copy(history_file, dest_project_path / history_file.name)
+                    logger.info(f"Restored conversation history: {history_file.name}")
+
+                return True
+
+            return False
+        except Exception as e:
+            logger.warning(f"Failed to copy conversation history: {e}")
+            return False
 
     def save_project(
         self,
         workspace_dir: Path,
         project_name: str,
-        description: str = ""
+        description: str = "",
+        email: str = ""
     ) -> Optional[Path]:
         """
         Save workspace as a persistent project on SSD.
@@ -1309,10 +1662,13 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
         Before copying, updates CLAUDE.md with session context so Claude
         can resume work when the project is restored later.
 
+        Also saves Claude's conversation history so it can be restored.
+
         Args:
             workspace_dir: Source workspace path
             project_name: Name for the saved project (sanitized)
             description: Session context/notes from user
+            email: User email (for ownership filtering)
 
         Returns:
             Path to saved project, or None on failure
@@ -1340,18 +1696,29 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
                 ignore=shutil.ignore_patterns('.claude', '__pycache__', '*.pyc', '.git')
             )
 
-            # Write metadata file
+            # Save Claude's conversation history
+            claude_project = self._get_claude_project_path(workspace_dir)
+            if claude_project:
+                history_dest = project_path / ".claude_history"
+                history_dest.mkdir(exist_ok=True)
+                for history_file in claude_project.glob("*.jsonl"):
+                    shutil.copy(history_file, history_dest / history_file.name)
+                    logger.info(f"Saved conversation history: {history_file.name}")
+
+            # Write metadata file (includes email for ownership)
             metadata = {
                 "name": safe_name,
                 "description": description,
+                "email": email.lower() if email else "",
                 "source_workspace": str(workspace_dir),
                 "saved_at": datetime.utcnow().isoformat(),
+                "has_conversation_history": claude_project is not None,
                 "files": [str(f.relative_to(project_path)) for f in project_path.rglob("*") if f.is_file()]
             }
             metadata_path = project_path / ".project_metadata.json"
             metadata_path.write_text(json.dumps(metadata, indent=2))
 
-            logger.info(f"Saved project '{safe_name}' to {project_path}")
+            logger.info(f"Saved project '{safe_name}' by {email} to {project_path}")
             return project_path
 
         except Exception as e:
@@ -1423,14 +1790,21 @@ following their stated goals and next steps.
         except Exception as e:
             logger.warning(f"Failed to update CLAUDE.md: {e}")
 
-    def list_saved_projects(self) -> list:
+    def list_saved_projects(self, email: str = "") -> list:
         """
-        List all saved projects.
+        List saved projects, optionally filtered by email.
+
+        Args:
+            email: If provided, only return projects owned by this email
 
         Returns:
             List of project metadata dicts
         """
         projects = []
+        email_filter = email.lower() if email else ""
+
+        if not self.PROJECTS_DIR.exists():
+            return projects
 
         for project_dir in self.PROJECTS_DIR.iterdir():
             if not project_dir.is_dir():
@@ -1441,34 +1815,44 @@ following their stated goals and next steps.
                 try:
                     metadata = json.loads(metadata_path.read_text())
                     metadata["path"] = str(project_dir)
+
+                    # Filter by email if specified
+                    if email_filter:
+                        project_email = metadata.get("email", "").lower()
+                        if project_email and project_email != email_filter:
+                            continue  # Skip projects owned by other users
+
                     projects.append(metadata)
                 except Exception as e:
                     logger.warning(f"Failed to read metadata for {project_dir}: {e}")
-                    # Still include project with basic info
+                    # Only include projects without metadata if no email filter
+                    if not email_filter:
+                        projects.append({
+                            "name": project_dir.name,
+                            "path": str(project_dir),
+                            "saved_at": datetime.fromtimestamp(project_dir.stat().st_mtime).isoformat()
+                        })
+            else:
+                # Project without metadata file - only include if no email filter
+                if not email_filter:
                     projects.append({
                         "name": project_dir.name,
                         "path": str(project_dir),
                         "saved_at": datetime.fromtimestamp(project_dir.stat().st_mtime).isoformat()
                     })
-            else:
-                # Project without metadata file
-                projects.append({
-                    "name": project_dir.name,
-                    "path": str(project_dir),
-                    "saved_at": datetime.fromtimestamp(project_dir.stat().st_mtime).isoformat()
-                })
 
         # Sort by saved_at descending
         projects.sort(key=lambda p: p.get("saved_at", ""), reverse=True)
         return projects
 
-    def restore_project(self, project_name: str, ccresearch_id: str) -> Optional[Path]:
+    def restore_project(self, project_name: str, ccresearch_id: str, email: str = "") -> Optional[Path]:
         """
         Restore a saved project to a new workspace.
 
         Args:
             project_name: Name of saved project
             ccresearch_id: New session ID
+            email: User's email address
 
         Returns:
             Path to new workspace, or None on failure
@@ -1480,25 +1864,50 @@ following their stated goals and next steps.
             return None
 
         try:
+            # Read project metadata to get original email if not provided
+            metadata_path = project_path / ".project_metadata.json"
+            if metadata_path.exists() and not email:
+                try:
+                    metadata = json.loads(metadata_path.read_text())
+                    email = metadata.get("email", "")
+                except Exception:
+                    pass
+
             # Create new workspace
             workspace = self.BASE_DIR / ccresearch_id
 
-            # Copy project files to workspace
+            # Copy project files to workspace (exclude .claude_history, we handle it separately)
             shutil.copytree(
                 project_path,
                 workspace,
-                ignore=shutil.ignore_patterns('.project_metadata.json')
+                ignore=shutil.ignore_patterns('.project_metadata.json', '.claude_history')
             )
+
+            # Restore conversation history if saved
+            self._copy_conversation_history(project_path, workspace)
+
+            # Get list of files in data directory for uploaded_files_section
+            data_dir = workspace / "data"
+            uploaded_files = []
+            if data_dir.exists():
+                uploaded_files = [f.name for f in data_dir.iterdir() if f.is_file()]
+
+            # Build uploaded files section
+            uploaded_files_section = ""
+            if uploaded_files:
+                file_list = "\n".join([f"| `{f}` | `data/{f}` |" for f in uploaded_files])
+                uploaded_files_section = UPLOADED_FILES_SECTION.format(file_list=file_list)
 
             # Update CLAUDE.md with new session info
             claude_md_path = workspace / "CLAUDE.md"
-            if claude_md_path.exists():
-                claude_md_content = CLAUDE_MD_TEMPLATE.format(
-                    session_id=ccresearch_id,
-                    created_at=datetime.utcnow().isoformat(),
-                    workspace_dir=str(workspace)
-                )
-                claude_md_path.write_text(claude_md_content)
+            claude_md_content = CLAUDE_MD_TEMPLATE.format(
+                session_id=ccresearch_id,
+                email=email or "Not provided",
+                created_at=datetime.utcnow().isoformat(),
+                workspace_dir=str(workspace),
+                uploaded_files_section=uploaded_files_section
+            )
+            claude_md_path.write_text(claude_md_content)
 
             # Create isolated .claude directory
             self._setup_claude_config(workspace)

@@ -33,6 +33,7 @@ import shutil
 import aiofiles
 import asyncio
 import re
+import secrets
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List
@@ -40,12 +41,13 @@ from typing import Optional, List
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, UploadFile, File, Form
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.config import settings
 from app.core.ccresearch_manager import ccresearch_manager
+from app.core.notifications import notify_access_request, notify_plugin_skill_request
 from app.models.models import CCResearchSession
 from collections import defaultdict
 import time
@@ -82,18 +84,30 @@ router = APIRouter()
 ALLOWED_EMAILS_FILE = Path.home() / ".ccresearch_allowed_emails.json"
 
 
-def load_allowed_emails() -> set:
-    """Load allowed emails from whitelist file."""
+def load_access_config() -> dict:
+    """Load access configuration (emails and access key) from file."""
     try:
         if ALLOWED_EMAILS_FILE.exists():
             with open(ALLOWED_EMAILS_FILE, 'r') as f:
                 data = json.load(f)
-                emails = set(e.lower() for e in data.get("allowed_emails", []))
-                logger.debug(f"Loaded {len(emails)} allowed emails")
-                return emails
+                return data
     except Exception as e:
-        logger.error(f"Failed to load allowed emails: {e}")
-    return set()
+        logger.error(f"Failed to load access config: {e}")
+    return {"allowed_emails": [], "access_key": None}
+
+
+def load_allowed_emails() -> set:
+    """Load allowed emails from whitelist file."""
+    config = load_access_config()
+    emails = set(e.lower() for e in config.get("allowed_emails", []))
+    logger.debug(f"Loaded {len(emails)} allowed emails")
+    return emails
+
+
+def get_access_key() -> str:
+    """Get the required access key for CCResearch."""
+    config = load_access_config()
+    return config.get("access_key", "")
 
 
 def is_email_allowed(email: str) -> bool:
@@ -102,6 +116,17 @@ def is_email_allowed(email: str) -> bool:
         return False
     allowed = load_allowed_emails()
     return email.lower() in allowed
+
+
+def is_access_key_valid(access_key: str) -> bool:
+    """Check if the provided access key matches the configured key."""
+    if not access_key:
+        return False
+    stored_key = get_access_key()
+    if not stored_key:
+        # No access key configured - allow access (backwards compatibility)
+        return True
+    return access_key == stored_key
 
 
 # ============ Pydantic Schemas ============
@@ -117,13 +142,20 @@ class ResizeRequest(BaseModel):
     cols: int
 
 
+class RenameRequest(BaseModel):
+    title: str
+
+
 class SessionResponse(BaseModel):
     id: str
     session_id: str
     email: str
+    session_number: int  # Per-user incremental number
     title: str
     workspace_dir: str
+    workspace_project: Optional[str] = None  # Linked Workspace project name
     status: str
+    session_mode: str = "claude"  # "claude" or "terminal" (direct Pi access)
     terminal_rows: int
     terminal_cols: int
     commands_executed: int
@@ -135,6 +167,20 @@ class SessionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class AccessRequestModel(BaseModel):
+    email: EmailStr
+    name: str
+    reason: str
+
+
+class PluginSkillRequestModel(BaseModel):
+    email: EmailStr
+    request_type: str  # "plugin" or "skill"
+    name: str
+    description: str
+    use_case: str
 
 
 class FileInfo(BaseModel):
@@ -165,6 +211,7 @@ class ProjectInfo(BaseModel):
     name: str
     path: str
     description: Optional[str] = None
+    email: Optional[str] = None
     saved_at: str
     files: Optional[List[str]] = None
 
@@ -172,6 +219,7 @@ class ProjectInfo(BaseModel):
 class CreateFromProjectRequest(BaseModel):
     session_id: str  # Browser session ID
     email: EmailStr
+    access_key: Optional[str] = None  # Optional - if provided, grants direct terminal access
     project_name: str
     title: Optional[str] = None
 
@@ -179,6 +227,23 @@ class CreateFromProjectRequest(BaseModel):
 class UploadResponse(BaseModel):
     uploaded_files: List[str]
     data_dir: str
+
+
+class ShareResponse(BaseModel):
+    share_token: str
+    share_url: str
+    shared_at: datetime
+
+
+class SharedSessionResponse(BaseModel):
+    """Public response for shared sessions (limited info)"""
+    id: str
+    title: str
+    email: str  # Show who created it
+    created_at: datetime
+    shared_at: datetime
+    files_count: int
+    has_log: bool
 
 
 class GitCloneRequest(BaseModel):
@@ -199,35 +264,83 @@ class GitCloneResponse(BaseModel):
 @router.post("/sessions", response_model=SessionResponse)
 async def create_session(
     session_id: str = Form(...),
-    email: str = Form(...),  # Email is now required for whitelist validation
+    email: str = Form(...),  # Email from authenticated user
+    access_key: Optional[str] = Form(None),  # Optional - if provided, grants direct terminal access
     title: Optional[str] = Form(None),
+    workspace_project: Optional[str] = Form(None),  # Optional link to Workspace project
     files: List[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new CCResearch session with workspace directory and optional file uploads.
 
-    Starts Claude Code directly - users can use any skills, MCP servers, or plugins.
-    Email must be in the allowed whitelist.
+    Authentication is handled by the frontend (login required with 24h trial).
+
+    Session modes:
+    - No access key = Claude Code session (default)
+    - Valid access key = Direct terminal access to Pi (SSD)
+    - Wrong access key = Error
+
+    If workspace_project is provided, creates workspace in the project's data/ directory.
     """
-    # Validate email against whitelist
-    if not is_email_allowed(email):
-        logger.warning(f"Access denied for email: {email}")
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied. Your email is not authorized to use CCResearch. Please contact the administrator."
-        )
+    # Determine session mode based on access key
+    session_mode = "claude"  # Default: Claude Code
+    if access_key:
+        # Access key provided - validate it
+        if is_access_key_valid(access_key):
+            session_mode = "terminal"  # Direct Pi terminal access
+            logger.info(f"Terminal mode session for {email}")
+        else:
+            logger.warning(f"Invalid access key attempt from email: {email}")
+            raise HTTPException(
+                status_code=403,
+                detail="wrong_access_key"  # Frontend will show "Wrong code - try again"
+            )
+
+    # Get next session number for this user
+    result = await db.execute(
+        select(func.coalesce(func.max(CCResearchSession.session_number), 0))
+        .where(CCResearchSession.email == email.lower())
+    )
+    max_session_number = result.scalar() or 0
+    next_session_number = max_session_number + 1
 
     ccresearch_id = str(uuid.uuid4())
 
     # Process uploaded files info
     uploaded_files_list = []
 
-    # Create workspace directory with CLAUDE.md
-    workspace_dir = ccresearch_manager.create_workspace(
-        ccresearch_id,
-        email=email,
-        uploaded_files=uploaded_files_list  # Will be updated after saving files
-    )
+    # Determine workspace location
+    workspace_dir = None
+    if workspace_project:
+        # Create workspace in Workspace project's data/ directory
+        from app.core.config import settings
+        project_data_path = Path(settings.WORKSPACE_PROJECTS_DIR) / workspace_project / "data" / f"research-{ccresearch_id[:8]}"
+        project_data_path.mkdir(parents=True, exist_ok=True)
+        workspace_dir = project_data_path
+        logger.info(f"Created workspace in project '{workspace_project}' at {workspace_dir}")
+
+        # Write minimal CLAUDE.md for linked workspace
+        claude_md_path = workspace_dir / "CLAUDE.md"
+        claude_md_content = f"""# Research Session (Workspace: {workspace_project})
+
+**Session ID:** {ccresearch_id}
+**Email:** {email}
+**Linked to:** Workspace project "{workspace_project}"
+
+Files created here will appear in the Workspace Files tab.
+
+---
+
+*CCResearch - Claude Code Research Platform*
+"""
+        claude_md_path.write_text(claude_md_content)
+    else:
+        # Create workspace in default location
+        workspace_dir = ccresearch_manager.create_workspace(
+            ccresearch_id,
+            email=email,
+            uploaded_files=uploaded_files_list  # Will be updated after saving files
+        )
 
     # Save uploaded files to data/ directory in workspace
     data_dir = Path(workspace_dir) / "data"
@@ -256,17 +369,24 @@ async def create_session(
             uploaded_files=uploaded_files_list
         )
 
-    # Create database entry
+    # Generate default title with session number and date
+    mode_label = "Terminal" if session_mode == "terminal" else "Claude"
+    default_title = f"{mode_label} #{next_session_number} - {datetime.utcnow().strftime('%b %d')}"
+
+    # Create database entry (store email lowercase for consistent matching)
     session = CCResearchSession(
         id=ccresearch_id,
         session_id=session_id,
-        email=email,
-        title=title or f"Research Session {datetime.utcnow().strftime('%H:%M')}",
+        email=email.lower(),
+        session_number=next_session_number,
+        title=title or default_title,
         workspace_dir=str(workspace_dir),
+        workspace_project=workspace_project,  # Link to Workspace project
         status="created",
+        session_mode=session_mode,  # "claude" or "terminal"
         uploaded_files=json.dumps(uploaded_files_list) if uploaded_files_list else None,
         auth_mode="oauth",  # Keep for database compatibility
-        is_admin=False,  # Keep for database compatibility
+        is_admin=session_mode == "terminal",  # Terminal mode = admin access
         expires_at=datetime.utcnow() + timedelta(hours=24)
     )
 
@@ -281,9 +401,12 @@ async def create_session(
         id=session.id,
         session_id=session.session_id,
         email=session.email,
+        session_number=session.session_number,
         title=session.title,
         workspace_dir=session.workspace_dir,
+        workspace_project=session.workspace_project,
         status=session.status,
+        session_mode=session.session_mode,
         terminal_rows=session.terminal_rows,
         terminal_cols=session.terminal_cols,
         commands_executed=session.commands_executed,
@@ -584,12 +707,56 @@ async def clone_github_repo(
         raise HTTPException(status_code=500, detail=f"Clone failed: {str(e)}")
 
 
+@router.get("/sessions/by-email", response_model=list[SessionResponse])
+async def list_sessions_by_email(
+    email: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """List all sessions for a specific email address.
+
+    This ensures users only see their own sessions across devices/browsers.
+    """
+    if not email:
+        return []
+
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.email == email.lower())
+        .where(CCResearchSession.expires_at > datetime.utcnow())
+        .order_by(CCResearchSession.created_at.desc())
+    )
+    sessions = result.scalars().all()
+
+    response_list = []
+    for s in sessions:
+        response_list.append(SessionResponse(
+            id=s.id,
+            session_id=s.session_id,
+            email=s.email,
+            session_number=s.session_number,
+            title=s.title,
+            workspace_dir=s.workspace_dir,
+            workspace_project=s.workspace_project,
+            status=s.status,
+            session_mode=s.session_mode or "claude",
+            terminal_rows=s.terminal_rows,
+            terminal_cols=s.terminal_cols,
+            commands_executed=s.commands_executed,
+            created_at=s.created_at,
+            last_activity_at=s.last_activity_at,
+            expires_at=s.expires_at,
+            uploaded_files=json.loads(s.uploaded_files) if s.uploaded_files else None,
+            is_admin=s.is_admin
+        ))
+    return response_list
+
+
 @router.get("/sessions/{browser_session_id}", response_model=list[SessionResponse])
 async def list_sessions(
     browser_session_id: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """List all sessions for a browser session"""
+    """List all sessions for a browser session (legacy - prefer by-email endpoint)"""
     result = await db.execute(
         select(CCResearchSession)
         .where(CCResearchSession.session_id == browser_session_id)
@@ -604,9 +771,12 @@ async def list_sessions(
             id=s.id,
             session_id=s.session_id,
             email=s.email,
+            session_number=s.session_number,
             title=s.title,
             workspace_dir=s.workspace_dir,
+            workspace_project=s.workspace_project,
             status=s.status,
+            session_mode=s.session_mode or "claude",
             terminal_rows=s.terminal_rows,
             terminal_cols=s.terminal_cols,
             commands_executed=s.commands_executed,
@@ -646,9 +816,12 @@ async def get_session(
         id=session.id,
         session_id=session.session_id,
         email=session.email,
+        session_number=session.session_number,
         title=session.title,
         workspace_dir=session.workspace_dir,
+        workspace_project=session.workspace_project,
         status=session.status,
+        session_mode=session.session_mode or "claude",
         terminal_rows=session.terminal_rows,
         terminal_cols=session.terminal_cols,
         commands_executed=session.commands_executed,
@@ -756,6 +929,41 @@ async def resize_terminal(
             logger.warning(f"Failed to resize PTY for {ccresearch_id}")
 
     return {"status": "resized", "rows": request.rows, "cols": request.cols}
+
+
+@router.patch("/sessions/{ccresearch_id}/rename")
+async def rename_session(
+    ccresearch_id: str,
+    request: RenameRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Rename a session (title only, does NOT change directory names).
+
+    This allows users to rename their sessions for better organization
+    without affecting the --continue flag in Claude Code.
+    """
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Only update title in database, not filesystem
+    old_title = session.title
+    session.title = request.title.strip()
+    await db.commit()
+
+    logger.info(f"Renamed session {ccresearch_id}: '{old_title}' -> '{session.title}'")
+    return {
+        "status": "renamed",
+        "id": ccresearch_id,
+        "old_title": old_title,
+        "new_title": session.title
+    }
 
 
 # ============ File Browser Endpoints ============
@@ -996,7 +1204,10 @@ async def save_session_as_project(
     request: SaveProjectRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    """Save current session workspace as a persistent project on SSD"""
+    """Save current session workspace as a persistent project on SSD.
+
+    The project is associated with the session's email for ownership filtering.
+    """
     result = await db.execute(
         select(CCResearchSession)
         .where(CCResearchSession.id == ccresearch_id)
@@ -1010,16 +1221,18 @@ async def save_session_as_project(
     if not workspace.exists():
         raise HTTPException(status_code=404, detail="Workspace not found")
 
+    # Pass session email for project ownership
     project_path = ccresearch_manager.save_project(
         workspace,
         request.project_name,
-        request.description or ""
+        request.description or "",
+        email=session.email
     )
 
     if not project_path:
         raise HTTPException(status_code=500, detail="Failed to save project")
 
-    logger.info(f"Saved session {ccresearch_id} as project '{request.project_name}'")
+    logger.info(f"Saved session {ccresearch_id} as project '{request.project_name}' for {session.email}")
 
     return SaveProjectResponse(
         name=request.project_name,
@@ -1029,9 +1242,12 @@ async def save_session_as_project(
 
 
 @router.get("/projects", response_model=List[ProjectInfo])
-async def list_projects():
-    """List all saved projects on SSD"""
-    projects = ccresearch_manager.list_saved_projects()
+async def list_projects(email: Optional[str] = None):
+    """List saved projects on SSD, optionally filtered by email.
+
+    If email is provided, only returns projects owned by that user.
+    """
+    projects = ccresearch_manager.list_saved_projects(email=email or "")
     return [ProjectInfo(**p) for p in projects]
 
 
@@ -1040,21 +1256,28 @@ async def create_session_from_project(
     request: CreateFromProjectRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    """Create a new session by restoring a saved project"""
-    # Validate email against whitelist
-    if not is_email_allowed(request.email):
-        logger.warning(f"Access denied for email: {request.email}")
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied. Your email is not authorized to use CCResearch. Please contact the administrator."
-        )
+    """Create a new session by restoring a saved project.
+
+    Authentication is handled by the frontend (login required with 24h trial).
+    """
+    # Determine session mode based on access key
+    session_mode = "claude"  # Default: Claude Code
+    if request.access_key:
+        if is_access_key_valid(request.access_key):
+            session_mode = "terminal"
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail="wrong_access_key"
+            )
 
     ccresearch_id = str(uuid.uuid4())
 
     # Restore project files to new workspace
     workspace_dir = ccresearch_manager.restore_project(
         request.project_name,
-        ccresearch_id
+        ccresearch_id,
+        email=request.email
     )
 
     if not workspace_dir:
@@ -1063,14 +1286,17 @@ async def create_session_from_project(
             detail=f"Project '{request.project_name}' not found"
         )
 
-    # Create database entry
+    # Create database entry (store email lowercase for consistent matching)
+    mode_label = "Terminal" if session_mode == "terminal" else "Claude"
     session = CCResearchSession(
         id=ccresearch_id,
         session_id=request.session_id,
-        email=request.email,
-        title=request.title or f"Restored: {request.project_name}",
+        email=request.email.lower(),
+        title=request.title or f"{mode_label} Restored: {request.project_name}",
         workspace_dir=str(workspace_dir),
         status="created",
+        session_mode=session_mode,
+        is_admin=session_mode == "terminal",
         expires_at=datetime.utcnow() + timedelta(hours=24)
     )
 
@@ -1084,9 +1310,12 @@ async def create_session_from_project(
         id=session.id,
         session_id=session.session_id,
         email=session.email,
+        session_number=session.session_number or 1,
         title=session.title,
         workspace_dir=session.workspace_dir,
+        workspace_project=session.workspace_project,
         status=session.status,
+        session_mode=session.session_mode or "claude",
         terminal_rows=session.terminal_rows,
         terminal_cols=session.terminal_cols,
         commands_executed=session.commands_executed,
@@ -1110,23 +1339,487 @@ async def delete_project(project_name: str):
     return {"status": "deleted", "name": project_name}
 
 
+# ============ Share Endpoints ============
+
+def generate_share_token() -> str:
+    """Generate a random URL-safe share token (12 characters)."""
+    return secrets.token_urlsafe(9)  # 12 characters
+
+
+@router.post("/sessions/{ccresearch_id}/share", response_model=ShareResponse)
+async def create_share_link(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Create a public share link for a session.
+
+    Anyone with the link can view the session files and log (read-only).
+    """
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Check if already shared
+    if session.share_token:
+        # Return existing share link
+        share_url = f"https://orpheuscore.uk/ccresearch/share/{session.share_token}"
+        return ShareResponse(
+            share_token=session.share_token,
+            share_url=share_url,
+            shared_at=session.shared_at or datetime.utcnow()
+        )
+
+    # Generate new share token
+    share_token = generate_share_token()
+
+    # Ensure uniqueness (unlikely to collide but check anyway)
+    existing = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.share_token == share_token)
+    )
+    if existing.scalar_one_or_none():
+        share_token = generate_share_token()  # Try once more
+
+    # Update session
+    session.share_token = share_token
+    session.shared_at = datetime.utcnow()
+    await db.commit()
+
+    share_url = f"https://orpheuscore.uk/ccresearch/share/{share_token}"
+    logger.info(f"Created share link for session {ccresearch_id}: {share_url}")
+
+    return ShareResponse(
+        share_token=share_token,
+        share_url=share_url,
+        shared_at=session.shared_at
+    )
+
+
+@router.delete("/sessions/{ccresearch_id}/share")
+async def revoke_share_link(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Revoke the share link for a session."""
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if not session.share_token:
+        raise HTTPException(status_code=400, detail="Session is not shared")
+
+    # Clear share token
+    session.share_token = None
+    session.shared_at = None
+    await db.commit()
+
+    logger.info(f"Revoked share link for session {ccresearch_id}")
+    return {"status": "revoked", "id": ccresearch_id}
+
+
+@router.get("/sessions/{ccresearch_id}/share-status")
+async def get_share_status(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Check if a session is shared and get share details."""
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session.share_token:
+        return {
+            "is_shared": True,
+            "share_token": session.share_token,
+            "share_url": f"https://orpheuscore.uk/ccresearch/share/{session.share_token}",
+            "shared_at": session.shared_at.isoformat() if session.shared_at else None
+        }
+    else:
+        return {"is_shared": False}
+
+
+# ============ Public Share View Endpoints (No Auth Required) ============
+
+@router.get("/share/{share_token}", response_model=SharedSessionResponse)
+async def get_shared_session(
+    share_token: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Get public info for a shared session (no auth required).
+
+    Returns limited session info for display on the share page.
+    """
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.share_token == share_token)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Shared session not found or link expired")
+
+    # Count files in workspace
+    workspace = Path(session.workspace_dir)
+    files_count = 0
+    if workspace.exists():
+        files_count = sum(1 for _ in workspace.rglob('*') if _.is_file())
+
+    # Check if log exists
+    log_path = ccresearch_manager.get_session_log_path(session.id)
+    has_log = log_path is not None and Path(log_path).exists() if log_path else False
+
+    return SharedSessionResponse(
+        id=session.id,
+        title=session.title,
+        email=session.email,
+        created_at=session.created_at,
+        shared_at=session.shared_at or session.created_at,
+        files_count=files_count,
+        has_log=has_log
+    )
+
+
+@router.get("/share/{share_token}/files", response_model=FileListResponse)
+async def list_shared_files(
+    share_token: str,
+    path: str = "",
+    db: AsyncSession = Depends(get_db)
+):
+    """List files in a shared session workspace (no auth required)."""
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.share_token == share_token)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Shared session not found")
+
+    workspace = Path(session.workspace_dir)
+
+    # Resolve requested path (prevent directory traversal)
+    if path:
+        target_path = (workspace / path).resolve()
+        if not str(target_path).startswith(str(workspace.resolve())):
+            raise HTTPException(status_code=403, detail="Access denied")
+    else:
+        target_path = workspace
+
+    if not target_path.exists():
+        raise HTTPException(status_code=404, detail="Path not found")
+
+    if not target_path.is_dir():
+        raise HTTPException(status_code=400, detail="Path is not a directory")
+
+    files = []
+    workspace_resolved = workspace.resolve()
+    BLOCKED_FILES = {'.credentials.json', 'credentials.json', '.env', '.secrets'}
+
+    for item in sorted(target_path.iterdir(), key=lambda x: (not x.is_dir(), x.name.lower())):
+        if item.name.startswith('.') and item.name != '.claude':
+            continue
+        if item.name in BLOCKED_FILES:
+            continue
+
+        try:
+            stat = item.stat()
+            rel_path = str(item.resolve().relative_to(workspace_resolved))
+            files.append(FileInfo(
+                name=item.name,
+                path=rel_path,
+                is_dir=item.is_dir(),
+                size=stat.st_size if item.is_file() else 0,
+                modified_at=datetime.fromtimestamp(stat.st_mtime)
+            ))
+        except (OSError, ValueError) as e:
+            logger.warning(f"Error reading file {item}: {e}")
+            continue
+
+    return FileListResponse(
+        files=files,
+        current_path=path or "/"
+    )
+
+
+@router.get("/share/{share_token}/files/download")
+async def download_shared_file(
+    share_token: str,
+    path: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Download a file from a shared session (no auth required)."""
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.share_token == share_token)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Shared session not found")
+
+    workspace = Path(session.workspace_dir)
+    target_path = (workspace / path).resolve()
+
+    if not str(target_path).startswith(str(workspace.resolve())):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    BLOCKED_FILES = {'.credentials.json', 'credentials.json', '.env', '.secrets'}
+    if target_path.name in BLOCKED_FILES:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not target_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    if not target_path.is_file():
+        raise HTTPException(status_code=400, detail="Path is not a file")
+
+    mime_type, _ = mimetypes.guess_type(str(target_path))
+    if not mime_type:
+        mime_type = "application/octet-stream"
+
+    return FileResponse(
+        path=target_path,
+        filename=target_path.name,
+        media_type=mime_type
+    )
+
+
+@router.get("/share/{share_token}/files/content")
+async def read_shared_file_content(
+    share_token: str,
+    path: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Read text content of a file in a shared session (no auth required)."""
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.share_token == share_token)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Shared session not found")
+
+    workspace = Path(session.workspace_dir)
+    target_path = (workspace / path).resolve()
+
+    if not str(target_path).startswith(str(workspace.resolve())):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    BLOCKED_FILES = {'.credentials.json', 'credentials.json', '.env', '.secrets'}
+    if target_path.name in BLOCKED_FILES:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if not target_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+
+    if not target_path.is_file():
+        raise HTTPException(status_code=400, detail="Path is not a file")
+
+    if target_path.stat().st_size > 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large for preview")
+
+    try:
+        content = target_path.read_text(encoding='utf-8')
+        return {"content": content, "path": path, "name": target_path.name}
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File is not text (binary file)")
+
+
+@router.get("/share/{share_token}/log")
+async def get_shared_session_log(
+    share_token: str,
+    max_lines: int = 2000,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get terminal log for a shared session (no auth required).
+
+    Returns ALL logs for the session concatenated chronologically,
+    with ANSI escape sequences removed for readability.
+    """
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.share_token == share_token)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Shared session not found")
+
+    # Use read_full_session_log to get ALL logs concatenated chronologically
+    log_content = ccresearch_manager.read_full_session_log(session.id, max_lines, clean=True)
+
+    if log_content is None:
+        return {"log": "No log available for this session", "lines": 0}
+
+    return {
+        "log": log_content,
+        "lines": len(log_content.splitlines())
+    }
+
+
+# ============ Access Request Endpoints ============
+
+# Directory for storing requests
+REQUESTS_DIR = Path("/data/ccresearch-requests")
+REQUESTS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@router.post("/requests/access")
+async def request_access(request: AccessRequestModel):
+    """
+    Submit a request to be added to the CCResearch whitelist.
+
+    Stores the request in a JSON file for admin review.
+    """
+    requests_file = REQUESTS_DIR / "access_requests.json"
+
+    # Load existing requests
+    requests = []
+    if requests_file.exists():
+        try:
+            requests = json.loads(requests_file.read_text())
+        except Exception:
+            requests = []
+
+    # Check if email already requested
+    existing = [r for r in requests if r.get("email", "").lower() == request.email.lower()]
+    if existing:
+        return {"status": "already_requested", "message": "Access request already submitted for this email."}
+
+    # Add new request
+    new_request = {
+        "email": request.email.lower(),
+        "name": request.name,
+        "reason": request.reason,
+        "submitted_at": datetime.utcnow().isoformat(),
+        "status": "pending"
+    }
+    requests.append(new_request)
+
+    # Save
+    requests_file.write_text(json.dumps(requests, indent=2))
+    logger.info(f"New access request from {request.email}")
+
+    # Send admin notification (async, don't block response)
+    try:
+        await notify_access_request(request.email, request.name, request.reason)
+    except Exception as e:
+        logger.warning(f"Failed to send access request notification: {e}")
+
+    return {"status": "submitted", "message": "Access request submitted. You will be notified when approved."}
+
+
+@router.get("/requests/access")
+async def list_access_requests():
+    """List all access requests (admin only - no auth for now)."""
+    requests_file = REQUESTS_DIR / "access_requests.json"
+    if not requests_file.exists():
+        return {"requests": []}
+    try:
+        requests = json.loads(requests_file.read_text())
+        return {"requests": requests}
+    except Exception:
+        return {"requests": []}
+
+
+@router.post("/requests/plugin-skill")
+async def request_plugin_or_skill(request: PluginSkillRequestModel):
+    """
+    Submit a request for a new plugin or skill to be added.
+
+    Stores the request in a JSON file for admin review.
+    """
+    requests_file = REQUESTS_DIR / "plugin_skill_requests.json"
+
+    # Load existing requests
+    requests = []
+    if requests_file.exists():
+        try:
+            requests = json.loads(requests_file.read_text())
+        except Exception:
+            requests = []
+
+    # Add new request
+    new_request = {
+        "email": request.email.lower(),
+        "request_type": request.request_type,
+        "name": request.name,
+        "description": request.description,
+        "use_case": request.use_case,
+        "submitted_at": datetime.utcnow().isoformat(),
+        "status": "pending"
+    }
+    requests.append(new_request)
+
+    # Save
+    requests_file.write_text(json.dumps(requests, indent=2))
+    logger.info(f"New {request.request_type} request: {request.name} from {request.email}")
+
+    # Send admin notification (async, don't block response)
+    try:
+        await notify_plugin_skill_request(
+            request.email,
+            request.request_type,
+            request.name,
+            request.description,
+            request.use_case
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send plugin/skill request notification: {e}")
+
+    return {"status": "submitted", "message": f"{request.request_type.capitalize()} request submitted. Thank you for the suggestion!"}
+
+
+@router.get("/requests/plugin-skill")
+async def list_plugin_skill_requests():
+    """List all plugin/skill requests (admin only - no auth for now)."""
+    requests_file = REQUESTS_DIR / "plugin_skill_requests.json"
+    if not requests_file.exists():
+        return {"requests": []}
+    try:
+        requests = json.loads(requests_file.read_text())
+        return {"requests": requests}
+    except Exception:
+        return {"requests": []}
+
+
 # ============ Session Monitoring Endpoints ============
 
 @router.get("/sessions/{ccresearch_id}/log")
 async def get_session_log(
     ccresearch_id: str,
     lines: int = 200,
+    clean: bool = False,
     db: AsyncSession = Depends(get_db)
 ):
     """
     Get the terminal log for a session.
 
-    This returns the raw terminal output captured during the session,
+    This returns the terminal output captured during the session,
     useful for debugging and monitoring what Claude is doing.
 
     Args:
         ccresearch_id: Session ID
         lines: Number of lines to return (default 200)
+        clean: If True, strip ANSI codes for readable display
 
     Returns:
         Log content or error
@@ -1142,7 +1835,7 @@ async def get_session_log(
         raise HTTPException(status_code=404, detail="Session not found")
 
     # Get log content
-    log_content = ccresearch_manager.read_session_log(ccresearch_id, lines)
+    log_content = ccresearch_manager.read_session_log(ccresearch_id, lines, clean=clean)
 
     if log_content is None:
         # Try to find the log file path
@@ -1274,28 +1967,56 @@ async def terminal_websocket(
                 except Exception as e:
                     logger.error(f"Failed to send automation notification: {e}")
 
-            # OAuth mode - no API key needed, uses server's Claude subscription
-            # NOTE: is_admin column exists for future use but currently all sessions use global sandbox setting
-            # TODO: Enable admin bypass when ready: use_sandbox = settings.CCRESEARCH_SANDBOX_ENABLED and not session.is_admin
+            # Check session mode and spawn appropriate process
+            session_mode = session.session_mode or "claude"
 
-            # Spawn or reconnect to Claude process
-            success = await ccresearch_manager.spawn_claude(
-                ccresearch_id,
-                Path(session.workspace_dir),
-                session.terminal_rows,
-                session.terminal_cols,
-                send_output,
-                sandboxed=settings.CCRESEARCH_SANDBOX_ENABLED,
-                automation_callback=send_automation_notification
-            )
+            # Determine if we should continue previous session
+            # Use --continue flag for:
+            # - Reconnecting to existing sessions (status != 'created')
+            # - Restored projects (title contains 'Restored')
+            is_existing_session = session.status != "created"
+            is_restored_project = "Restored:" in (session.title or "")
+            should_continue = is_existing_session or is_restored_project
 
-            if not success:
-                await websocket.send_json({
-                    "type": "error",
-                    "error": "Failed to start Claude Code. Ensure 'claude' CLI is installed."
-                })
-                await websocket.close()
-                return
+            if should_continue:
+                logger.info(f"Resuming session {ccresearch_id} with --continue flag")
+
+            if session_mode == "terminal":
+                # Direct terminal access - spawn bash shell
+                success = await ccresearch_manager.spawn_shell(
+                    ccresearch_id,
+                    Path(session.workspace_dir),
+                    session.terminal_rows,
+                    session.terminal_cols,
+                    send_output
+                )
+                if not success:
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": "Failed to start terminal session."
+                    })
+                    await websocket.close()
+                    return
+            else:
+                # Claude Code mode - spawn Claude CLI
+                # Pass continue_session=True for existing sessions to retain conversation history
+                success = await ccresearch_manager.spawn_claude(
+                    ccresearch_id,
+                    Path(session.workspace_dir),
+                    session.terminal_rows,
+                    session.terminal_cols,
+                    send_output,
+                    sandboxed=settings.CCRESEARCH_SANDBOX_ENABLED,
+                    automation_callback=send_automation_notification,
+                    continue_session=should_continue
+                )
+                if not success:
+                    await websocket.send_json({
+                        "type": "error",
+                        "error": "Failed to start Claude Code. Ensure 'claude' CLI is installed."
+                    })
+                    await websocket.close()
+                    return
 
             # Update session status
             session.status = "active"

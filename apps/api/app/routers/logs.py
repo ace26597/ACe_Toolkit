@@ -247,51 +247,6 @@ async def get_shutdown_logs(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/medresearch")
-async def get_medresearch_logs(
-    lines: int = Query(100, ge=1, le=10000),
-    date: Optional[str] = Query(None)
-):
-    """
-    Get MedResearch session logs (filtered from backend logs).
-
-    Args:
-        lines: Number of lines to return
-        date: Optional date filter in YYYYMMDD format
-
-    Returns:
-        Log content filtered for medresearch-related entries
-    """
-    try:
-        # Get backend logs first
-        if date:
-            log_pattern = f"backend-{date}.log"
-        else:
-            backend_logs = get_log_files("backend-*.log")
-            if not backend_logs:
-                return PlainTextResponse("No backend logs found")
-            log_pattern = backend_logs[0].name
-
-        log_file = LOG_DIR / log_pattern
-
-        # Filter for medresearch-related entries
-        cmd = ["grep", "-iE", "(medresearch|MedResearch|medresearch_manager|/medresearch/)", str(log_file)]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-
-        if not result.stdout:
-            return PlainTextResponse("No MedResearch logs found in recent backend logs")
-
-        # Return last N lines
-        all_lines = result.stdout.strip().split('\n')
-        filtered_lines = all_lines[-lines:] if len(all_lines) > lines else all_lines
-
-        return PlainTextResponse('\n'.join(filtered_lines))
-
-    except Exception as e:
-        logger.error(f"Error getting medresearch logs: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/ccresearch")
 async def get_ccresearch_logs(
     lines: int = Query(100, ge=1, le=10000),
@@ -319,8 +274,8 @@ async def get_ccresearch_logs(
 
         log_file = LOG_DIR / log_pattern
 
-        # Filter for ccresearch-related entries (also include medresearch for backwards compatibility)
-        cmd = ["grep", "-iE", "(ccresearch|CCResearch|ccresearch_manager|/ccresearch/|medresearch|MedResearch)", str(log_file)]
+        # Filter for ccresearch-related entries
+        cmd = ["grep", "-iE", "(ccresearch|CCResearch|ccresearch_manager|/ccresearch/)", str(log_file)]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
 
         if not result.stdout:
@@ -461,8 +416,6 @@ def categorize_log(filename: str) -> str:
     """Categorize log file by name."""
     if "ccresearch" in filename.lower():
         return "ccresearch"
-    if "medresearch" in filename.lower():
-        return "medresearch"
     elif "backend" in filename:
         return "backend"
     elif "frontend" in filename:

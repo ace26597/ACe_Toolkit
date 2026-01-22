@@ -1,5 +1,5 @@
 #!/bin/bash
-# Master startup script for ACe_Toolkit
+# Master startup script for BlestLabs
 # Starts both backend and frontend services
 
 set -e
@@ -11,7 +11,7 @@ mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/startup-$(date +%Y%m%d).log"
 
 echo "========================================" | tee -a "$LOG_FILE"
-echo "$(date): ACe_Toolkit Startup Initiated" | tee -a "$LOG_FILE"
+echo "$(date): BlestLabs Startup Initiated" | tee -a "$LOG_FILE"
 echo "========================================" | tee -a "$LOG_FILE"
 
 # Wait for network to be ready (important for boot startup)
@@ -38,7 +38,7 @@ else
 fi
 
 echo "========================================" | tee -a "$LOG_FILE"
-echo "$(date): ACe_Toolkit Startup Complete" | tee -a "$LOG_FILE"
+echo "$(date): BlestLabs Startup Complete" | tee -a "$LOG_FILE"
 echo "$(date): Backend: http://localhost:8000" | tee -a "$LOG_FILE"
 echo "$(date): Frontend: http://localhost:3000" | tee -a "$LOG_FILE"
 echo "$(date): Logs: $LOG_DIR" | tee -a "$LOG_FILE"

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import dynamic from 'next/dynamic';
+import { useSearchParams } from 'next/navigation';
 import {
   Terminal as TerminalIcon,
   Plus,
@@ -15,10 +16,9 @@ import {
   ChevronDown,
   ChevronRight,
   FolderArchive,
-  Save,
   FolderOpen,
-  HardDrive,
   ArrowLeft,
+  Pencil,
   Power,
   SquarePlus,
   Database,
@@ -40,10 +40,16 @@ import {
   Folder,
   Archive,
   Github,
-  GitBranch
+  GitBranch,
+  Share2,
+  Link2,
+  Copy,
+  Check,
+  ExternalLink
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/components/ui/ToastProvider';
+import { ProtectedRoute, useAuth } from '@/components/auth';
 
 // Dynamic import for Terminal (client-only, xterm.js requires DOM)
 const CCResearchTerminal = dynamic(
@@ -79,8 +85,10 @@ interface CCResearchSession {
   id: string;
   session_id: string;
   email: string;
+  session_number: number;
   title: string;
   workspace_dir: string;
+  workspace_project?: string;  // Linked Workspace project name
   status: 'created' | 'active' | 'disconnected' | 'terminated' | 'error';
   terminal_rows: number;
   terminal_cols: number;
@@ -89,14 +97,6 @@ interface CCResearchSession {
   last_activity_at: string;
   expires_at: string;
   uploaded_files?: string[];
-}
-
-interface SavedProject {
-  name: string;
-  path: string;
-  description?: string;
-  saved_at: string;
-  files?: string[];
 }
 
 interface CapabilitiesData {
@@ -123,6 +123,10 @@ interface CapabilitiesData {
     source?: string;
     skills: Array<{ name: string; description: string; category: string; status: string }>;
     summary: { total: number; installed: number };
+  };
+  agents?: {
+    installed: Array<{ name: string; description: string; status: string }>;
+    summary: { total: number; active: number };
   };
   scientific_skills: {
     total: number;
@@ -175,12 +179,14 @@ const ccresearchApi = {
   createSession: async (
     browserSessionId: string,
     email?: string,
+    accessKey?: string,
     title?: string,
     files?: File[]
   ): Promise<CCResearchSession> => {
     const formData = new FormData();
     formData.append('session_id', browserSessionId);
     if (email) formData.append('email', email);
+    if (accessKey) formData.append('access_key', accessKey);
     if (title) formData.append('title', title);
     if (files) {
       files.forEach(file => formData.append('files', file));
@@ -243,6 +249,13 @@ const ccresearchApi = {
     return res.json();
   },
 
+  listSessionsByEmail: async (email: string): Promise<CCResearchSession[]> => {
+    if (!email) return [];
+    const res = await fetch(`${API_URL}/ccresearch/sessions/by-email?email=${encodeURIComponent(email)}`);
+    if (!res.ok) throw new Error('Failed to list sessions');
+    return res.json();
+  },
+
   deleteSession: async (ccresearchId: string): Promise<void> => {
     const res = await fetch(`${API_URL}/ccresearch/sessions/${ccresearchId}`, {
       method: 'DELETE',
@@ -266,52 +279,87 @@ const ccresearchApi = {
     });
   },
 
+  renameSession: async (ccresearchId: string, title: string): Promise<{ old_title: string; new_title: string }> => {
+    const res = await fetch(`${API_URL}/ccresearch/sessions/${ccresearchId}/rename`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title }),
+    });
+    if (!res.ok) throw new Error('Failed to rename session');
+    return res.json();
+  },
+
   downloadWorkspaceZip: (ccresearchId: string): void => {
     window.open(`${API_URL}/ccresearch/sessions/${ccresearchId}/download-zip`, '_blank');
   },
 
-  // Project save/restore
-  saveProject: async (ccresearchId: string, projectName: string, description?: string): Promise<{
-    name: string;
-    path: string;
-    saved_at: string;
+  // Request access to CCResearch
+  requestAccess: async (email: string, name: string, reason: string): Promise<{ status: string; message: string }> => {
+    const res = await fetch(`${API_URL}/ccresearch/requests/access`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, name, reason }),
+    });
+    return res.json();
+  },
+
+  // Request a plugin or skill
+  requestPluginOrSkill: async (
+    email: string,
+    requestType: 'plugin' | 'skill',
+    name: string,
+    description: string,
+    useCase: string
+  ): Promise<{ status: string; message: string }> => {
+    const res = await fetch(`${API_URL}/ccresearch/requests/plugin-skill`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        request_type: requestType,
+        name,
+        description,
+        use_case: useCase,
+      }),
+    });
+    return res.json();
+  },
+
+  // Share session
+  createShareLink: async (ccresearchId: string): Promise<{
+    share_token: string;
+    share_url: string;
+    shared_at: string;
   }> => {
-    const res = await fetch(`${API_URL}/ccresearch/sessions/${ccresearchId}/save-project`, {
+    const res = await fetch(`${API_URL}/ccresearch/sessions/${ccresearchId}/share`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_name: projectName, description }),
     });
     if (!res.ok) {
-      const error = await res.json().catch(() => ({ detail: 'Failed to save project' }));
-      throw new Error(error.detail || 'Failed to save project');
+      const error = await res.json().catch(() => ({ detail: 'Failed to create share link' }));
+      throw new Error(error.detail || 'Failed to create share link');
     }
     return res.json();
   },
 
-  listProjects: async (): Promise<SavedProject[]> => {
-    const res = await fetch(`${API_URL}/ccresearch/projects`);
-    if (!res.ok) throw new Error('Failed to list projects');
-    return res.json();
-  },
-
-  createFromProject: async (browserSessionId: string, email: string, projectName: string, title?: string): Promise<CCResearchSession> => {
-    const res = await fetch(`${API_URL}/ccresearch/sessions/from-project`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: browserSessionId, email, project_name: projectName, title }),
-    });
-    if (!res.ok) {
-      const error = await res.json().catch(() => ({ detail: 'Failed to restore project' }));
-      throw new Error(error.detail || 'Failed to restore project');
-    }
-    return res.json();
-  },
-
-  deleteProject: async (projectName: string): Promise<void> => {
-    const res = await fetch(`${API_URL}/ccresearch/projects/${encodeURIComponent(projectName)}`, {
+  revokeShareLink: async (ccresearchId: string): Promise<void> => {
+    const res = await fetch(`${API_URL}/ccresearch/sessions/${ccresearchId}/share`, {
       method: 'DELETE',
     });
-    if (!res.ok) throw new Error('Failed to delete project');
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: 'Failed to revoke share link' }));
+      throw new Error(error.detail || 'Failed to revoke share link');
+    }
+  },
+
+  getShareStatus: async (ccresearchId: string): Promise<{
+    is_shared: boolean;
+    share_token?: string;
+    share_url?: string;
+    shared_at?: string;
+  }> => {
+    const res = await fetch(`${API_URL}/ccresearch/sessions/${ccresearchId}/share-status`);
+    if (!res.ok) return { is_shared: false };
+    return res.json();
   },
 };
 
@@ -325,22 +373,21 @@ const generateSessionId = () => {
   return newId;
 };
 
-export default function CCResearchPage() {
+function CCResearchPageContent() {
   const { showToast } = useToast();
+  const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [sessions, setSessions] = useState<CCResearchSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [initialSessionLoaded, setInitialSessionLoaded] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [browserSessionId, setBrowserSessionId] = useState('');
   const [terminalConnected, setTerminalConnected] = useState(false);
   const [showFileBrowser, setShowFileBrowser] = useState(false);
   const [showSessionDropdown, setShowSessionDropdown] = useState(false);
-  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
-  const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [saveProjectName, setSaveProjectName] = useState('');
-  const [saveProjectContext, setSaveProjectContext] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [showProjectsTab, setShowProjectsTab] = useState(false);
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [capabilities, setCapabilities] = useState<CapabilitiesData | null>(null);
 
@@ -350,22 +397,46 @@ export default function CCResearchPage() {
 
   // New session creation state
   const [showNewSessionModal, setShowNewSessionModal] = useState(false);
-  const [newSessionEmail, setNewSessionEmail] = useState('');
+  const [newSessionAccessKey, setNewSessionAccessKey] = useState('');
   const [newSessionTitle, setNewSessionTitle] = useState('');
   const [newSessionFiles, setNewSessionFiles] = useState<File[]>([]);
-  const [emailError, setEmailError] = useState('');
+  const [accessKeyError, setAccessKeyError] = useState('');
   const [uploadMode, setUploadMode] = useState<'files' | 'directory'>('files');
   const [newSessionGithubUrl, setNewSessionGithubUrl] = useState('');
   const [newSessionGithubBranch, setNewSessionGithubBranch] = useState('');
-  // OAuth mode only - uses server's Claude subscription
+  // User email for session filtering - persists across page loads
+  const [userEmail, setUserEmail] = useState('');
+  // Request plugin/skill state
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
+  // Request plugin/skill state
+  const [showRequestPluginSkillForm, setShowRequestPluginSkillForm] = useState(false);
+  const [requestType, setRequestType] = useState<'plugin' | 'skill'>('skill');
+  const [requestName, setRequestName] = useState('');
+  const [requestDescription, setRequestDescription] = useState('');
+  const [requestUseCase, setRequestUseCase] = useState('');
 
-  // Initialize browser session ID and load saved email
+  // Share session state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareUrl, setShareUrl] = useState('');
+  const [shareToken, setShareToken] = useState('');
+  const [isShared, setIsShared] = useState(false);
+  const [isCreatingShare, setIsCreatingShare] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  // Initialize browser session ID and use logged-in user's email
   useEffect(() => {
     setBrowserSessionId(generateSessionId());
-    // Load saved email from localStorage
-    const savedEmail = localStorage.getItem('ccresearch_email');
-    if (savedEmail) setNewSessionEmail(savedEmail);
-  }, []);
+    // Use logged-in user's email for session filtering
+    if (user?.email) {
+      setUserEmail(user.email);
+      localStorage.setItem('ccresearch_email', user.email);
+    }
+    // Load saved access key from localStorage (still needed for direct terminal access)
+    const savedAccessKey = localStorage.getItem('ccresearch_access_key');
+    if (savedAccessKey) {
+      setNewSessionAccessKey(savedAccessKey);
+    }
+  }, [user]);
 
   // Load capabilities data (embedded for reliability)
   useEffect(() => {
@@ -385,69 +456,95 @@ export default function CCResearchPage() {
           { id: "ralph-loop@claude-plugins-official", name: "Ralph Loop", version: "f70b65538da0", status: "active", description: "Iterative refinement workflow" },
           { id: "huggingface-skills@claude-plugins-official", name: "HuggingFace Skills", version: "f70b65538da0", status: "active", description: "HuggingFace model integration" },
           { id: "ai@claude-skills", name: "AI Skills", version: "1.0.0", status: "active", description: "AI/ML development utilities" },
-          { id: "backend@claude-skills", name: "Backend Skills", version: "1.0.0", status: "active", description: "Backend development patterns" }
+          { id: "backend@claude-skills", name: "Backend Skills", version: "1.0.0", status: "active", description: "Backend development patterns" },
+          { id: "aact-clinical-trials@local", name: "AACT Clinical Trials", version: "1.0.0", status: "active", description: "Query AACT database (566K+ studies)" }
         ],
-        summary: { total: 12, active: 12, with_mcp: 1 }
+        summary: { total: 14, active: 14, with_mcp: 1 }
       },
       mcp_servers: {
         active: [
-          { name: "context7", status: "running", description: "Library documentation lookup", tools: ["resolve-library-id", "query-docs"] },
-          { name: "filesystem", status: "running", description: "Secure file operations", tools: ["read_file", "write_file", "list_directory", "search_files"] },
+          // Medical/Clinical MCP Servers (10)
+          { name: "pubmed", status: "running", description: "Biomedical literature search", tools: ["search_articles", "get_article_metadata", "find_related_articles"] },
+          { name: "biorxiv", status: "running", description: "bioRxiv/medRxiv preprints", tools: ["search_preprints", "get_preprint", "get_categories"] },
+          { name: "chembl", status: "running", description: "Bioactive compounds & drug data", tools: ["compound_search", "get_bioactivity", "target_search", "get_mechanism"] },
+          { name: "clinical-trials", status: "running", description: "ClinicalTrials.gov API v2", tools: ["search_trials", "get_trial_details", "search_investigators"] },
+          { name: "aact", status: "running", description: "AACT Clinical Trials DB (566K+)", tools: ["list_tables", "describe_table", "read_query"] },
+          { name: "cms-coverage", status: "running", description: "Medicare Coverage (NCDs/LCDs)", tools: ["search_national_coverage", "search_local_coverage", "get_coverage_document"] },
+          { name: "npi-registry", status: "running", description: "NPI Provider Lookup", tools: ["npi_validate", "npi_lookup", "npi_search"] },
+          { name: "icd-10-codes", status: "running", description: "ICD-10-CM/PCS codes (2026)", tools: ["lookup_code", "search_codes", "validate_code", "get_hierarchy"] },
+          { name: "medidata", status: "running", description: "Clinical trial data platform", tools: ["query_trials", "get_study_data"] },
+          { name: "open-targets", status: "running", description: "Drug target platform", tools: ["search_targets", "get_associations"] },
+          // Research/Data MCP Servers (4)
+          { name: "scholar-gateway", status: "running", description: "Semantic literature search", tools: ["semanticSearch"] },
+          { name: "hugging-face", status: "running", description: "HuggingFace models/datasets", tools: ["model_search", "dataset_search", "paper_search"] },
+          { name: "hf-mcp-server", status: "running", description: "HuggingFace Hub login", tools: ["use_space", "get_model_info"] },
+          { name: "MotherDuck", status: "running", description: "Cloud DuckDB analytics", tools: ["run_query", "list_databases"] },
+          // Core Tools MCP Servers (8)
           { name: "memory", status: "running", description: "Knowledge graph persistence", tools: ["create_entities", "create_relations", "read_graph", "search_nodes"] },
-          { name: "sequential-thinking", status: "running", description: "Dynamic problem-solving", tools: ["sequentialthinking"] },
-          { name: "fetch", status: "running", description: "Web content fetching", tools: ["fetch"] },
+          { name: "filesystem", status: "running", description: "Secure file operations", tools: ["read_file", "write_file", "list_directory", "search_files"] },
           { name: "git", status: "running", description: "Git repository operations", tools: ["git_status", "git_diff", "git_commit", "git_log"] },
+          { name: "sqlite", status: "running", description: "SQLite database operations", tools: ["read_query", "write_query", "list_tables", "describe_table"] },
+          { name: "playwright", status: "running", description: "Browser automation", tools: ["browser_navigate", "browser_snapshot", "browser_click", "browser_screenshot"] },
+          { name: "fetch", status: "running", description: "Web content fetching", tools: ["fetch"] },
           { name: "time", status: "running", description: "Time/timezone utilities", tools: ["get_current_time", "convert_time"] },
-          { name: "sqlite", status: "running", description: "SQLite database operations", tools: ["read_query", "write_query", "list_tables"] },
-          { name: "playwright", status: "running", description: "Browser automation", tools: ["browser_navigate", "browser_screenshot", "browser_click"] }
+          { name: "sequential-thinking", status: "running", description: "Dynamic problem-solving", tools: ["sequentialthinking"] },
+          // Utilities MCP Servers (4)
+          { name: "cloudflare", status: "running", description: "Cloudflare services", tools: ["manage_dns", "get_analytics"] },
+          { name: "bitly", status: "running", description: "URL shortening", tools: ["shorten_url", "get_clicks"] },
+          { name: "lunarcrush", status: "running", description: "Crypto social analytics", tools: ["get_coin_data", "search_assets"] },
+          { name: "mercury", status: "running", description: "Banking API", tools: ["get_accounts", "get_transactions"] }
         ],
-        available_local: [
-          { name: "postgres", description: "PostgreSQL access", auth_required: true, maintained: true },
-          { name: "redis", description: "Redis cache", auth_required: true, maintained: true }
-        ],
-        available_remote: [
-          { name: "github", description: "GitHub repositories", auth_method: "OAuth" },
-          { name: "gitlab", description: "GitLab CI/CD", auth_method: "None" },
-          { name: "linear", description: "Project management", auth_method: "OAuth" },
-          { name: "motherduck", description: "Cloud DuckDB analytics", auth_method: "API Key", status: "configured" },
-          { name: "sentry", description: "Error monitoring", auth_method: "OAuth" },
-          { name: "slack", description: "Slack messaging", auth_method: "OAuth" },
-          { name: "supabase", description: "Database & auth", auth_method: "OAuth" }
-        ],
-        summary: { running: 9, available_local: 2, available_remote: 7 }
+        available_local: [],
+        available_remote: [],
+        summary: { running: 26, available_local: 0, available_remote: 0 }
       },
       available_skills: {
         source: "https://github.com/anthropics/skills",
         skills: [
+          // Custom installed skills
           { name: "code-review", description: "Comprehensive code quality check and linting", category: "custom", status: "installed" },
           { name: "update-docs", description: "Quick documentation refresh for CLAUDE.md/README", category: "custom", status: "installed" },
+          { name: "aact-clinical-trials", description: "Query AACT Clinical Trials database (566K+ studies)", category: "scientific", status: "installed" },
+          // Document processing skills (newly installed)
+          { name: "pdf-processing-pro", description: "Production PDF: forms, tables, OCR, validation, batch ops", category: "documents", status: "installed" },
+          { name: "xlsx", description: "Excel spreadsheet creation, editing, formulas, charts", category: "documents", status: "installed" },
+          { name: "docx", description: "Word documents with tracked changes, comments, formatting", category: "documents", status: "installed" },
+          // Scientific skills (newly installed)
+          { name: "exploratory-data-analysis", description: "EDA on 200+ scientific file formats with reports", category: "scientific", status: "installed" },
+          { name: "plotly", description: "Interactive charts, plots, dashboards (Express + Graph Objects)", category: "scientific", status: "installed" },
+          // Development skills
+          { name: "frontend-design", description: "Frontend UI/UX design", category: "development", status: "installed" },
+          { name: "feature-dev", description: "Guided feature development workflow", category: "development", status: "installed" },
+          { name: "create-plugin", description: "End-to-end plugin creation", category: "development", status: "installed" },
+          { name: "new-sdk-app", description: "Create Agent SDK applications", category: "development", status: "installed" },
+          { name: "markitdown", description: "Convert files to Markdown", category: "documents", status: "installed" },
+          { name: "pdf", description: "PDF generation and manipulation", category: "documents", status: "installed" },
+          { name: "pptx", description: "PowerPoint presentation creation", category: "documents", status: "installed" },
+          // Available skills (not yet installed)
           { name: "algorithmic-art", description: "Create algorithmic and generative art", category: "creative", status: "available" },
           { name: "brand-guidelines", description: "Brand identity and design guidelines", category: "enterprise", status: "available" },
           { name: "canvas-design", description: "Canvas-based visual design", category: "creative", status: "available" },
           { name: "doc-coauthoring", description: "Collaborative document authoring", category: "enterprise", status: "available" },
-          { name: "docx", description: "Word document generation", category: "documents", status: "installed" },
-          { name: "frontend-design", description: "Frontend UI/UX design", category: "development", status: "installed" },
           { name: "internal-comms", description: "Internal communications tools", category: "enterprise", status: "available" },
           { name: "mcp-builder", description: "MCP server builder", category: "development", status: "available" },
-          { name: "pdf", description: "PDF generation and manipulation", category: "documents", status: "installed" },
-          { name: "pptx", description: "PowerPoint presentation creation", category: "documents", status: "installed" },
           { name: "skill-creator", description: "Create and test new skills", category: "development", status: "available" },
           { name: "slack-gif-creator", description: "GIF creation for Slack", category: "creative", status: "available" },
           { name: "theme-factory", description: "Theme generation and customization", category: "creative", status: "available" },
           { name: "web-artifacts-builder", description: "Web artifact creation", category: "development", status: "available" },
-          { name: "webapp-testing", description: "Web application testing", category: "development", status: "available" },
-          { name: "xlsx", description: "Excel spreadsheet creation", category: "documents", status: "installed" },
-          { name: "markitdown", description: "Convert files to Markdown", category: "documents", status: "installed" },
-          { name: "feature-dev", description: "Guided feature development workflow", category: "development", status: "installed" },
-          { name: "create-plugin", description: "End-to-end plugin creation", category: "development", status: "installed" },
-          { name: "new-sdk-app", description: "Create Agent SDK applications", category: "development", status: "installed" }
+          { name: "webapp-testing", description: "Web application testing", category: "development", status: "available" }
         ],
-        summary: { total: 22, installed: 12 }
+        summary: { total: 26, installed: 15 }
+      },
+      agents: {
+        installed: [
+          { name: "prompt-engineer", description: "AI specialist for prompt engineering and optimization", status: "active" }
+        ],
+        summary: { total: 1, active: 1 }
       },
       scientific_skills: {
-        total: 140,
+        total: 145,
         categories: {
-          databases: { count: 27, status: "all_working", skills: [
+          databases: { count: 28, status: "all_working", skills: [
             { name: "pubmed-database", description: "Biomedical literature", status: "working" },
             { name: "uniprot-database", description: "Protein sequences", status: "working" },
             { name: "chembl-database", description: "Bioactive molecules", status: "working" },
@@ -462,7 +559,8 @@ export default function CCResearchPage() {
             { name: "gwas-database", description: "GWAS catalog", status: "working" },
             { name: "opentargets-database", description: "Target-disease links", status: "working" },
             { name: "ensembl-database", description: "Genome annotation", status: "working" },
-            { name: "pubchem-database", description: "Chemical compounds", status: "working" }
+            { name: "pubchem-database", description: "Chemical compounds", status: "working" },
+            { name: "aact-database", description: "Clinical trials (566K+)", status: "working" }
           ]},
           bioinformatics: { count: 15, status: "all_working", skills: [
             { name: "biopython", description: "Sequence analysis", status: "working" },
@@ -478,7 +576,7 @@ export default function CCResearchPage() {
             { name: "torchdrug", description: "Drug discovery ML", status: "working" },
             { name: "diffdock", description: "Molecular docking", status: "working" }
           ]},
-          data_science_ml: { count: 18, status: "all_working", skills: [
+          data_science_ml: { count: 20, status: "all_working", skills: [
             { name: "polars", description: "Fast DataFrames", status: "working" },
             { name: "scikit-learn", description: "Machine learning", status: "working" },
             { name: "pytorch-lightning", description: "PyTorch training", status: "working" },
@@ -487,15 +585,20 @@ export default function CCResearchPage() {
             { name: "statsmodels", description: "Statistical models", status: "working" },
             { name: "pymc", description: "Probabilistic programming", status: "working" },
             { name: "networkx", description: "Network analysis", status: "working" },
-            { name: "esm", description: "Protein LLMs", status: "working" }
+            { name: "esm", description: "Protein LLMs", status: "working" },
+            { name: "plotly", description: "Interactive charts", status: "working" },
+            { name: "exploratory-data-analysis", description: "EDA 200+ formats", status: "working" }
           ]},
-          document_generation: { count: 11, status: "all_working", skills: [
+          document_generation: { count: 14, status: "all_working", skills: [
             { name: "generate-image", description: "AI image generation", status: "working" },
             { name: "latex-posters", description: "LaTeX posters", status: "working" },
             { name: "scientific-slides", description: "Presentations", status: "working" },
             { name: "clinical-reports", description: "Clinical reports", status: "working" },
             { name: "markitdown", description: "File to Markdown", status: "working" },
-            { name: "scientific-writing", description: "Manuscript writing", status: "working" }
+            { name: "scientific-writing", description: "Manuscript writing", status: "working" },
+            { name: "pdf-processing-pro", description: "PDF forms, OCR, tables", status: "working" },
+            { name: "xlsx", description: "Excel spreadsheets", status: "working" },
+            { name: "docx", description: "Word documents", status: "working" }
           ]},
           research_workflows: { count: 10, status: "all_working", skills: [
             { name: "literature-review", description: "Systematic reviews", status: "working" },
@@ -536,18 +639,22 @@ export default function CCResearchPage() {
     setCapabilities(capabilitiesData);
   }, []);
 
-  // Load sessions on mount and periodically
+  // Load sessions on mount and periodically - filter by user email
   const loadSessions = useCallback(async () => {
-    if (!browserSessionId) return;
+    if (!userEmail) {
+      // No email set yet - don't load sessions (user needs to create one first)
+      setIsLoading(false);
+      return;
+    }
     try {
-      const data = await ccresearchApi.listSessions(browserSessionId);
+      const data = await ccresearchApi.listSessionsByEmail(userEmail);
       setSessions(data);
     } catch (error) {
       console.error('Failed to load sessions:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [browserSessionId]);
+  }, [userEmail]);
 
   useEffect(() => {
     loadSessions();
@@ -555,27 +662,129 @@ export default function CCResearchPage() {
     return () => clearInterval(interval);
   }, [loadSessions]);
 
-  // Load saved projects
-  const loadProjects = useCallback(async () => {
+  // Handle session query parameter (from Workspace redirect)
+  useEffect(() => {
+    const sessionParam = searchParams.get('session');
+    if (sessionParam && !initialSessionLoaded && !isLoading) {
+      // Check if this session exists in our list
+      const sessionExists = sessions.some(s => s.id === sessionParam);
+      if (sessionExists) {
+        setActiveSessionId(sessionParam);
+        setInitialSessionLoaded(true);
+      } else if (sessions.length > 0) {
+        // Sessions loaded but param session not found - might need to fetch it
+        // Try setting it anyway - the terminal component will handle errors
+        setActiveSessionId(sessionParam);
+        setInitialSessionLoaded(true);
+      }
+    }
+  }, [searchParams, initialSessionLoaded, isLoading, sessions]);
+
+  // Check share status when active session changes
+  const checkShareStatus = useCallback(async (sessionId: string) => {
     try {
-      const data = await ccresearchApi.listProjects();
-      setSavedProjects(data);
+      const status = await ccresearchApi.getShareStatus(sessionId);
+      setIsShared(status.is_shared);
+      if (status.is_shared && status.share_url) {
+        setShareUrl(status.share_url);
+        setShareToken(status.share_token || '');
+      } else {
+        setShareUrl('');
+        setShareToken('');
+      }
     } catch (error) {
-      console.error('Failed to load projects:', error);
+      console.error('Failed to check share status:', error);
+      setIsShared(false);
     }
   }, []);
 
   useEffect(() => {
-    loadProjects();
-  }, [loadProjects]);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClick = () => setShowSessionDropdown(false);
-    if (showSessionDropdown) {
-      document.addEventListener('click', handleClick);
-      return () => document.removeEventListener('click', handleClick);
+    if (activeSessionId) {
+      checkShareStatus(activeSessionId);
+    } else {
+      setIsShared(false);
+      setShareUrl('');
+      setShareToken('');
     }
+  }, [activeSessionId, checkShareStatus]);
+
+  // Create or get share link
+  const handleCreateShare = async () => {
+    if (!activeSessionId) return;
+    setIsCreatingShare(true);
+    try {
+      const result = await ccresearchApi.createShareLink(activeSessionId);
+      setShareUrl(result.share_url);
+      setShareToken(result.share_token);
+      setIsShared(true);
+      showToast({ message: 'Share link created', type: 'success' });
+    } catch (error) {
+      showToast({
+        message: error instanceof Error ? error.message : 'Failed to create share link',
+        type: 'error'
+      });
+    } finally {
+      setIsCreatingShare(false);
+    }
+  };
+
+  // Revoke share link
+  const handleRevokeShare = async () => {
+    if (!activeSessionId) return;
+    try {
+      await ccresearchApi.revokeShareLink(activeSessionId);
+      setIsShared(false);
+      setShareUrl('');
+      setShareToken('');
+      setShowShareModal(false);
+      showToast({ message: 'Share link revoked', type: 'success' });
+    } catch (error) {
+      showToast({
+        message: error instanceof Error ? error.message : 'Failed to revoke share link',
+        type: 'error'
+      });
+    }
+  };
+
+  // Copy share URL to clipboard
+  const copyShareUrl = async () => {
+    if (!shareUrl) return;
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    } catch (error) {
+      showToast({ message: 'Failed to copy to clipboard', type: 'error' });
+    }
+  };
+
+  // Close dropdown when clicking outside - with delay to prevent immediate close
+  useEffect(() => {
+    if (!showSessionDropdown) return;
+
+    // Small delay to prevent the opening click from immediately closing
+    const timeoutId = setTimeout(() => {
+      const handleClick = (e: MouseEvent) => {
+        // Check if click is inside dropdown
+        const dropdown = document.getElementById('session-dropdown');
+        if (dropdown && dropdown.contains(e.target as Node)) {
+          return; // Don't close if clicking inside dropdown
+        }
+        setShowSessionDropdown(false);
+      };
+      document.addEventListener('click', handleClick);
+      // Store handler reference for cleanup
+      (window as unknown as Record<string, (e: MouseEvent) => void>).__dropdownHandler = handleClick;
+    }, 10);
+
+    return () => {
+      clearTimeout(timeoutId);
+      const handler = (window as unknown as Record<string, (e: MouseEvent) => void>).__dropdownHandler;
+      if (handler) {
+        document.removeEventListener('click', handler);
+        delete (window as unknown as Record<string, (e: MouseEvent) => void>).__dropdownHandler;
+      }
+    };
   }, [showSessionDropdown]);
 
   // Auto-open files bar when terminal connects
@@ -599,20 +808,11 @@ export default function CCResearchPage() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [activeSessionId]);
 
-  // Validate email
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
   // Open new session modal
   const openNewSessionModal = () => {
-    // Load saved email from localStorage (auto-populate)
-    const savedEmail = localStorage.getItem('ccresearch_email');
-    setNewSessionEmail(savedEmail || '');
     setNewSessionTitle('');
     setNewSessionFiles([]);
-    setEmailError('');
+    setAccessKeyError('');
     setShowNewSessionModal(true);
   };
 
@@ -634,27 +834,24 @@ export default function CCResearchPage() {
     setNewSessionFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Create session with optional email and files
+  // Create session with user's email, optional access key, and optional files
   const createSession = async () => {
     if (!browserSessionId) return;
 
-    const hasEmail = newSessionEmail.trim().length > 0;
+    // Use logged-in user's email
+    const userEmail = user?.email;
+    if (!userEmail) {
+      showToast({ message: 'Please log in to create a session', type: 'error' });
+      return;
+    }
+
+    const hasAccessKey = newSessionAccessKey.trim().length > 0;
     const hasGithubUrl = newSessionGithubUrl.trim().length > 0;
 
-    // Email is required for access control
-    if (!hasEmail) {
-      setEmailError('Email is required for access');
-      return;
-    }
-
-    // Validate email format
-    if (!validateEmail(newSessionEmail)) {
-      setEmailError('Please enter a valid email address');
-      return;
-    }
+    // Access key is optional - if provided, grants direct terminal access
 
     setIsCreating(true);
-    setEmailError('');
+    setAccessKeyError('');
     try {
       // Terminate current session if one is active (cleanup sandbox process)
       if (activeSessionId) {
@@ -667,14 +864,18 @@ export default function CCResearchPage() {
 
       const session = await ccresearchApi.createSession(
         browserSessionId,
-        hasEmail ? newSessionEmail.trim() : undefined,
+        userEmail,
+        hasAccessKey ? newSessionAccessKey.trim() : undefined,
         newSessionTitle.trim() || undefined,
         newSessionFiles.length > 0 ? newSessionFiles : undefined
       );
 
-      // Save email to localStorage for future sessions
-      if (hasEmail) {
-        localStorage.setItem('ccresearch_email', newSessionEmail.trim());
+      // Save email to localStorage and update user email state for session filtering
+      const trimmedEmail = userEmail.toLowerCase();
+      localStorage.setItem('ccresearch_email', trimmedEmail);
+      setUserEmail(trimmedEmail);
+      if (hasAccessKey) {
+        localStorage.setItem('ccresearch_access_key', newSessionAccessKey.trim());
       }
 
       // Clone GitHub repo if URL provided
@@ -696,6 +897,9 @@ export default function CCResearchPage() {
         }
       }
 
+      // Determine session type for message
+      const sessionType = hasAccessKey ? 'Terminal' : 'Claude Code';
+
       setSessions(prev => [session, ...prev]);
       setActiveSessionId(session.id);
       setShowNewSessionModal(false);
@@ -704,12 +908,20 @@ export default function CCResearchPage() {
       setNewSessionGithubUrl('');
       setNewSessionGithubBranch('');
       showToast({
-        message: `Session created${newSessionFiles.length > 0 ? ` with ${newSessionFiles.length} file(s)` : ''}${cloneMessage}`,
+        message: `${sessionType} session created${newSessionFiles.length > 0 ? ` with ${newSessionFiles.length} file(s)` : ''}${cloneMessage}`,
         type: 'success'
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create session';
+
+      // Handle specific error codes
+      if (errorMessage === 'wrong_access_key') {
+        setAccessKeyError('Wrong access key. Try again or leave empty for Claude Code.');
+        return;
+      }
+
       showToast({
-        message: error instanceof Error ? error.message : 'Failed to create session',
+        message: errorMessage,
         type: 'error'
       });
     } finally {
@@ -735,62 +947,60 @@ export default function CCResearchPage() {
     }
   };
 
-  const saveProject = async () => {
-    if (!activeSessionId || !saveProjectName.trim()) return;
-    setIsSaving(true);
-    try {
-      await ccresearchApi.saveProject(activeSessionId, saveProjectName.trim(), saveProjectContext.trim());
-      showToast({ message: `Project "${saveProjectName}" saved to SSD`, type: 'success' });
-      setShowSaveDialog(false);
-      setSaveProjectName('');
-      setSaveProjectContext('');
-      loadProjects();
-    } catch (error) {
-      showToast({
-        message: error instanceof Error ? error.message : 'Failed to save project',
-        type: 'error'
-      });
-    } finally {
-      setIsSaving(false);
-    }
+  const startRenameSession = (sessionId: string, currentTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingSessionId(sessionId);
+    setEditingTitle(currentTitle);
   };
 
-  const restoreProject = async (projectName: string) => {
-    if (!browserSessionId) return;
-
-    // Prompt for email if not available
-    const email = prompt('Enter your email address to restore this project:');
-    if (!email || !validateEmail(email)) {
-      showToast({ message: 'Valid email is required to restore a project', type: 'error' });
+  const saveRenamedSession = async (sessionId: string, e?: React.KeyboardEvent | React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!editingTitle.trim()) {
+      setEditingSessionId(null);
       return;
     }
-
-    setIsCreating(true);
     try {
-      const session = await ccresearchApi.createFromProject(browserSessionId, email, projectName);
-      setSessions(prev => [session, ...prev]);
-      setActiveSessionId(session.id);
-      setShowSessionDropdown(false);
-      showToast({ message: `Restored project "${projectName}"`, type: 'success' });
-    } catch (error) {
-      showToast({
-        message: error instanceof Error ? error.message : 'Failed to restore project',
-        type: 'error'
-      });
-    } finally {
-      setIsCreating(false);
+      await ccresearchApi.renameSession(sessionId, editingTitle.trim());
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId ? { ...s, title: editingTitle.trim() } : s
+      ));
+      showToast({ message: 'Session renamed', type: 'success' });
+    } catch {
+      showToast({ message: 'Failed to rename session', type: 'error' });
     }
+    setEditingSessionId(null);
   };
 
-  const deleteProject = async (projectName: string, e: React.MouseEvent) => {
+  const cancelRename = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm(`Delete saved project "${projectName}"?`)) return;
+    setEditingSessionId(null);
+  };
+
+  // Submit plugin/skill request
+  const submitPluginSkillRequest = async () => {
+    const userEmail = user?.email;
+    if (!userEmail || !requestName.trim() || !requestDescription.trim() || !requestUseCase.trim()) {
+      showToast({ message: 'Please fill in all fields', type: 'error' });
+      return;
+    }
+    setIsSubmittingRequest(true);
     try {
-      await ccresearchApi.deleteProject(projectName);
-      setSavedProjects(prev => prev.filter(p => p.name !== projectName));
-      showToast({ message: 'Project deleted', type: 'success' });
+      const result = await ccresearchApi.requestPluginOrSkill(
+        userEmail,
+        requestType,
+        requestName.trim(),
+        requestDescription.trim(),
+        requestUseCase.trim()
+      );
+      showToast({ message: result.message, type: 'success' });
+      setShowRequestPluginSkillForm(false);
+      setRequestName('');
+      setRequestDescription('');
+      setRequestUseCase('');
     } catch {
-      showToast({ message: 'Failed to delete project', type: 'error' });
+      showToast({ message: 'Failed to submit request', type: 'error' });
+    } finally {
+      setIsSubmittingRequest(false);
     }
   };
 
@@ -928,6 +1138,26 @@ export default function CCResearchPage() {
               {/* Separator - hidden on very small screens */}
               <div className="w-px h-6 bg-gray-700 mx-1 sm:mx-2 hidden sm:block" />
 
+              {/* Use Cases Link */}
+              <Link
+                href="/ccresearch/use-cases"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-purple-600/20 hover:bg-purple-600/40 text-purple-300 hover:text-purple-200 rounded-lg transition-colors text-xs sm:text-sm"
+                title="Browse use cases and examples"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Use Cases</span>
+              </Link>
+
+              {/* Tips Link */}
+              <Link
+                href="/ccresearch/tips"
+                className="flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 bg-amber-600/20 hover:bg-amber-600/40 text-amber-300 hover:text-amber-200 rounded-lg transition-colors text-xs sm:text-sm"
+                title="Prompting tips and best practices"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Tips</span>
+              </Link>
+
               {/* Quick Actions */}
               <button
                 onClick={openNewSessionModal}
@@ -970,8 +1200,15 @@ export default function CCResearchPage() {
                   className="flex items-center gap-2 px-2 sm:px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors w-full"
                 >
                   <TerminalIcon className="w-4 h-4 text-gray-400" />
-                  <span className="flex-1 text-left text-sm truncate">
-                    {activeSession?.title || 'Select Session'}
+                  <span className="flex-1 text-left text-sm truncate flex items-center gap-2">
+                    {activeSession ? (
+                      <>
+                        <span className="px-1.5 py-0.5 bg-indigo-600/30 text-indigo-300 text-xs rounded font-medium">
+                          #{activeSession.session_number}
+                        </span>
+                        {activeSession.title}
+                      </>
+                    ) : 'Select Session'}
                   </span>
                   {activeSession && (
                     <div className={`w-2 h-2 rounded-full ${getStatusColor(activeSession.status)}`} />
@@ -981,122 +1218,143 @@ export default function CCResearchPage() {
 
                 {/* Session Dropdown */}
                 {showSessionDropdown && (
-                  <div className="absolute top-full left-0 mt-1 w-80 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
-                    {/* Tabs */}
-                    <div className="flex border-b border-gray-700">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setShowProjectsTab(false); }}
-                        className={`flex-1 px-3 py-2 text-sm font-medium transition-colors ${
-                          !showProjectsTab ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400 hover:text-gray-300'
-                        }`}
-                      >
-                        Sessions
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setShowProjectsTab(true); loadProjects(); }}
-                        className={`flex-1 px-3 py-2 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
-                          showProjectsTab ? 'text-green-400 border-b-2 border-green-400' : 'text-gray-400 hover:text-gray-300'
-                        }`}
-                      >
-                        <HardDrive className="w-3.5 h-3.5" />
-                        Saved
-                      </button>
-                    </div>
+                  <div id="session-dropdown" className="absolute top-full left-0 mt-1 w-80 bg-gray-900 border border-gray-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                    {/* New Session Button */}
+                    <button
+                      onClick={openNewSessionModal}
+                      disabled={isCreating}
+                      className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-800 transition-colors text-blue-400 border-b border-gray-700"
+                    >
+                      {isCreating ? (
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Plus className="w-4 h-4" />
+                      )}
+                      <span className="text-sm font-medium">New Session</span>
+                    </button>
 
-                    {!showProjectsTab ? (
-                      <>
-                        {/* New Session Button */}
-                        <button
-                          onClick={openNewSessionModal}
-                          disabled={isCreating}
-                          className="w-full flex items-center gap-2 px-3 py-2 hover:bg-gray-800 transition-colors text-blue-400 border-b border-gray-700"
-                        >
-                          {isCreating ? (
-                            <RefreshCw className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <Plus className="w-4 h-4" />
-                          )}
-                          <span className="text-sm font-medium">New Session</span>
-                        </button>
-
-                        {/* Sessions List */}
-                        <div className="max-h-64 overflow-y-auto">
-                          {isLoading ? (
-                            <div className="flex items-center justify-center py-4">
-                              <RefreshCw className="w-5 h-5 animate-spin text-gray-400" />
-                            </div>
-                          ) : sessions.length === 0 ? (
-                            <div className="py-4 text-center text-gray-500 text-sm">
-                              No sessions yet
-                            </div>
-                          ) : (
-                            sessions.map(session => (
-                              <div
-                                key={session.id}
-                                onClick={() => {
-                                  setActiveSessionId(session.id);
-                                  setShowSessionDropdown(false);
-                                }}
-                                className={`flex items-center gap-3 px-3 py-2 hover:bg-gray-800 cursor-pointer transition-colors ${
-                                  activeSessionId === session.id ? 'bg-gray-800' : ''
-                                }`}
-                              >
-                                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusColor(session.status)}`} />
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-sm truncate">{session.title}</div>
-                                  <div className="text-xs text-gray-500 flex items-center gap-2">
-                                    <span>{formatTimeAgo(session.created_at)}</span>
-                                    <span>•</span>
-                                    <span>Expires: {getExpiresIn(session.expires_at)}</span>
-                                  </div>
-                                </div>
-                                <button
-                                  onClick={(e) => deleteSession(session.id, e)}
-                                  className="p-1 hover:bg-red-900/50 rounded transition-colors flex-shrink-0"
-                                  title="Delete session"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                                </button>
-                              </div>
-                            ))
-                          )}
+                    {/* Sessions List with Date Grouping */}
+                    <div className="max-h-80 overflow-y-auto">
+                      {isLoading ? (
+                        <div className="flex items-center justify-center py-4">
+                          <RefreshCw className="w-5 h-5 animate-spin text-gray-400" />
                         </div>
-                      </>
-                    ) : (
-                      /* Saved Projects List */
-                      <div className="max-h-64 overflow-y-auto">
-                        {savedProjects.length === 0 ? (
-                          <div className="py-6 text-center text-gray-500 text-sm">
-                            <HardDrive className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                            <p>No saved projects</p>
-                            <p className="text-xs mt-1">Save a session to persist it on SSD</p>
-                          </div>
-                        ) : (
-                          savedProjects.map(project => (
-                            <div
-                              key={project.name}
-                              onClick={() => restoreProject(project.name)}
-                              className="flex items-center gap-3 px-3 py-2 hover:bg-gray-800 cursor-pointer transition-colors"
-                            >
-                              <FolderOpen className="w-4 h-4 text-green-400 flex-shrink-0" />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm truncate">{project.name}</div>
-                                <div className="text-xs text-gray-500">
-                                  Saved {formatTimeAgo(project.saved_at)}
-                                </div>
+                      ) : sessions.length === 0 ? (
+                        <div className="py-4 text-center text-gray-500 text-sm">
+                          No sessions yet
+                        </div>
+                      ) : (
+                        (() => {
+                          // Group sessions by date
+                          const grouped: Record<string, typeof sessions> = {};
+                          sessions.forEach(session => {
+                            const date = new Date(session.created_at);
+                            const today = new Date();
+                            const yesterday = new Date(today);
+                            yesterday.setDate(yesterday.getDate() - 1);
+
+                            let label: string;
+                            if (date.toDateString() === today.toDateString()) {
+                              label = 'Today';
+                            } else if (date.toDateString() === yesterday.toDateString()) {
+                              label = 'Yesterday';
+                            } else if (date > new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)) {
+                              label = 'This Week';
+                            } else {
+                              label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            }
+
+                            if (!grouped[label]) grouped[label] = [];
+                            grouped[label].push(session);
+                          });
+
+                          return Object.entries(grouped).map(([dateLabel, dateSessions]) => (
+                            <div key={dateLabel}>
+                              <div className="px-3 py-1.5 text-xs font-medium text-gray-500 bg-gray-800/50 sticky top-0">
+                                {dateLabel}
                               </div>
-                              <button
-                                onClick={(e) => deleteProject(project.name, e)}
-                                className="p-1 hover:bg-red-900/50 rounded transition-colors flex-shrink-0"
-                                title="Delete project"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-red-400" />
-                              </button>
+                              {dateSessions.map(session => (
+                                <div
+                                  key={session.id}
+                                  onClick={() => {
+                                    if (editingSessionId !== session.id) {
+                                      setActiveSessionId(session.id);
+                                      setShowSessionDropdown(false);
+                                    }
+                                  }}
+                                  className={`group flex items-center gap-3 px-3 py-2 hover:bg-gray-800 cursor-pointer transition-colors ${
+                                    activeSessionId === session.id ? 'bg-gray-800' : ''
+                                  }`}
+                                >
+                                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusColor(session.status)}`} />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="text-sm truncate flex items-center gap-2">
+                                      <span className="px-1.5 py-0.5 bg-indigo-600/30 text-indigo-300 text-xs rounded font-medium">
+                                        #{session.session_number}
+                                      </span>
+                                      {editingSessionId === session.id ? (
+                                        <input
+                                          type="text"
+                                          value={editingTitle}
+                                          onChange={(e) => setEditingTitle(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') saveRenamedSession(session.id, e);
+                                            if (e.key === 'Escape') setEditingSessionId(null);
+                                          }}
+                                          onClick={(e) => e.stopPropagation()}
+                                          autoFocus
+                                          className="flex-1 px-1 py-0.5 bg-gray-700 border border-blue-500 rounded text-white text-sm focus:outline-none"
+                                        />
+                                      ) : (
+                                        <span className="truncate">{session.title}</span>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-gray-500">
+                                      {formatTimeAgo(session.created_at)}
+                                    </div>
+                                  </div>
+                                  {editingSessionId === session.id ? (
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={(e) => saveRenamedSession(session.id, e)}
+                                        className="p-1 hover:bg-green-900/50 rounded transition-colors flex-shrink-0"
+                                        title="Save"
+                                      >
+                                        <Check className="w-3.5 h-3.5 text-green-400" />
+                                      </button>
+                                      <button
+                                        onClick={cancelRename}
+                                        className="p-1 hover:bg-gray-700 rounded transition-colors flex-shrink-0"
+                                        title="Cancel"
+                                      >
+                                        <X className="w-3.5 h-3.5 text-gray-400" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={(e) => startRenameSession(session.id, session.title, e)}
+                                        className="p-1 hover:bg-gray-700 rounded transition-colors flex-shrink-0 opacity-0 group-hover:opacity-100"
+                                        title="Rename session"
+                                      >
+                                        <Pencil className="w-3 h-3 text-gray-400" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => deleteSession(session.id, e)}
+                                        className="p-1 hover:bg-red-900/50 rounded transition-colors flex-shrink-0"
+                                        title="Delete session"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 text-red-400" />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                          ))
-                        )}
-                      </div>
-                    )}
+                          ));
+                        })()
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1111,17 +1369,6 @@ export default function CCResearchPage() {
                     <span className="hidden md:inline">{terminalConnected ? 'Connected' : 'Disconnected'}</span>
                   </div>
                   <div className="w-px h-4 bg-gray-700 hidden sm:block" />
-                  <button
-                    onClick={() => {
-                      setSaveProjectName(activeSession.title);
-                      setShowSaveDialog(true);
-                    }}
-                    className="flex items-center gap-1 sm:gap-1.5 p-1.5 sm:px-2 sm:py-1 text-xs hover:bg-gray-700/50 rounded transition-colors text-gray-400 hover:text-green-400"
-                    title="Save project to SSD"
-                  >
-                    <Save className="w-3.5 h-3.5" />
-                    <span className="hidden md:inline">Save</span>
-                  </button>
                   <button
                     onClick={() => ccresearchApi.downloadWorkspaceZip(activeSessionId!)}
                     className="flex items-center gap-1 sm:gap-1.5 p-1.5 sm:px-2 sm:py-1 text-xs hover:bg-gray-700/50 rounded transition-colors text-gray-400 hover:text-blue-400"
@@ -1143,6 +1390,16 @@ export default function CCResearchPage() {
                       <PanelRightOpen className="w-3.5 h-3.5" />
                     )}
                     <span className="hidden md:inline">Files</span>
+                  </button>
+                  <button
+                    onClick={() => setShowShareModal(true)}
+                    className={`flex items-center gap-1 sm:gap-1.5 p-1.5 sm:px-2 sm:py-1 text-xs rounded transition-colors ${
+                      isShared ? 'bg-emerald-600 text-white' : 'hover:bg-gray-700/50 text-gray-400 hover:text-emerald-400'
+                    }`}
+                    title={isShared ? 'Session is shared - click to manage' : 'Share this session'}
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span className="hidden md:inline">{isShared ? 'Shared' : 'Share'}</span>
                   </button>
                 </>
               )}
@@ -1169,7 +1426,12 @@ export default function CCResearchPage() {
                     <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
                     <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
                   </div>
-                  <span className="text-xs text-gray-500 ml-2">
+                  <span className="text-xs text-gray-500 ml-2 flex items-center gap-2">
+                    {activeSession && (
+                      <span className="px-1.5 py-0.5 bg-indigo-600/30 text-indigo-300 text-xs rounded font-medium">
+                        #{activeSession.session_number}
+                      </span>
+                    )}
                     {activeSession?.title}
                   </span>
                 </div>
@@ -1250,7 +1512,7 @@ export default function CCResearchPage() {
         ) : (
           /* Landing Page - Responsive Layout */
           <div className="flex-1 flex flex-col lg:flex-row bg-gray-950 overflow-hidden">
-            {/* Left Column - Hero, Quick Start, Video */}
+            {/* Left Column - Hero, Features, Video */}
             <div className="w-full lg:w-1/2 h-auto lg:h-full overflow-y-auto border-b lg:border-b-0 lg:border-r border-gray-800 p-4 sm:p-6">
               {/* Hero Section */}
               <div className="mb-4 sm:mb-6">
@@ -1298,30 +1560,68 @@ export default function CCResearchPage() {
                 </div>
               </div>
 
-              {/* Getting Started */}
-              <div className="bg-gray-900/50 border border-gray-800 rounded-xl p-4 mb-6">
-                <h3 className="text-sm font-semibold text-gray-200 mb-3 flex items-center gap-2">
-                  <span>📋</span> Quick Start Guide
-                </h3>
-                <ol className="space-y-2 text-xs text-gray-400">
-                  <li className="flex gap-2">
-                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600/20 text-blue-400 text-[10px] flex items-center justify-center font-bold">1</span>
-                    <span><strong className="text-gray-300">Theme:</strong> Press Enter for default</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600/20 text-blue-400 text-[10px] flex items-center justify-center font-bold">2</span>
-                    <span><strong className="text-gray-300">Auth:</strong> Click login URL or paste code</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-600/20 text-blue-400 text-[10px] flex items-center justify-center font-bold">3</span>
-                    <span><strong className="text-gray-300">Setup:</strong> Press Enter through prompts</span>
-                  </li>
-                  <li className="flex gap-2">
-                    <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-600/20 text-green-400 text-[10px] flex items-center justify-center font-bold">4</span>
-                    <span><strong className="text-gray-300">Research:</strong> Ask Claude anything!</span>
-                  </li>
-                </ol>
-              </div>
+              {/* Use Cases Link */}
+              <Link
+                href="/ccresearch/use-cases"
+                className="block mb-4 p-4 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-xl hover:border-purple-500/50 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-500/20 rounded-lg group-hover:bg-purple-500/30 transition-colors">
+                    <BookOpen className="w-5 h-5 text-purple-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-white group-hover:text-purple-300 transition-colors">
+                      Browse Use Cases & Examples
+                    </h3>
+                    <p className="text-xs text-gray-400">
+                      40+ example prompts for scientific databases, ML, drug discovery, and more
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-purple-400 transition-colors" />
+                </div>
+              </Link>
+
+              {/* Tips Link */}
+              <Link
+                href="/ccresearch/tips"
+                className="block mb-4 p-4 bg-gradient-to-r from-amber-900/30 to-orange-900/30 border border-amber-500/30 rounded-xl hover:border-amber-500/50 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-amber-500/20 rounded-lg group-hover:bg-amber-500/30 transition-colors">
+                    <Sparkles className="w-5 h-5 text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-white group-hover:text-amber-300 transition-colors">
+                      Tips Before Using
+                    </h3>
+                    <p className="text-xs text-gray-400">
+                      Learn how Claude Code works, prompting best practices, and how to use skills & MCP
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-amber-400 transition-colors" />
+                </div>
+              </Link>
+
+              {/* Request Plugin/Skill Button */}
+              <button
+                onClick={() => setShowRequestPluginSkillForm(true)}
+                className="block w-full mb-6 p-4 bg-gradient-to-r from-emerald-900/30 to-teal-900/30 border border-emerald-500/30 rounded-xl hover:border-emerald-500/50 transition-all group text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-500/20 rounded-lg group-hover:bg-emerald-500/30 transition-colors">
+                    <Plug className="w-5 h-5 text-emerald-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-white group-hover:text-emerald-300 transition-colors">
+                      Request a Plugin or Skill
+                    </h3>
+                    <p className="text-xs text-gray-400">
+                      Suggest new capabilities - paste a link or describe what you need
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-500 group-hover:text-emerald-400 transition-colors" />
+                </div>
+              </button>
 
               {/* Video: Learn About Claude, MCP & Skills */}
               <div>
@@ -1695,7 +1995,7 @@ export default function CCResearchPage() {
 
               {/* Total Skills Summary */}
               <div className="mt-4 p-3 bg-gradient-to-r from-blue-900/20 to-purple-900/20 rounded-xl border border-blue-700/30 text-center">
-                <p className="text-2xl font-bold text-white">{capabilities?.scientific_skills.total || 140}+</p>
+                <p className="text-2xl font-bold text-white">{capabilities?.scientific_skills.total || 145}+</p>
                 <p className="text-xs text-gray-400">Scientific Skills Ready</p>
               </div>
             </div>
@@ -1713,73 +2013,6 @@ export default function CCResearchPage() {
           </div>
         </div>
       </div>
-
-      {/* Save Project Dialog - Responsive */}
-      {showSaveDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 w-full max-w-[500px] shadow-2xl">
-            <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4 flex items-center gap-2">
-              <HardDrive className="w-4 h-4 sm:w-5 sm:h-5 text-green-400" />
-              Save Project to SSD
-            </h3>
-            <p className="text-xs sm:text-sm text-gray-400 mb-3 sm:mb-4">
-              Save this session as a permanent project. Add context below so Claude knows what you were working on when you restore later.
-            </p>
-            <input
-              type="text"
-              value={saveProjectName}
-              onChange={(e) => setSaveProjectName(e.target.value)}
-              placeholder="Project name"
-              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500 mb-3"
-              autoFocus
-            />
-            <div className="mb-4">
-              <label className="block text-sm text-gray-400 mb-2">
-                Session Context <span className="text-yellow-500">(paste this in Claude Code before saving)</span>
-              </label>
-              <textarea
-                value={saveProjectContext}
-                onChange={(e) => setSaveProjectContext(e.target.value)}
-                placeholder="Describe what you were working on, your goals, current progress, and next steps...
-
-Example:
-- Goal: Analyzing CRISPR gene therapy papers for cancer treatment
-- Progress: Found 15 relevant papers, extracted key findings
-- Next steps: Compare efficacy data across studies, create summary table
-- Notes: Focus on CAR-T cell therapy approaches"
-                className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-green-500 h-40 resize-none text-sm"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                This context will be added to CLAUDE.md so Claude can resume your work seamlessly.
-              </p>
-            </div>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => {
-                  setShowSaveDialog(false);
-                  setSaveProjectName('');
-                  setSaveProjectContext('');
-                }}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveProject}
-                disabled={!saveProjectName.trim() || isSaving}
-                className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors flex items-center gap-2"
-              >
-                {isSaving ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                Save Project
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* New Session Modal with Email and File Upload - Responsive */}
       {showNewSessionModal && (
@@ -1804,20 +2037,30 @@ Example:
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {/* Left Column - Required Fields */}
                 <div className="space-y-3">
-                  {/* Email (required for access control) */}
+                  {/* User Email (from login) */}
                   <div>
                     <label className="block text-xs font-medium text-gray-300 mb-1">
-                      Email <span className="text-red-400">*</span>
+                      Logged in as
+                    </label>
+                    <div className="w-full px-3 py-2 text-sm bg-gray-800/50 border border-gray-700 rounded-lg text-gray-300">
+                      {user?.email || 'Not logged in'}
+                    </div>
+                  </div>
+
+                  {/* Access Key (optional - for direct terminal access) */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-300 mb-1">
+                      Access Key <span className="text-gray-500">(optional)</span>
                     </label>
                     <input
-                      type="email"
-                      value={newSessionEmail}
-                      onChange={(e) => { setNewSessionEmail(e.target.value); setEmailError(''); }}
-                      placeholder="your@email.com"
-                      required
-                      className={`w-full px-3 py-2 text-sm bg-gray-800 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${emailError ? 'border-red-500' : 'border-gray-700'}`}
+                      type="password"
+                      value={newSessionAccessKey}
+                      onChange={(e) => { setNewSessionAccessKey(e.target.value); setAccessKeyError(''); }}
+                      placeholder="Leave empty for Claude Code"
+                      className={`w-full px-3 py-2 text-sm bg-gray-800 border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${accessKeyError ? 'border-red-500' : 'border-gray-700'}`}
                     />
-                    {emailError && <p className="text-xs text-red-400 mt-1">{emailError}</p>}
+                    {accessKeyError && <p className="text-xs text-red-400 mt-1">{accessKeyError}</p>}
+                    <p className="text-[10px] text-gray-500 mt-1">With key = Direct Pi terminal • Without = Claude Code</p>
                   </div>
 
                   {/* Session Title */}
@@ -1837,7 +2080,7 @@ Example:
                     <p className="text-blue-300 flex items-center gap-1">
                       <Sparkles className="w-3.5 h-3.5" /> Claude Code Research Platform
                     </p>
-                    <p className="text-gray-400 mt-1">Full access to 140+ skills, 12 plugins, and 9 MCP servers.</p>
+                    <p className="text-gray-400 mt-1">Full access to 145+ skills, 14 plugins, and 26 MCP servers.</p>
                   </div>
 
                   {/* GitHub Repo - Compact */}
@@ -1956,6 +2199,7 @@ Example:
                   </div>
                 </div>
               </div>
+
             </div>
 
             {/* Footer - Always visible */}
@@ -1981,6 +2225,269 @@ Example:
           </div>
         </div>
       )}
+
+      {/* Request Plugin/Skill Modal */}
+      {showRequestPluginSkillForm && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-md">
+            {/* Header */}
+            <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Plug className="w-5 h-5 text-emerald-400" />
+                Request Plugin/Skill
+              </h2>
+              <button
+                onClick={() => setShowRequestPluginSkillForm(false)}
+                className="p-1 text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 space-y-4">
+              {/* Request Type */}
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-2">Request Type</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setRequestType('skill')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      requestType === 'skill' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    }`}
+                  >
+                    Skill
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRequestType('plugin')}
+                    className={`flex-1 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      requestType === 'plugin' ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                    }`}
+                  >
+                    Plugin
+                  </button>
+                </div>
+              </div>
+
+              {/* Logged in as */}
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Logged in as</label>
+                <div className="w-full px-3 py-2 text-sm bg-gray-800/50 border border-gray-700 rounded-lg text-gray-300">
+                  {user?.email || 'Not logged in'}
+                </div>
+              </div>
+
+              {/* Name */}
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">{requestType === 'skill' ? 'Skill' : 'Plugin'} Name</label>
+                <input
+                  type="text"
+                  value={requestName}
+                  onChange={(e) => setRequestName(e.target.value)}
+                  placeholder={`e.g., ${requestType === 'skill' ? 'clinical-trials-search' : 'deep-learning-skills'}`}
+                  className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Description or Link</label>
+                <textarea
+                  value={requestDescription}
+                  onChange={(e) => setRequestDescription(e.target.value)}
+                  placeholder="Describe what it does, or paste a link to the plugin/skill (GitHub, npm, etc.)"
+                  rows={3}
+                  className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                />
+                <p className="mt-1 text-xs text-gray-500">You can paste a GitHub URL, npm package link, or describe the functionality</p>
+              </div>
+
+              {/* Use Case */}
+              <div>
+                <label className="block text-xs font-medium text-gray-300 mb-1">Your Use Case</label>
+                <textarea
+                  value={requestUseCase}
+                  onChange={(e) => setRequestUseCase(e.target.value)}
+                  placeholder="How would you use this in your research?"
+                  rows={2}
+                  className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-800 flex justify-end gap-2">
+              <button
+                onClick={() => setShowRequestPluginSkillForm(false)}
+                className="px-3 py-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitPluginSkillRequest}
+                disabled={isSubmittingRequest}
+                className="px-4 py-1.5 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors flex items-center gap-1.5"
+              >
+                {isSubmittingRequest ? (
+                  <><RefreshCw className="w-4 h-4 animate-spin" /> Submitting...</>
+                ) : (
+                  <>Submit Request</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Session Modal */}
+      {showShareModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-xl w-full max-w-md">
+            {/* Header */}
+            <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Share2 className="w-5 h-5 text-emerald-400" />
+                Share Session
+              </h2>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="p-1 text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-4 space-y-4">
+              {isShared ? (
+                <>
+                  {/* Already shared - show link */}
+                  <div className="bg-emerald-900/20 border border-emerald-800 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-emerald-400 text-sm mb-2">
+                      <Link2 className="w-4 h-4" />
+                      <span className="font-medium">Session is shared</span>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      Anyone with this link can view your session files (read-only).
+                    </p>
+                  </div>
+
+                  {/* Share URL */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-300 mb-2">Share Link</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={shareUrl}
+                        readOnly
+                        className="flex-1 px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white font-mono"
+                      />
+                      <button
+                        onClick={copyShareUrl}
+                        className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors"
+                        title="Copy to clipboard"
+                      >
+                        {shareCopied ? (
+                          <Check className="w-4 h-4 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-gray-400" />
+                        )}
+                      </button>
+                      <a
+                        href={shareUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-lg transition-colors"
+                        title="Open in new tab"
+                      >
+                        <ExternalLink className="w-4 h-4 text-gray-400" />
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Revoke option */}
+                  <div className="pt-2 border-t border-gray-800">
+                    <button
+                      onClick={handleRevokeShare}
+                      className="w-full px-4 py-2 text-sm bg-red-900/30 hover:bg-red-900/50 text-red-400 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <X className="w-4 h-4" />
+                      Revoke Share Link
+                    </button>
+                    <p className="text-xs text-gray-500 text-center mt-2">
+                      This will disable the share link permanently.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Not shared yet */}
+                  <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 text-center">
+                    <Share2 className="w-10 h-10 text-gray-500 mx-auto mb-3" />
+                    <h3 className="text-white font-medium mb-2">Share this session</h3>
+                    <p className="text-sm text-gray-400 mb-4">
+                      Create a public link to share your research session. Others will be able to view files and terminal output (read-only).
+                    </p>
+                    <button
+                      onClick={handleCreateShare}
+                      disabled={isCreatingShare}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors flex items-center justify-center gap-2 mx-auto"
+                    >
+                      {isCreatingShare ? (
+                        <><RefreshCw className="w-4 h-4 animate-spin" /> Creating...</>
+                      ) : (
+                        <><Link2 className="w-4 h-4" /> Create Share Link</>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Info */}
+                  <div className="text-xs text-gray-500 space-y-1">
+                    <p>• Share link gives read-only access to files</p>
+                    <p>• You can revoke the link at any time</p>
+                    <p>• Terminal output/log is also visible</p>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-gray-800 flex justify-end">
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="px-4 py-1.5 text-sm bg-gray-800 hover:bg-gray-700 text-white rounded-lg transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// Loading fallback component
+function CCResearchLoading() {
+  return (
+    <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="text-center">
+        <RefreshCw className="w-8 h-8 text-blue-500 mx-auto mb-4 animate-spin" />
+        <p className="text-gray-400">Loading CCResearch...</p>
+      </div>
+    </div>
+  );
+}
+
+// Default export with ProtectedRoute and Suspense boundary
+export default function CCResearchPage() {
+  return (
+    <ProtectedRoute>
+      <Suspense fallback={<CCResearchLoading />}>
+        <CCResearchPageContent />
+      </Suspense>
+    </ProtectedRoute>
   );
 }

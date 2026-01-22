@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     DATA_BASE_DIR: str = "/data"
     MERMAID_DATA_DIR: str = "/data/mermaid-projects"
     CLAUDE_WORKSPACES_DIR: str = "/data/claude-workspaces"
+    WORKSPACE_DATA_DIR: str = "/data/workspace"
+
+    # Per-user data storage (auth system)
+    USER_DATA_BASE_DIR: str = "/data/users"
+    WORKSPACE_PROJECTS_DIR: str = "/data/workspace"  # Legacy global workspace
 
     # CCResearch (Claude Code Research Platform) Settings
     CCRESEARCH_DATA_DIR: str = "/data/ccresearch-projects"
@@ -54,6 +59,24 @@ class Settings(BaseSettings):
     MEDRESEARCH_DATA_DIR: str = "/data/ccresearch-projects"
     MEDRESEARCH_LOGS_DIR: str = "/data/ccresearch-logs"
     MEDRESEARCH_SANDBOX_ENABLED: bool = True
+
+    # AACT Clinical Trials Database (optional - for CCResearch)
+    AACT_DB_HOST: Optional[str] = None
+    AACT_DB_PORT: Optional[str] = None
+    AACT_DB_NAME: Optional[str] = None
+    AACT_DB_USER: Optional[str] = None
+    AACT_DB_PASSWORD: Optional[str] = None
+    AACT_DB_URL: Optional[str] = None
+
+    # Notifications (optional - for admin alerts on signups/requests)
+    # Discord: Create a webhook at Server Settings > Integrations > Webhooks
+    DISCORD_WEBHOOK_URL: Optional[str] = None
+    # Ntfy.sh: Use any topic name, e.g., "https://ntfy.sh/my-blestlabs-alerts"
+    NTFY_TOPIC_URL: Optional[str] = None
+
+    # Admin account (created on first startup)
+    ADMIN_EMAIL: str = "ace.tech.gg@gmail.com"
+    ADMIN_PASSWORD: Optional[str] = None  # Set in .env, never hardcode!
 
     class Config:
         env_file = ".env"

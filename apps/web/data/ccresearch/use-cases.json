@@ -1,0 +1,609 @@
+{
+  "lastUpdated": "2026-01-20",
+  "categories": [
+    {
+      "id": "scientific-databases",
+      "title": "Scientific Databases",
+      "icon": "Database",
+      "iconColor": "blue",
+      "description": "Query PubMed, UniProt, ChEMBL, PDB, bioRxiv, and 20+ scientific databases",
+      "examples": [
+        {
+          "id": "pubmed-search",
+          "title": "PubMed Literature Search",
+          "description": "Search biomedical literature with advanced filters",
+          "prompt": "Search PubMed for recent papers on CRISPR-Cas9 gene editing in cancer therapy from 2024-2025. Summarize the top 5 most cited papers.",
+          "tags": ["literature", "biomedical"],
+          "mcp": "pubmed",
+          "verified": true
+        },
+        {
+          "id": "biorxiv-preprints",
+          "title": "bioRxiv Preprint Search",
+          "description": "Search preprints before peer review",
+          "prompt": "Search bioRxiv for recent preprints on single-cell RNA sequencing in neurodegenerative diseases. Get the top 5 with their abstracts.",
+          "tags": ["preprints", "neuroscience"],
+          "mcp": "biorxiv",
+          "verified": true,
+          "output": "Found 127 preprints matching criteria:\n\n1. DOI: 10.1101/2025.12.15.123456\n   Title: Single-cell atlas of Alzheimer's disease progression\n   Authors: Smith et al.\n   Posted: 2025-12-15\n   Category: Neuroscience\n\n2. DOI: 10.1101/2025.11.28.654321\n   Title: scRNA-seq reveals microglial heterogeneity in Parkinson's\n   ..."
+        },
+        {
+          "id": "uniprot-protein",
+          "title": "UniProt Protein Information",
+          "description": "Retrieve protein sequences and annotations",
+          "prompt": "Look up the human TP53 protein in UniProt. Get its sequence, function, and known disease associations.",
+          "tags": ["protein", "annotation"],
+          "skill": "uniprot-database",
+          "verified": true
+        },
+        {
+          "id": "chembl-compound",
+          "title": "ChEMBL Drug Data",
+          "description": "Query bioactive compounds and drug data",
+          "prompt": "Search ChEMBL for compounds that inhibit EGFR with IC50 < 100nM. List their structures and bioactivity data.",
+          "tags": ["drug-discovery", "bioactivity"],
+          "mcp": "chembl",
+          "verified": true,
+          "output": "Found 847 compounds with EGFR IC50 < 100nM:\n\nTop results by potency:\n1. CHEMBL553 (Gefitinib) - IC50: 2.1nM\n   SMILES: COc1cc2ncnc(Nc3ccc(F)c(Cl)c3)c2cc1OCCCN4CCOCC4\n   Mechanism: EGFR tyrosine kinase inhibitor\n\n2. CHEMBL554 (Erlotinib) - IC50: 0.8nM\n   ..."
+        },
+        {
+          "id": "pdb-structure",
+          "title": "PDB Structure Lookup",
+          "description": "Find 3D protein structures",
+          "prompt": "Find the crystal structure of human insulin receptor (INSR) in PDB. What is the resolution and binding site information?",
+          "tags": ["structure", "3D"],
+          "skill": "pdb-database"
+        },
+        {
+          "id": "clinical-trials-api",
+          "title": "ClinicalTrials.gov API Search",
+          "description": "Search trials via official API",
+          "prompt": "Search ClinicalTrials.gov for Phase 3 breast cancer immunotherapy trials currently recruiting in the US. Show enrollment and endpoints.",
+          "tags": ["clinical", "trials", "immunotherapy"],
+          "mcp": "clinical-trials",
+          "verified": true,
+          "output": "Found 42 Phase 3 breast cancer immunotherapy trials:\n\n1. NCT04191135 - Pembrolizumab + Chemotherapy\n   Status: RECRUITING | Phase: 3\n   Enrollment: 1,200 patients\n   Primary Endpoint: Pathological complete response\n   Locations: 85 sites in US\n\n2. NCT05382286 - Atezolizumab + T-DXd\n   ..."
+        },
+        {
+          "id": "aact-sql-query",
+          "title": "AACT Database SQL Query",
+          "description": "Query 566K+ clinical trials with SQL",
+          "prompt": "Query AACT database: find all Phase 3 oncology trials sponsored by Pfizer in the last 5 years. Show their primary outcomes and completion rates.",
+          "tags": ["SQL", "clinical-trials"],
+          "mcp": "aact",
+          "verified": true,
+          "output": "Query executed on AACT (566,234 studies):\n\n| nct_id | brief_title | phase | start_date | overall_status |\n|--------|-------------|-------|------------|----------------|\n| NCT04379596 | Pembrolizumab vs Chemo | Phase 3 | 2020-05 | Completed |\n| NCT04191135 | Palbociclib Combo | Phase 3 | 2021-02 | Recruiting |\n..."
+        },
+        {
+          "id": "scholar-semantic",
+          "title": "Semantic Literature Search",
+          "description": "AI-powered academic search",
+          "prompt": "Use semantic search to find papers about 'machine learning approaches for drug-target interaction prediction'. Rank by relevance.",
+          "tags": ["semantic", "AI", "literature"],
+          "mcp": "scholar-gateway"
+        }
+      ]
+    },
+    {
+      "id": "medical-clinical",
+      "title": "Medical & Clinical Tools",
+      "icon": "Stethoscope",
+      "iconColor": "red",
+      "description": "ICD-10 codes, NPI lookup, Medicare coverage, and clinical data",
+      "examples": [
+        {
+          "id": "icd10-lookup",
+          "title": "ICD-10 Code Lookup",
+          "description": "Look up diagnosis and procedure codes",
+          "prompt": "Look up ICD-10 codes for Type 2 Diabetes with complications. Show the hierarchy from E11 and list all specific complication codes.",
+          "tags": ["ICD-10", "diagnosis", "coding"],
+          "mcp": "icd-10-codes",
+          "verified": true,
+          "output": "ICD-10-CM Code: E11 - Type 2 diabetes mellitus\n\nHierarchy:\nE11.0 - Type 2 DM with hyperosmolarity\nE11.1 - Type 2 DM with ketoacidosis\nE11.2 - Type 2 DM with kidney complications\n  E11.21 - with diabetic nephropathy\n  E11.22 - with diabetic CKD\nE11.3 - Type 2 DM with ophthalmic complications\n  E11.31 - with diabetic retinopathy\n  E11.32 - with diabetic macular edema\n..."
+        },
+        {
+          "id": "icd10-search",
+          "title": "ICD-10 Code Search",
+          "description": "Search codes by description",
+          "prompt": "Search ICD-10 for all codes related to 'acute myocardial infarction'. Show codes, descriptions, and which are billable.",
+          "tags": ["ICD-10", "search", "cardiology"],
+          "mcp": "icd-10-codes",
+          "verified": true
+        },
+        {
+          "id": "npi-lookup",
+          "title": "NPI Provider Lookup",
+          "description": "Validate and look up healthcare providers",
+          "prompt": "Look up NPI 1234567890. Verify it's valid and show the provider's name, specialty, practice location, and credentials.",
+          "tags": ["NPI", "provider", "verification"],
+          "mcp": "npi-registry",
+          "verified": true,
+          "output": "NPI Validation: VALID (Luhn check passed)\n\nProvider Details:\nNPI: 1234567890\nType: Individual (NPI-1)\nName: John Smith, MD\nCredential: MD, FACC\nSpecialty: Cardiovascular Disease\nAddress: 123 Medical Center Dr, Boston, MA 02115\nPhone: (617) 555-0123\nLicense: MA-12345 (Active)"
+        },
+        {
+          "id": "npi-search",
+          "title": "NPI Provider Search",
+          "description": "Find providers by name, specialty, location",
+          "prompt": "Search for cardiologists in Boston, MA. Show their NPIs, practice addresses, and subspecialties.",
+          "tags": ["NPI", "search", "cardiology"],
+          "mcp": "npi-registry"
+        },
+        {
+          "id": "cms-ncd-search",
+          "title": "Medicare NCD Coverage Search",
+          "description": "Search National Coverage Determinations",
+          "prompt": "Search Medicare NCDs for coverage of continuous glucose monitoring (CGM) devices. What are the coverage criteria?",
+          "tags": ["Medicare", "coverage", "NCD"],
+          "mcp": "cms-coverage",
+          "verified": true,
+          "output": "NCD 40.2 - Continuous Glucose Monitoring (CGM)\n\nCoverage Status: COVERED with conditions\n\nCriteria:\n1. Patient has diabetes mellitus\n2. Patient is insulin-treated\n3. Patient performs 4+ finger-stick tests/day\n4. Ordered by treating physician\n\nCovered Devices:\n- Dexcom G6/G7\n- Abbott FreeStyle Libre 2/3\n- Medtronic Guardian Connect"
+        },
+        {
+          "id": "cms-lcd-search",
+          "title": "Medicare LCD Search",
+          "description": "Search Local Coverage Determinations",
+          "prompt": "Search for LCDs covering molecular diagnostic testing for oncology in California. What MAC handles this region?",
+          "tags": ["Medicare", "LCD", "oncology"],
+          "mcp": "cms-coverage"
+        }
+      ]
+    },
+    {
+      "id": "bioinformatics",
+      "title": "Bioinformatics & Genomics",
+      "icon": "Dna",
+      "iconColor": "green",
+      "description": "Sequence analysis, genomics, and computational biology tools",
+      "examples": [
+        {
+          "id": "biopython-sequence",
+          "title": "Sequence Analysis with BioPython",
+          "description": "Analyze DNA/protein sequences",
+          "prompt": "Use BioPython to analyze this DNA sequence: ATGCGATCGATCGATCGATCG. Calculate GC content, translate to protein, and find restriction sites.",
+          "tags": ["sequence", "DNA"],
+          "skill": "biopython"
+        },
+        {
+          "id": "blast-search",
+          "title": "BLAST Sequence Search",
+          "description": "Find similar sequences in databases",
+          "prompt": "Run a BLAST search for this protein sequence against the nr database: MVLSPADKTNVKAAWGKVGAHAGEYGAEALERMFLSFPTTKTYFPHFDLSH",
+          "tags": ["BLAST", "homology"],
+          "skill": "biopython"
+        },
+        {
+          "id": "scanpy-scrna",
+          "title": "Single-Cell RNA-seq Analysis",
+          "description": "Analyze single-cell transcriptomics data",
+          "prompt": "Load a single-cell RNA-seq dataset and perform standard preprocessing: quality control, normalization, highly variable genes, PCA, and UMAP clustering.",
+          "tags": ["scRNA-seq", "clustering"],
+          "skill": "scanpy"
+        },
+        {
+          "id": "alphafold-structure",
+          "title": "AlphaFold Structure Prediction",
+          "description": "Get AI-predicted protein structures",
+          "prompt": "Retrieve the AlphaFold predicted structure for human BRCA1 protein. What is the confidence score and domain organization?",
+          "tags": ["structure", "AI"],
+          "skill": "alphafold-database"
+        }
+      ]
+    },
+    {
+      "id": "drug-discovery",
+      "title": "Drug Discovery & Chemistry",
+      "icon": "Pill",
+      "iconColor": "pink",
+      "description": "Cheminformatics, molecular modeling, and drug design tools",
+      "examples": [
+        {
+          "id": "rdkit-molecule",
+          "title": "Molecular Analysis with RDKit",
+          "description": "Calculate molecular properties and descriptors",
+          "prompt": "Use RDKit to analyze aspirin (CC(=O)OC1=CC=CC=C1C(=O)O). Calculate molecular weight, LogP, H-bond donors/acceptors, and check Lipinski's Rule of Five.",
+          "tags": ["cheminformatics", "properties"],
+          "skill": "rdkit"
+        },
+        {
+          "id": "chembl-mechanism",
+          "title": "Drug Mechanism Lookup",
+          "description": "Get drug mechanism of action",
+          "prompt": "Use ChEMBL to look up the mechanism of action for Imatinib. What targets does it inhibit and what are the binding affinities?",
+          "tags": ["mechanism", "kinase"],
+          "mcp": "chembl",
+          "verified": true
+        },
+        {
+          "id": "chembl-admet",
+          "title": "ADMET Properties",
+          "description": "Get pharmacokinetic properties",
+          "prompt": "Get ADMET properties for Metformin from ChEMBL. Show absorption, distribution, metabolism, excretion, and toxicity data.",
+          "tags": ["ADMET", "pharmacokinetics"],
+          "mcp": "chembl"
+        },
+        {
+          "id": "diffdock-docking",
+          "title": "Protein-Ligand Docking",
+          "description": "Predict binding poses with DiffDock",
+          "prompt": "Use DiffDock to dock imatinib to the ABL kinase. Predict binding poses and confidence scores.",
+          "tags": ["docking", "binding"],
+          "skill": "diffdock"
+        },
+        {
+          "id": "drugbank-info",
+          "title": "DrugBank Drug Information",
+          "description": "Get comprehensive drug data",
+          "prompt": "Look up metformin in DrugBank. Get its mechanism of action, targets, drug interactions, and pharmacokinetics.",
+          "tags": ["drug-info", "pharmacology"],
+          "skill": "drugbank-database"
+        },
+        {
+          "id": "admet-prediction",
+          "title": "ADMET Property Prediction",
+          "description": "Predict absorption, distribution, metabolism, excretion, toxicity",
+          "prompt": "Use DeepChem to predict ADMET properties for this compound: CC(C)CC1=CC=C(C=C1)C(C)C(=O)O (ibuprofen)",
+          "tags": ["ADMET", "toxicity"],
+          "skill": "deepchem"
+        }
+      ]
+    },
+    {
+      "id": "machine-learning",
+      "title": "Machine Learning & AI",
+      "icon": "Brain",
+      "iconColor": "purple",
+      "description": "PyTorch, scikit-learn, transformers, and deep learning tools",
+      "examples": [
+        {
+          "id": "sklearn-classification",
+          "title": "Classification with scikit-learn",
+          "description": "Train and evaluate ML classifiers",
+          "prompt": "Create a random forest classifier for a binary classification task. Include cross-validation, feature importance, and ROC-AUC evaluation.",
+          "tags": ["classification", "sklearn"],
+          "skill": "scikit-learn"
+        },
+        {
+          "id": "pytorch-training",
+          "title": "PyTorch Neural Network",
+          "description": "Build and train neural networks",
+          "prompt": "Create a PyTorch neural network for image classification on MNIST. Include training loop, validation, and accuracy metrics.",
+          "tags": ["deep-learning", "pytorch"],
+          "skill": "pytorch-lightning"
+        },
+        {
+          "id": "transformers-nlp",
+          "title": "NLP with Transformers",
+          "description": "Use pre-trained language models",
+          "prompt": "Use Hugging Face Transformers to perform sentiment analysis on scientific paper abstracts. Use a BERT-based model.",
+          "tags": ["NLP", "BERT"],
+          "skill": "transformers"
+        },
+        {
+          "id": "shap-explanation",
+          "title": "Model Interpretability with SHAP",
+          "description": "Explain model predictions",
+          "prompt": "Use SHAP to explain predictions from an XGBoost model. Create summary plots and individual prediction explanations.",
+          "tags": ["explainability", "SHAP"],
+          "skill": "shap"
+        },
+        {
+          "id": "huggingface-models",
+          "title": "HuggingFace Model Search",
+          "description": "Search and explore HuggingFace models",
+          "prompt": "Search HuggingFace for the top protein language models. Compare their sizes, licenses, and download counts. Which one is best for embeddings?",
+          "tags": ["models", "AI", "search"],
+          "mcp": "hf-mcp-server",
+          "verified": true
+        },
+        {
+          "id": "huggingface-datasets",
+          "title": "HuggingFace Dataset Discovery",
+          "description": "Find and explore datasets on HuggingFace",
+          "prompt": "Find datasets on HuggingFace related to clinical notes or medical text. Show their sizes, formats, and licensing information.",
+          "tags": ["datasets", "medical", "NLP"],
+          "mcp": "hf-mcp-server"
+        }
+      ]
+    },
+    {
+      "id": "data-visualization",
+      "title": "Data Analysis & Visualization",
+      "icon": "BarChart3",
+      "iconColor": "amber",
+      "description": "Pandas, Polars, matplotlib, plotly, and statistical analysis",
+      "examples": [
+        {
+          "id": "polars-analysis",
+          "title": "Fast Data Analysis with Polars",
+          "description": "High-performance DataFrame operations",
+          "prompt": "Use Polars to load a large CSV file, perform groupby aggregations, and filter data. Show the performance advantage over pandas.",
+          "tags": ["data", "fast"],
+          "skill": "polars"
+        },
+        {
+          "id": "plotly-interactive",
+          "title": "Interactive Plots with Plotly",
+          "description": "Create interactive visualizations",
+          "prompt": "Create an interactive scatter plot with Plotly showing gene expression data. Add hover info, color by cluster, and export as HTML.",
+          "tags": ["interactive", "plots"],
+          "skill": "plotly"
+        },
+        {
+          "id": "seaborn-stats",
+          "title": "Statistical Visualization with Seaborn",
+          "description": "Publication-quality statistical plots",
+          "prompt": "Use Seaborn to create a heatmap of correlation matrix with hierarchical clustering. Add annotations and custom color palette.",
+          "tags": ["statistics", "heatmap"],
+          "skill": "seaborn"
+        },
+        {
+          "id": "statsmodels-regression",
+          "title": "Statistical Modeling",
+          "description": "Regression and hypothesis testing",
+          "prompt": "Perform linear regression with statsmodels. Include diagnostic plots, residual analysis, and confidence intervals.",
+          "tags": ["regression", "statistics"],
+          "skill": "statsmodels"
+        }
+      ]
+    },
+    {
+      "id": "your-data",
+      "title": "Your Data (Upload & Analyze)",
+      "icon": "Upload",
+      "iconColor": "emerald",
+      "description": "Upload your own CSV, Excel, PDF, or image files and analyze them with Claude Code",
+      "examples": [
+        {
+          "id": "csv-exploration",
+          "title": "CSV Data Exploration",
+          "description": "Load and explore your uploaded CSV file",
+          "prompt": "Load the CSV file from data/ folder. Show me the first 10 rows, column types, basic statistics, and identify any missing values or anomalies.",
+          "tags": ["CSV", "exploration", "pandas"],
+          "verified": true,
+          "output": "Loaded: data/experiment_results.csv\n\nShape: 1,247 rows x 15 columns\n\nColumns:\n- patient_id (int64)\n- age (float64) - 3 missing values\n- treatment_group (object)\n- response_score (float64)\n...\n\nKey Statistics:\n- Mean age: 54.3 +/- 12.1\n- Treatment groups: Control (412), Drug A (418), Drug B (417)"
+        },
+        {
+          "id": "excel-analysis",
+          "title": "Excel Multi-Sheet Analysis",
+          "description": "Analyze Excel workbooks with multiple sheets",
+          "prompt": "Load the Excel file from data/ and analyze all sheets. Compare data across sheets and create a summary report.",
+          "tags": ["Excel", "multi-sheet", "analysis"]
+        },
+        {
+          "id": "csv-visualization",
+          "title": "Data Visualization from CSV",
+          "description": "Create charts and plots from your data",
+          "prompt": "Load my CSV data and create visualizations: 1) Distribution plots for numeric columns, 2) Correlation heatmap, 3) Time series plot if date column exists. Save plots to output/ folder.",
+          "tags": ["visualization", "charts", "matplotlib"],
+          "verified": true
+        },
+        {
+          "id": "pdf-extraction",
+          "title": "PDF Text Extraction",
+          "description": "Extract and analyze text from PDF documents",
+          "prompt": "Extract all text from the PDF in data/ folder. Summarize the key findings, extract any tables, and identify important figures or statistics mentioned.",
+          "tags": ["PDF", "extraction", "NLP"]
+        },
+        {
+          "id": "pdf-table-extract",
+          "title": "PDF Table Extraction",
+          "description": "Extract tables from PDF documents to CSV",
+          "prompt": "Extract all tables from the PDF document in data/ folder. Convert each table to CSV format and save to output/ folder.",
+          "tags": ["PDF", "tables", "conversion"]
+        },
+        {
+          "id": "image-analysis",
+          "title": "Image Analysis",
+          "description": "Analyze images using vision capabilities",
+          "prompt": "Analyze the image(s) in data/ folder. Describe what you see, extract any text (OCR), and identify key elements or patterns.",
+          "tags": ["image", "vision", "OCR"]
+        },
+        {
+          "id": "data-cleaning",
+          "title": "Data Cleaning Pipeline",
+          "description": "Clean and preprocess messy data",
+          "prompt": "Load my data file and perform data cleaning: handle missing values, remove duplicates, fix data types, standardize formats, and validate data quality. Save cleaned version to output/.",
+          "tags": ["cleaning", "preprocessing", "ETL"],
+          "verified": true
+        },
+        {
+          "id": "data-merge",
+          "title": "Merge Multiple Data Files",
+          "description": "Combine data from multiple uploaded files",
+          "prompt": "Load all CSV files from data/ folder. Identify common keys and merge them into a single dataset. Handle conflicts and create a merge report.",
+          "tags": ["merge", "join", "multiple-files"]
+        },
+        {
+          "id": "statistical-analysis",
+          "title": "Statistical Analysis Report",
+          "description": "Run statistical tests on your data",
+          "prompt": "Perform comprehensive statistical analysis on my data: descriptive statistics, normality tests, t-tests or ANOVA between groups, correlation analysis, and generate a statistical report.",
+          "tags": ["statistics", "hypothesis-testing", "report"]
+        },
+        {
+          "id": "ml-prediction",
+          "title": "Build ML Model from Data",
+          "description": "Train a machine learning model on your uploaded data",
+          "prompt": "Using my CSV data, build a predictive model: 1) Explore features, 2) Split train/test, 3) Try multiple algorithms (RF, XGBoost, LogReg), 4) Evaluate and compare, 5) Save best model.",
+          "tags": ["ML", "prediction", "scikit-learn"]
+        },
+        {
+          "id": "generate-report",
+          "title": "Generate Analysis Report",
+          "description": "Create a comprehensive report from your data",
+          "prompt": "Analyze my data and generate a comprehensive markdown report with: executive summary, methodology, key findings, visualizations, and recommendations. Save to output/report.md",
+          "tags": ["report", "markdown", "summary"],
+          "verified": true
+        },
+        {
+          "id": "data-to-sql",
+          "title": "Import Data to SQLite",
+          "description": "Load data into SQLite for SQL queries",
+          "prompt": "Load my CSV data into a SQLite database. Then run SQL queries to answer: 1) Top 10 records by value, 2) Group statistics, 3) Filtered subsets. Show the SQL used.",
+          "tags": ["SQL", "SQLite", "database"],
+          "mcp": "sqlite"
+        }
+      ]
+    },
+    {
+      "id": "mcp-servers",
+      "title": "MCP Server Tools",
+      "icon": "Server",
+      "iconColor": "cyan",
+      "description": "Memory, Playwright, SQLite, Git, Context7, and 15+ other MCP servers",
+      "examples": [
+        {
+          "id": "memory-knowledge",
+          "title": "Knowledge Graph Memory",
+          "description": "Store and retrieve information in memory",
+          "prompt": "Create a knowledge graph entity for the drug 'Remdesivir' with its properties, mechanism, and clinical uses. Then search for it.",
+          "tags": ["memory", "knowledge-graph"],
+          "mcp": "memory",
+          "verified": true,
+          "output": "Entity created:\n{\n  \"name\": \"Remdesivir\",\n  \"entityType\": \"Drug\",\n  \"observations\": [\n    \"Antiviral medication developed by Gilead Sciences\",\n    \"FDA approved for COVID-19 treatment in October 2020\",\n    \"Mechanism: RNA polymerase inhibitor\"\n  ]\n}\n\nSearch results: Found 1 matching entity with 6 observations."
+        },
+        {
+          "id": "playwright-scrape",
+          "title": "Web Automation with Playwright",
+          "description": "Automate browser interactions",
+          "prompt": "Use Playwright to navigate to a scientific journal website, take a screenshot, and extract paper titles from the page.",
+          "tags": ["browser", "automation"],
+          "mcp": "playwright",
+          "verified": true
+        },
+        {
+          "id": "sqlite-query",
+          "title": "SQLite Database Queries",
+          "description": "Query and analyze structured data",
+          "prompt": "Create a SQLite table for experiment results, insert sample data, and run analytical queries with aggregations.",
+          "tags": ["database", "SQL"],
+          "mcp": "sqlite",
+          "verified": true
+        },
+        {
+          "id": "git-operations",
+          "title": "Git Repository Management",
+          "description": "Version control operations",
+          "prompt": "Show the git status, recent commits, and create a diff of unstaged changes in the current repository.",
+          "tags": ["git", "version-control"],
+          "mcp": "git",
+          "verified": true
+        },
+        {
+          "id": "context7-docs",
+          "title": "Context7 Documentation Lookup",
+          "description": "Get up-to-date library documentation",
+          "prompt": "Use Context7 to look up the latest documentation for FastAPI authentication. Show code examples for JWT setup.",
+          "tags": ["docs", "libraries"],
+          "mcp": "context7",
+          "verified": true,
+          "output": "Found: FastAPI documentation (12,277 code snippets)\n\nJWT Authentication Example:\n@app.post(\"/token\")\nasync def login_for_access_token(\n    form_data: OAuth2PasswordRequestForm = Depends()\n) -> Token:\n    user = authenticate_user(db, form_data.username, form_data.password)\n    access_token = create_access_token(data={\"sub\": user.username})\n    return Token(access_token=access_token, token_type=\"bearer\")"
+        },
+        {
+          "id": "sequential-thinking",
+          "title": "Sequential Thinking",
+          "description": "Complex multi-step reasoning",
+          "prompt": "Use sequential thinking to design a complete drug discovery pipeline: from target identification through lead optimization.",
+          "tags": ["reasoning", "planning"],
+          "mcp": "sequential-thinking"
+        },
+        {
+          "id": "fetch-api",
+          "title": "Fetch Web Content",
+          "description": "Retrieve and process web pages",
+          "prompt": "Fetch the FDA drug approval page and extract information about recent approvals in oncology.",
+          "tags": ["web", "fetch", "API"],
+          "mcp": "fetch"
+        }
+      ]
+    },
+    {
+      "id": "plugins",
+      "title": "Plugins & Skills",
+      "icon": "Sparkles",
+      "iconColor": "yellow",
+      "description": "Frontend design, feature development, code simplification, and more",
+      "examples": [
+        {
+          "id": "frontend-design",
+          "title": "Frontend Design",
+          "description": "Create production-grade UI components",
+          "prompt": "/frontend-design Create a modern dashboard for displaying clinical trial data with cards, charts, and a responsive layout.",
+          "tags": ["UI", "React"],
+          "plugin": "frontend-design"
+        },
+        {
+          "id": "feature-dev",
+          "title": "Feature Development",
+          "description": "Guided feature implementation workflow",
+          "prompt": "/feature-dev Add a new API endpoint for uploading and parsing CSV files with validation and error handling.",
+          "tags": ["development", "API"],
+          "plugin": "feature-dev"
+        },
+        {
+          "id": "code-simplifier",
+          "title": "Code Simplification",
+          "description": "Refactor code for clarity",
+          "prompt": "Simplify and refactor this complex function to improve readability and maintainability while preserving functionality.",
+          "tags": ["refactor", "clean-code"],
+          "plugin": "code-simplifier"
+        },
+        {
+          "id": "ralph-loop",
+          "title": "Ralph Loop Iteration",
+          "description": "Iterative refinement workflow",
+          "prompt": "/ralph-loop Start an iterative development session to build and refine a data processing pipeline.",
+          "tags": ["iteration", "refinement"],
+          "plugin": "ralph-loop"
+        },
+        {
+          "id": "huggingface-skills",
+          "title": "HuggingFace Integration",
+          "description": "Access HuggingFace models and datasets",
+          "prompt": "Search HuggingFace for the best model for biomedical named entity recognition. Download and run inference.",
+          "tags": ["models", "HuggingFace"],
+          "plugin": "huggingface-skills"
+        }
+      ]
+    },
+    {
+      "id": "development",
+      "title": "Development Tools",
+      "icon": "Code",
+      "iconColor": "red",
+      "description": "Code generation, testing, documentation, and DevOps",
+      "examples": [
+        {
+          "id": "python-script",
+          "title": "Python Script Generation",
+          "description": "Generate complete Python scripts",
+          "prompt": "Write a Python script that downloads protein structures from PDB, calculates RMSD between structures, and generates a report.",
+          "tags": ["Python", "script"]
+        },
+        {
+          "id": "api-design",
+          "title": "REST API Design",
+          "description": "Design and implement APIs",
+          "prompt": "Design a FastAPI REST API for a molecular database with endpoints for CRUD operations, search, and batch processing.",
+          "tags": ["API", "FastAPI"],
+          "skill": "backend"
+        },
+        {
+          "id": "testing",
+          "title": "Test Generation",
+          "description": "Generate unit and integration tests",
+          "prompt": "Generate comprehensive pytest tests for a data processing module. Include fixtures, parametrized tests, and edge cases.",
+          "tags": ["testing", "pytest"]
+        },
+        {
+          "id": "documentation",
+          "title": "Documentation Generation",
+          "description": "Create technical documentation",
+          "prompt": "Generate comprehensive documentation for this Python module including docstrings, usage examples, and API reference.",
+          "tags": ["docs", "docstrings"],
+          "skill": "document-skills"
+        }
+      ]
+    }
+  ]
+}
