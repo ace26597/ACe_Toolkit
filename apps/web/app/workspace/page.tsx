@@ -227,7 +227,7 @@ function WelcomeContent() {
       <div className="relative z-10">
         {/* Hero Section */}
         <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 via-transparent to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 via-transparent to-transparent pointer-events-none" />
           <div className="max-w-7xl mx-auto px-6 pt-12 pb-8">
             <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
               {/* Left: Text Content */}
