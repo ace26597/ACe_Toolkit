@@ -48,11 +48,14 @@ class ProjectManager:
 
     def _sanitize_name(self, name: str) -> str:
         """Sanitize a name for use as a directory name."""
-        safe = "".join(c for c in name if c.isalnum() or c in (' ', '-', '_')).strip()
+        # Replace non-alphanumeric (except hyphen, underscore) with hyphen
+        safe = "".join(c if c.isalnum() or c in ('-', '_') else '-' for c in name)
+        # Collapse multiple hyphens into one
+        while '--' in safe:
+            safe = safe.replace('--', '-')
+        safe = safe.strip('-').strip()
         if not safe or safe in ('.', '..'):
             safe = f"project-{uuid.uuid4().hex[:8]}"
-        # Replace spaces with dashes for cleaner paths
-        safe = safe.replace(' ', '-')
         return safe
 
     def _get_project_path(self, project_name: str) -> Path:

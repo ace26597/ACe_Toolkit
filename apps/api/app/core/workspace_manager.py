@@ -45,9 +45,12 @@ class WorkspaceManager:
 
     def _sanitize_name(self, name: str) -> str:
         """Sanitize a name for use as a directory/file name."""
-        # Remove dangerous characters
-        safe = "".join(c for c in name if c.isalnum() or c in (' ', '-', '_', '.'))
-        safe = safe.strip()
+        # Remove dangerous characters, keep alphanumeric, hyphen, underscore, dot
+        safe = "".join(c if c.isalnum() or c in ('-', '_', '.') else '-' for c in name)
+        # Collapse multiple hyphens into one
+        while '--' in safe:
+            safe = safe.replace('--', '-')
+        safe = safe.strip('-').strip()
         # Prevent empty or dot-only names
         if not safe or safe in ('.', '..'):
             safe = f"project-{uuid.uuid4().hex[:8]}"

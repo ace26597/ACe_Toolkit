@@ -987,8 +987,8 @@ export default function WorkspacePage() {
   const [loadingContent, setLoadingContent] = useState(false);
   const [skipLargeFileLoad, setSkipLargeFileLoad] = useState(false);
 
-  // View mode
-  const [viewMode, setViewMode] = useState<ViewMode>('notes');
+  // View mode - default to terminal for quick research start
+  const [viewMode, setViewMode] = useState<ViewMode>('terminal');
 
   // Terminal state
   const { user } = useAuth();
@@ -1003,10 +1003,14 @@ export default function WorkspacePage() {
 
   // Import data modal state
   const [showImportModal, setShowImportModal] = useState(false);
-  const [importType, setImportType] = useState<'github' | 'web'>('github');
-  const [importUrl, setImportUrl] = useState('');
+  const [importType, setImportType] = useState<'github' | 'web' | 'upload'>('github');
+  const [importUrls, setImportUrls] = useState<string[]>(['']);
   const [importBranch, setImportBranch] = useState('');
   const [isImporting, setIsImporting] = useState(false);
+  const [importFiles, setImportFiles] = useState<File[]>([]);
+  const importFileInputRef = useCallback((node: HTMLInputElement | null) => {
+    if (node) node.value = '';
+  }, []);
 
   // Terminal mode state
   const [terminalMode, setTerminalMode] = useState<'claude' | 'ssh'>('claude');
@@ -1107,64 +1111,111 @@ export default function WorkspacePage() {
     }
   };
 
-  // Import data from GitHub
+  // Import data from GitHub (supports multiple URLs)
   const importFromGitHub = async () => {
-    if (!terminalSessionId || !importUrl.trim()) return;
+    const validUrls = importUrls.filter(url => url.trim());
+    if (!terminalSessionId || validUrls.length === 0) {
+      showToast('Start a terminal first to clone repositories', 'error');
+      return;
+    }
 
     setIsImporting(true);
+    let successCount = 0;
     try {
-      const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/clone-repo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          repo_url: importUrl.trim(),
-          branch: importBranch.trim() || undefined,
-          target_path: 'data',
-        }),
-      });
+      for (const url of validUrls) {
+        const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/clone-repo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            repo_url: url.trim(),
+            branch: importBranch.trim() || undefined,
+            target_path: 'data',
+          }),
+        });
 
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ detail: 'Clone failed' }));
-        throw new Error(error.detail || 'Failed to clone repository');
+        if (res.ok) {
+          successCount++;
+        } else {
+          const error = await res.json().catch(() => ({ detail: 'Clone failed' }));
+          showToast(`Failed to clone ${url}: ${error.detail}`, 'error');
+        }
       }
 
-      const result = await res.json();
-      showToast(`Cloned ${result.repo_name} successfully`, 'success');
-      setShowImportModal(false);
-      setImportUrl('');
-      setImportBranch('');
+      if (successCount > 0) {
+        showToast(`Cloned ${successCount} repository(s) successfully`, 'success');
+        setShowImportModal(false);
+        setImportUrls(['']);
+        setImportBranch('');
+      }
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to clone repository', 'error');
+      showToast(error instanceof Error ? error.message : 'Failed to clone repositories', 'error');
     } finally {
       setIsImporting(false);
     }
   };
 
-  // Import data from Web URL
+  // Import data from Web URLs (supports multiple)
   const importFromWeb = async () => {
-    if (!terminalSessionId || !importUrl.trim()) return;
+    const validUrls = importUrls.filter(url => url.trim());
+    if (!terminalSessionId || validUrls.length === 0) {
+      showToast('Start a terminal first to fetch web URLs', 'error');
+      return;
+    }
+
+    setIsImporting(true);
+    let successCount = 0;
+    try {
+      for (const url of validUrls) {
+        const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/fetch-url`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: url.trim(),
+          }),
+        });
+
+        if (res.ok) {
+          successCount++;
+        } else {
+          const error = await res.json().catch(() => ({ detail: 'Fetch failed' }));
+          showToast(`Failed to fetch ${url}: ${error.detail}`, 'error');
+        }
+      }
+
+      if (successCount > 0) {
+        showToast(`Fetched ${successCount} URL(s) successfully`, 'success');
+        setShowImportModal(false);
+        setImportUrls(['']);
+      }
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to fetch URLs', 'error');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  // Import files via upload
+  const importFromUpload = async () => {
+    if (importFiles.length === 0) return;
 
     setIsImporting(true);
     try {
-      const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/fetch-url`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: importUrl.trim(),
-        }),
-      });
-
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ detail: 'Fetch failed' }));
-        throw new Error(error.detail || 'Failed to fetch URL');
+      if (terminalSessionId) {
+        // Upload to terminal session
+        await handleTerminalUpload(importFiles, 'data');
+      } else if (selectedProject) {
+        // Upload to workspace project
+        await workspaceApi.uploadData(selectedProject, importFiles, '');
+      } else {
+        showToast('Select a project or start a terminal first', 'error');
+        return;
       }
 
-      const result = await res.json();
-      showToast(`Saved ${result.filename}`, 'success');
+      showToast(`Uploaded ${importFiles.length} file(s) successfully`, 'success');
       setShowImportModal(false);
-      setImportUrl('');
+      setImportFiles([]);
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to fetch URL', 'error');
+      showToast(error instanceof Error ? error.message : 'Failed to upload files', 'error');
     } finally {
       setIsImporting(false);
     }
@@ -1173,9 +1224,28 @@ export default function WorkspacePage() {
   const handleImport = () => {
     if (importType === 'github') {
       importFromGitHub();
-    } else {
+    } else if (importType === 'web') {
       importFromWeb();
+    } else if (importType === 'upload') {
+      importFromUpload();
     }
+  };
+
+  // Add/remove URL inputs
+  const addUrlInput = () => {
+    setImportUrls([...importUrls, '']);
+  };
+
+  const removeUrlInput = (index: number) => {
+    if (importUrls.length > 1) {
+      setImportUrls(importUrls.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateUrlInput = (index: number, value: string) => {
+    const newUrls = [...importUrls];
+    newUrls[index] = value;
+    setImportUrls(newUrls);
   };
 
   // Upload files to terminal session
@@ -2057,29 +2127,28 @@ export default function WorkspacePage() {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Import Data - Always visible */}
+                  <button
+                    onClick={() => setShowImportModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 rounded text-sm transition-colors"
+                    title="Import data from GitHub, Web URLs, or upload files"
+                  >
+                    <Download size={14} />
+                    Import Data
+                  </button>
                   {terminalSessionId && (
-                    <>
-                      <button
-                        onClick={() => setShowImportModal(true)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 rounded text-sm transition-colors"
-                        title="Import data from GitHub or Web"
-                      >
-                        <Download size={14} />
-                        Import Data
-                      </button>
-                      <button
-                        onClick={() => setShowFileBrowser(!showFileBrowser)}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors ${
-                          showFileBrowser
-                            ? 'bg-slate-600 text-white'
-                            : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                        }`}
-                        title="Toggle file browser"
-                      >
-                        <FolderOpen size={14} />
-                        Files
-                      </button>
-                    </>
+                    <button
+                      onClick={() => setShowFileBrowser(!showFileBrowser)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors ${
+                        showFileBrowser
+                          ? 'bg-slate-600 text-white'
+                          : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                      }`}
+                      title="Toggle file browser"
+                    >
+                      <FolderOpen size={14} />
+                      Files
+                    </button>
                   )}
                   {terminalSessionId ? (
                     <button
@@ -2319,7 +2388,7 @@ export default function WorkspacePage() {
     {/* Import Data Modal */}
     {showImportModal && (
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-        <div className="bg-slate-800 rounded-xl w-full max-w-md border border-slate-700 shadow-2xl">
+        <div className="bg-slate-800 rounded-xl w-full max-w-lg border border-slate-700 shadow-2xl">
           <div className="flex items-center justify-between p-4 border-b border-slate-700">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
               <Download size={20} className="text-indigo-400" />
@@ -2328,8 +2397,9 @@ export default function WorkspacePage() {
             <button
               onClick={() => {
                 setShowImportModal(false);
-                setImportUrl('');
+                setImportUrls(['']);
                 setImportBranch('');
+                setImportFiles([]);
               }}
               className="text-slate-400 hover:text-white p-1"
             >
@@ -2342,7 +2412,7 @@ export default function WorkspacePage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setImportType('github')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                   importType === 'github'
                     ? 'bg-indigo-600 text-white'
                     : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -2353,7 +2423,7 @@ export default function WorkspacePage() {
               </button>
               <button
                 onClick={() => setImportType('web')}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 px-4 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
                   importType === 'web'
                     ? 'bg-indigo-600 text-white'
                     : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
@@ -2362,6 +2432,17 @@ export default function WorkspacePage() {
                 <Globe size={16} />
                 Web URL
               </button>
+              <button
+                onClick={() => setImportType('upload')}
+                className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-sm font-medium transition-colors ${
+                  importType === 'upload'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                <Upload size={16} />
+                Upload
+              </button>
             </div>
 
             {/* GitHub Import */}
@@ -2369,19 +2450,40 @@ export default function WorkspacePage() {
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                    Repository URL
+                    Repository URLs
                   </label>
-                  <input
-                    type="text"
-                    value={importUrl}
-                    onChange={(e) => setImportUrl(e.target.value)}
-                    placeholder="https://github.com/user/repo"
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
+                  <div className="space-y-2">
+                    {importUrls.map((url, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={url}
+                          onChange={(e) => updateUrlInput(index, e.target.value)}
+                          placeholder="https://github.com/user/repo"
+                          className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        />
+                        {importUrls.length > 1 && (
+                          <button
+                            onClick={() => removeUrlInput(index)}
+                            className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+                          >
+                            <X size={18} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={addUrlInput}
+                    className="mt-2 text-sm text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                  >
+                    <Plus size={14} />
+                    Add another URL
+                  </button>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                    Branch (optional)
+                    Branch (optional, applies to all)
                   </label>
                   <input
                     type="text"
@@ -2392,7 +2494,7 @@ export default function WorkspacePage() {
                   />
                 </div>
                 <p className="text-xs text-slate-500">
-                  Repository will be cloned into the data/ folder
+                  Repositories will be cloned into the data/ folder. Requires active terminal.
                 </p>
               </div>
             )}
@@ -2402,18 +2504,73 @@ export default function WorkspacePage() {
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                    Web URL
+                    Web URLs
                   </label>
-                  <input
-                    type="text"
-                    value={importUrl}
-                    onChange={(e) => setImportUrl(e.target.value)}
-                    placeholder="https://example.com/page"
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
+                  <div className="space-y-2">
+                    {importUrls.map((url, index) => (
+                      <div key={index} className="flex gap-2">
+                        <input
+                          type="text"
+                          value={url}
+                          onChange={(e) => updateUrlInput(index, e.target.value)}
+                          placeholder="https://example.com/page"
+                          className="flex-1 px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                        />
+                        {importUrls.length > 1 && (
+                          <button
+                            onClick={() => removeUrlInput(index)}
+                            className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+                          >
+                            <X size={18} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    onClick={addUrlInput}
+                    className="mt-2 text-sm text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                  >
+                    <Plus size={14} />
+                    Add another URL
+                  </button>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Page content will be saved as a markdown file
+                  Page content will be saved as markdown files. Requires active terminal.
+                </p>
+              </div>
+            )}
+
+            {/* File Upload */}
+            {importType === 'upload' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    Select Files
+                  </label>
+                  <input
+                    ref={importFileInputRef}
+                    type="file"
+                    multiple
+                    onChange={(e) => setImportFiles(Array.from(e.target.files || []))}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white file:mr-4 file:py-1 file:px-3 file:rounded file:border-0 file:text-sm file:bg-indigo-600 file:text-white hover:file:bg-indigo-700 cursor-pointer"
+                  />
+                </div>
+                {importFiles.length > 0 && (
+                  <div className="bg-slate-900 rounded-lg p-3">
+                    <p className="text-sm text-slate-300 mb-2">{importFiles.length} file(s) selected:</p>
+                    <ul className="text-xs text-slate-400 space-y-1 max-h-32 overflow-y-auto">
+                      {importFiles.map((file, i) => (
+                        <li key={i} className="flex items-center gap-2">
+                          <FileText size={12} />
+                          {file.name} ({(file.size / 1024).toFixed(1)} KB)
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <p className="text-xs text-slate-500">
+                  Files will be uploaded to the data/ folder. Works with or without active terminal.
                 </p>
               </div>
             )}
@@ -2423,8 +2580,9 @@ export default function WorkspacePage() {
             <button
               onClick={() => {
                 setShowImportModal(false);
-                setImportUrl('');
+                setImportUrls(['']);
                 setImportBranch('');
+                setImportFiles([]);
               }}
               className="px-4 py-2 text-slate-300 hover:text-white transition-colors"
             >
@@ -2432,7 +2590,7 @@ export default function WorkspacePage() {
             </button>
             <button
               onClick={handleImport}
-              disabled={isImporting || !importUrl.trim()}
+              disabled={isImporting || (importType !== 'upload' && !importUrls.some(u => u.trim())) || (importType === 'upload' && importFiles.length === 0)}
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-600 text-white rounded-lg transition-colors"
             >
               {isImporting ? (
