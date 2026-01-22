@@ -110,7 +110,6 @@ apps/api/
 | GET | `/projects/{name}/data/download` | Download file |
 | GET | `/projects/{name}/data/content` | Read file content |
 | PUT | `/projects/{name}/data/content` | Save file content |
-| POST | `/extensions/submit` | Submit extension for admin review |
 
 ### Unified Projects (`/ccresearch/unified-projects`)
 

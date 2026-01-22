@@ -38,7 +38,6 @@ lsof -i :3000 -i :8000  # Check our ports
 | App | Route | Description |
 |-----|-------|-------------|
 | **C3 Researcher Workspace** | `/workspace` | Claude Code Custom Researcher - AI-powered research terminal |
-| **Customize C3** | `/customize-c3` | Create skills, plugins, MCP servers, and agents |
 | **Video Factory** | `/video-factory` | AI video production pipeline |
 
 **C3 Researcher Workspace Features:**

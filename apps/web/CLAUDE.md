@@ -72,23 +72,6 @@ apps/web/
 The CCResearch terminal functionality has been fully integrated into the Workspace Terminal tab.
 Legacy share links still work at `/ccresearch/share/[token]`.
 
-### Customize C3 (`/customize-c3`)
-
-**Status:** NEW (2026-01-22)
-
-Interface for creating custom skills, plugins, MCP servers, and agents.
-
-**Features:**
-- Four extension types: Skill, Plugin, MCP Server, Agent
-- Start Fresh - opens workspace in customize mode
-- From Template - clone existing template from GitHub
-- Links to documentation: Claude Code Docs, MCP Specification, GitHub
-
-**How it works:**
-- User selects extension type
-- Links to `/workspace?mode=customize&type={skill|plugin|mcp|agent}`
-- Claude Code session gets specialized guidance for extension development
-
 ### C3 Researcher Workspace (`/workspace`)
 
 Claude Code Custom Researcher - AI-powered research terminal with comprehensive scientific capabilities.
