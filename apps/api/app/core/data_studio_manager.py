@@ -1,10 +1,12 @@
 """
 Data Studio Manager - Manages headless Claude Code sessions for data analysis.
 
-Uses claude -p (print mode) with stream-json for non-interactive analysis.
+Uses claude -p (print mode) with stream-json output for non-interactive analysis.
+Each message spawns a new claude process but uses persistent session IDs.
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -19,114 +21,90 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class DataStudioSession:
-    """Represents a Data Studio session with a Claude process."""
+    """Represents a Data Studio session."""
     id: str
     user_id: str
     project_name: str
     project_dir: str
-    data_studio_dir: str
-    process: Optional[asyncio.subprocess.Process] = None
+    claude_session_id: str  # Deterministic UUID for Claude --session-id
     created_at: datetime = field(default_factory=datetime.utcnow)
     last_activity: datetime = field(default_factory=datetime.utcnow)
     is_active: bool = True
-    message_queue: asyncio.Queue = field(default_factory=asyncio.Queue)
+    is_first_message: bool = True
 
 
 class DataStudioManager:
     """
     Manages headless Claude Code sessions for Data Studio.
 
-    Each session spawns a claude -p process with streaming JSON I/O.
+    Each message spawns a new claude -p process with --output-format stream-json.
+    Session continuity is maintained via --session-id (same UUID per project).
     """
 
     def __init__(self):
         self.sessions: Dict[str, DataStudioSession] = {}
-        self._output_tasks: Dict[str, asyncio.Task] = {}
 
     def _get_project_dir(self, user_id: str, project_name: str) -> str:
         """Get the project directory path."""
         return f"/data/users/{user_id}/projects/{project_name}"
 
-    def _get_data_studio_dir(self, project_dir: str) -> str:
-        """Get the Data Studio subdirectory path."""
-        return os.path.join(project_dir, ".data-studio")
+    def _generate_claude_session_id(self, user_id: str, project_name: str) -> str:
+        """Generate a deterministic UUID for Claude session based on user+project."""
+        # Create a deterministic UUID from user_id and project_name
+        hash_input = f"data-studio:{user_id}:{project_name}"
+        hash_bytes = hashlib.sha256(hash_input.encode()).digest()[:16]
+        return str(uuid.UUID(bytes=hash_bytes))
 
-    def _ensure_data_studio_structure(self, data_studio_dir: str) -> None:
-        """Create Data Studio directory structure if it doesn't exist."""
+    def _ensure_data_studio_structure(self, project_dir: str) -> None:
+        """Create Data Studio directory structure if needed."""
+        data_studio_dir = os.path.join(project_dir, ".data-studio")
         dirs = [
             data_studio_dir,
-            os.path.join(data_studio_dir, "dashboards"),
             os.path.join(data_studio_dir, "exports"),
-            os.path.join(data_studio_dir, ".claude"),
         ]
         for d in dirs:
             os.makedirs(d, exist_ok=True)
 
-        # Create Data Studio CLAUDE.md if it doesn't exist
-        claude_md_path = os.path.join(data_studio_dir, "CLAUDE.md")
+        # Create CLAUDE.md for the project if it doesn't exist
+        claude_md_path = os.path.join(project_dir, "CLAUDE.md")
         if not os.path.exists(claude_md_path):
-            self._create_data_studio_claude_md(claude_md_path)
+            self._create_claude_md(claude_md_path, project_dir)
 
-    def _create_data_studio_claude_md(self, path: str) -> None:
-        """Create the Data Studio specific CLAUDE.md."""
-        content = '''# Data Studio Assistant
+    def _create_claude_md(self, path: str, project_dir: str) -> None:
+        """Create CLAUDE.md with data analysis instructions."""
+        content = '''# Data Studio Project
 
-You are a data analysis assistant in C3 Data Studio. Your role is to help users
-explore, analyze, and visualize their data files.
+You are a data analysis assistant. Your role is to help analyze data files in this project.
+
+## Available Data Files
+
+Data files are located in the `data/` directory. Use the Read tool to examine them.
 
 ## Your Capabilities
 
-- Read and analyze CSV, Excel, JSON, Parquet, and other data files
-- Generate Python code for data analysis using pandas, polars, numpy
-- Create visualizations using matplotlib, plotly, seaborn
-- Perform statistical analysis and generate insights
+- Read and analyze CSV, Excel, JSON, Parquet files
+- Generate Python code for analysis using pandas, numpy, matplotlib, plotly
+- Create visualizations and statistical summaries
 - Clean, transform, and filter data
-- Answer questions about data patterns and anomalies
+- Answer questions about patterns and anomalies
 
-## Output Guidelines
+## Guidelines
 
-### For Visualizations
-When creating charts, prefer Plotly for interactivity. Output the chart and explain what it shows.
+1. **Always start by listing files**: Use `ls data/` to see available files
+2. **Read before analyzing**: Use the Read tool to examine file contents
+3. **Show your work**: Display sample data before transformations
+4. **Be concise**: Summarize findings clearly
+5. **Handle errors gracefully**: Report issues without failing
 
-### For Tables
-When showing data, limit to first 100 rows unless asked for more. Always show column types and null counts.
+## Output Format
 
-### For Analysis
-1. First understand the data structure (shape, columns, types)
-2. Check for missing values and data quality issues
-3. Provide statistical summaries where relevant
-4. Generate visualizations to support insights
-5. Explain findings in plain language
-
-## Working Directory
-
-- User data files: `../data/` (relative to this directory)
-- Your outputs: `./exports/`
-- Project root: `../`
-
-## Best Practices
-
-1. Always start by reading and understanding the data
-2. Handle missing data gracefully (don't fail, report and continue)
-3. Use clear variable names in generated code
-4. Show sample data before complex transformations
-5. Ask clarifying questions if the request is ambiguous
-6. Provide actionable insights, not just numbers
-
-## Example Interactions
-
-User: "Analyze this CSV"
-You: Read the file, show shape/columns/types, basic stats, identify patterns, suggest visualizations.
-
-User: "Show me trends over time"
-You: Identify date columns, aggregate appropriately, create line chart, explain trends.
-
-User: "Find outliers"
-You: Use statistical methods (IQR, z-score), visualize with box plots, list specific outliers.
+When creating visualizations, prefer Plotly for interactivity.
+When showing tables, limit to 20 rows unless asked for more.
+Always explain what the data shows in plain language.
 '''
         with open(path, 'w') as f:
             f.write(content)
-        logger.info(f"Created Data Studio CLAUDE.md at {path}")
+        logger.info(f"Created CLAUDE.md at {path}")
 
     def list_data_files(self, project_dir: str) -> List[Dict]:
         """List available data files in the project."""
@@ -138,7 +116,8 @@ You: Use statistical methods (IQR, z-score), visualize with box plots, list spec
 
         data_extensions = {
             '.csv', '.tsv', '.xlsx', '.xls', '.json', '.jsonl',
-            '.parquet', '.feather', '.pickle', '.pkl', '.h5', '.hdf5'
+            '.parquet', '.feather', '.pickle', '.pkl', '.h5', '.hdf5',
+            '.txt', '.md'
         }
 
         for root, _, filenames in os.walk(data_dir):
@@ -147,14 +126,17 @@ You: Use statistical methods (IQR, z-score), visualize with box plots, list spec
                 if ext in data_extensions:
                     full_path = os.path.join(root, filename)
                     rel_path = os.path.relpath(full_path, project_dir)
-                    stat = os.stat(full_path)
-                    files.append({
-                        "name": filename,
-                        "path": rel_path,
-                        "size": stat.st_size,
-                        "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                        "type": ext[1:]  # Remove the dot
-                    })
+                    try:
+                        stat = os.stat(full_path)
+                        files.append({
+                            "name": filename,
+                            "path": rel_path,
+                            "size": stat.st_size,
+                            "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                            "type": ext[1:]  # Remove the dot
+                        })
+                    except OSError:
+                        continue
 
         return sorted(files, key=lambda x: x['name'])
 
@@ -164,145 +146,126 @@ You: Use statistical methods (IQR, z-score), visualize with box plots, list spec
         project_name: str,
         session_id: Optional[str] = None
     ) -> DataStudioSession:
-        """
-        Create a new Data Studio session.
-
-        Spawns a claude -p process with streaming JSON I/O.
-        """
+        """Create a new Data Studio session."""
         if session_id is None:
             session_id = f"ds-{uuid.uuid4().hex[:8]}"
 
         project_dir = self._get_project_dir(user_id, project_name)
-        data_studio_dir = self._get_data_studio_dir(project_dir)
 
         # Ensure project exists
         if not os.path.exists(project_dir):
             raise ValueError(f"Project not found: {project_name}")
 
         # Create Data Studio structure
-        self._ensure_data_studio_structure(data_studio_dir)
+        self._ensure_data_studio_structure(project_dir)
 
-        # Create session object first (process started on first message)
+        # Generate deterministic Claude session ID for this user+project
+        claude_session_id = self._generate_claude_session_id(user_id, project_name)
+
         session = DataStudioSession(
             id=session_id,
             user_id=user_id,
             project_name=project_name,
             project_dir=project_dir,
-            data_studio_dir=data_studio_dir,
+            claude_session_id=claude_session_id,
         )
 
         self.sessions[session_id] = session
         logger.info(f"Created Data Studio session {session_id} for project {project_name}")
+        logger.info(f"Claude session ID: {claude_session_id}")
 
         return session
 
-    async def _start_claude_process(self, session: DataStudioSession) -> None:
-        """Start the Claude process for a session."""
-        if session.process is not None:
-            return
-
-        # Build command
-        cmd = [
-            "claude",
-            "-p",  # Print mode (non-interactive)
-            "--output-format", "stream-json",
-            "--input-format", "stream-json",
-            "--session-id", session.id,
-            "--permission-mode", "bypassPermissions",
-        ]
-
-        logger.info(f"Starting Claude process: {' '.join(cmd)}")
-        logger.info(f"Working directory: {session.data_studio_dir}")
-
-        # Spawn process
-        session.process = await asyncio.create_subprocess_exec(
-            *cmd,
-            stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            cwd=session.data_studio_dir,
-        )
-
-        logger.info(f"Claude process started with PID {session.process.pid}")
-
     async def send_message(self, session_id: str, message: str) -> None:
         """
-        Send a message to the Claude process.
-
-        For stream-json input format, we send JSON objects.
+        Prepare to send a message. Actual execution happens in stream_output.
         """
         session = self.sessions.get(session_id)
         if not session:
             raise ValueError(f"Session not found: {session_id}")
 
-        # Start process if not running
-        if session.process is None:
-            await self._start_claude_process(session)
-
-        if session.process.stdin is None:
-            raise RuntimeError("Process stdin is not available")
-
-        # Format message for stream-json input
-        # The input format expects JSON with the user message
-        input_data = {
-            "type": "user",
-            "message": message
-        }
-
-        line = json.dumps(input_data) + "\n"
-        session.process.stdin.write(line.encode())
-        await session.process.stdin.drain()
-
         session.last_activity = datetime.utcnow()
-        logger.debug(f"Sent message to session {session_id}: {message[:100]}...")
+        # Store the pending message for stream_output to process
+        session._pending_message = message
 
     async def stream_output(
         self,
         session_id: str
     ) -> AsyncGenerator[Dict, None]:
         """
-        Stream parsed output events from Claude.
+        Execute Claude and stream the output.
 
-        Yields structured events for the frontend.
+        Spawns: claude -p "message" --output-format stream-json --session-id {uuid}
+        Or for continuation: claude -p "message" --resume {uuid} --output-format stream-json
         """
         session = self.sessions.get(session_id)
         if not session:
             raise ValueError(f"Session not found: {session_id}")
 
-        if session.process is None:
-            await self._start_claude_process(session)
+        message = getattr(session, '_pending_message', None)
+        if not message:
+            yield {"type": "error", "message": "No message to process"}
+            return
 
-        if session.process.stdout is None:
-            raise RuntimeError("Process stdout is not available")
+        # Build command
+        cmd = ["claude", "-p", message, "--output-format", "stream-json"]
+
+        if session.is_first_message:
+            # First message: use --session-id to create new session
+            cmd.extend(["--session-id", session.claude_session_id])
+            session.is_first_message = False
+        else:
+            # Subsequent messages: use --resume to continue session
+            cmd.extend(["--resume", session.claude_session_id])
+
+        # Add permission mode
+        cmd.extend(["--permission-mode", "bypassPermissions"])
+
+        logger.info(f"Executing: {' '.join(cmd[:6])}...")  # Log truncated command
+        logger.info(f"Working directory: {session.project_dir}")
 
         try:
-            async for line in session.process.stdout:
-                line_str = line.decode().strip()
-                if not line_str:
-                    continue
+            # Spawn process
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                cwd=session.project_dir,
+            )
 
-                event = self._parse_output_line(line_str)
-                if event:
-                    yield event
+            # Stream stdout
+            if process.stdout:
+                async for line in process.stdout:
+                    line_str = line.decode().strip()
+                    if not line_str:
+                        continue
 
-                    # Check for completion
-                    if event.get("type") == "result":
-                        yield {"type": "done"}
-                        break
+                    event = self._parse_output_line(line_str)
+                    if event:
+                        yield event
+
+            # Wait for process to complete
+            await process.wait()
+
+            # Check for errors
+            if process.returncode != 0 and process.stderr:
+                stderr = await process.stderr.read()
+                if stderr:
+                    error_msg = stderr.decode().strip()
+                    logger.error(f"Claude error: {error_msg}")
+                    yield {"type": "error", "message": error_msg[:500]}
+
+            yield {"type": "done"}
 
         except asyncio.CancelledError:
             logger.info(f"Output streaming cancelled for session {session_id}")
             raise
         except Exception as e:
-            logger.error(f"Error streaming output for session {session_id}: {e}")
+            logger.error(f"Error in stream_output for session {session_id}: {e}")
             yield {"type": "error", "message": str(e)}
 
     def _parse_output_line(self, line: str) -> Optional[Dict]:
-        """
-        Parse a line of Claude's stream-json output.
-
-        Transforms Claude's format into frontend-friendly events.
-        """
+        """Parse a line of Claude's stream-json output."""
         try:
             data = json.loads(line)
         except json.JSONDecodeError:
@@ -311,22 +274,15 @@ You: Use statistical methods (IQR, z-score), visualize with box plots, list spec
 
         msg_type = data.get("type")
 
+        # Handle different message types from Claude's stream-json output
         if msg_type == "assistant":
-            # Assistant message - may contain text, tool use, etc.
             message = data.get("message", {})
             content_blocks = message.get("content", [])
 
-            events = []
             for block in content_blocks:
                 block_type = block.get("type")
-
                 if block_type == "text":
-                    text = block.get("text", "")
-                    # Check for code blocks
-                    if "```" in text:
-                        return self._parse_text_with_code(text)
-                    return {"type": "text", "content": text}
-
+                    return {"type": "text", "content": block.get("text", "")}
                 elif block_type == "tool_use":
                     return {
                         "type": "tool_call",
@@ -335,27 +291,6 @@ You: Use statistical methods (IQR, z-score), visualize with box plots, list spec
                         "input": block.get("input", {}),
                         "status": "running"
                     }
-
-            # Fallback
-            return {"type": "assistant", "data": data}
-
-        elif msg_type == "tool_use":
-            return {
-                "type": "tool_call",
-                "id": data.get("id"),
-                "tool": data.get("name"),
-                "input": data.get("input", {}),
-                "status": "running"
-            }
-
-        elif msg_type == "tool_result":
-            content = data.get("content", "")
-            return {
-                "type": "tool_result",
-                "tool_use_id": data.get("tool_use_id"),
-                "content": content[:5000] if len(content) > 5000 else content,
-                "truncated": len(content) > 5000
-            }
 
         elif msg_type == "content_block_start":
             block = data.get("content_block", {})
@@ -367,7 +302,8 @@ You: Use statistical methods (IQR, z-score), visualize with box plots, list spec
                     "input": {},
                     "status": "starting"
                 }
-            return None
+            elif block.get("type") == "text":
+                return None  # Wait for delta
 
         elif msg_type == "content_block_delta":
             delta = data.get("delta", {})
@@ -375,68 +311,45 @@ You: Use statistical methods (IQR, z-score), visualize with box plots, list spec
                 return {"type": "text_delta", "content": delta.get("text", "")}
             elif delta.get("type") == "input_json_delta":
                 return {"type": "input_delta", "content": delta.get("partial_json", "")}
+
+        elif msg_type == "content_block_stop":
+            return None  # Block finished
+
+        elif msg_type == "message_start":
+            return {"type": "thinking", "content": "Processing..."}
+
+        elif msg_type == "message_delta":
+            # Contains stop_reason, usage, etc.
             return None
 
-        elif msg_type == "message_stop" or msg_type == "result":
-            return {"type": "done"}
+        elif msg_type == "message_stop":
+            return None  # Will send done after
+
+        elif msg_type == "result":
+            # Final result
+            result = data.get("result", "")
+            if result:
+                return {"type": "text", "content": result}
+            return None
 
         elif msg_type == "error":
             return {"type": "error", "message": data.get("error", {}).get("message", "Unknown error")}
 
-        # Unknown type - pass through
-        return {"type": "raw", "data": data}
+        elif msg_type == "system":
+            # System messages (e.g., session info)
+            return {"type": "thinking", "content": data.get("message", "")}
 
-    def _parse_text_with_code(self, text: str) -> Dict:
-        """Parse text that may contain code blocks."""
-        import re
-
-        # Find code blocks
-        code_pattern = r'```(\w+)?\n(.*?)```'
-        matches = list(re.finditer(code_pattern, text, re.DOTALL))
-
-        if not matches:
-            return {"type": "text", "content": text}
-
-        # For now, return the first code block found
-        match = matches[0]
-        language = match.group(1) or "python"
-        code = match.group(2).strip()
-
-        # Get text before and after
-        before = text[:match.start()].strip()
-        after = text[match.end():].strip()
-
-        return {
-            "type": "code",
-            "language": language,
-            "content": code,
-            "context_before": before,
-            "context_after": after
-        }
+        # Unknown type - log and skip
+        logger.debug(f"Unknown message type: {msg_type}")
+        return None
 
     async def close_session(self, session_id: str) -> bool:
-        """Close a Data Studio session and cleanup."""
+        """Close a Data Studio session."""
         session = self.sessions.get(session_id)
         if not session:
             return False
 
         session.is_active = False
-
-        # Cancel output task if running
-        if session_id in self._output_tasks:
-            self._output_tasks[session_id].cancel()
-            del self._output_tasks[session_id]
-
-        # Terminate process
-        if session.process:
-            try:
-                session.process.terminate()
-                await asyncio.wait_for(session.process.wait(), timeout=5.0)
-            except asyncio.TimeoutError:
-                session.process.kill()
-            except Exception as e:
-                logger.error(f"Error closing session {session_id}: {e}")
-
         del self.sessions[session_id]
         logger.info(f"Closed Data Studio session {session_id}")
         return True
