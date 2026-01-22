@@ -561,6 +561,59 @@ function WelcomeContent() {
           )}
         </div>
 
+        {/* Video Gallery Section */}
+        <div className="mb-6">
+          <button
+            onClick={() => toggleSection('videos')}
+            className="w-full flex items-center justify-between p-4 bg-red-900/30 border border-red-700/50 rounded-xl hover:bg-red-900/40 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Play className="w-5 h-5 text-red-400" />
+              <span className="text-lg font-semibold text-white">Video Tutorials</span>
+            </div>
+            {expandedSection === 'videos' ? (
+              <ChevronDown className="w-5 h-5 text-slate-400" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-slate-400" />
+            )}
+          </button>
+          {expandedSection === 'videos' && (
+            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl">
+              <div className="grid md:grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* MCP Protocol Video */}
+                <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl overflow-hidden">
+                  <video
+                    controls
+                    className="w-full aspect-video object-contain bg-black"
+                    preload="metadata"
+                    poster="/mcp-video-poster.png"
+                  >
+                    <source src="/mcp-protocol-video.mp4" type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                  <div className="p-4 border-t border-slate-700/50">
+                    <h4 className="font-medium text-white mb-1">Claude Code, MCP & Skills</h4>
+                    <p className="text-sm text-slate-400">
+                      Learn how Claude Code uses MCP (Model Context Protocol) servers and skills to extend capabilities for scientific research tasks.
+                    </p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="text-xs bg-red-500/20 text-red-300 px-2 py-0.5 rounded">Introduction</span>
+                      <span className="text-xs bg-slate-600/50 text-slate-400 px-2 py-0.5 rounded">~5 min</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Placeholder for future videos */}
+                <div className="bg-slate-900/30 border border-dashed border-slate-700/50 rounded-xl flex flex-col items-center justify-center p-8 min-h-[280px]">
+                  <Video className="w-12 h-12 text-slate-600 mb-3" />
+                  <p className="text-slate-500 text-center">More tutorials coming soon</p>
+                  <p className="text-xs text-slate-600 text-center mt-1">Advanced workflows, database queries, data analysis</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Call to Action */}
         <div className="text-center py-8">
           <p className="text-slate-400 mb-4">
