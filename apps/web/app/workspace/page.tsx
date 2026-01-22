@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, FolderOpen, FileText, RefreshCw, Home, Globe, Github, X, ChevronRight, Clock, MessageSquare, Loader2, Download, Terminal, Plus, FileCode, FileJson, Square, Image, Video, Music, FileType, Sparkles, Bot, Upload, Table, FileSpreadsheet, Lightbulb } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
+import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, Clock, Download, Terminal, Plus, FileCode, FileJson, Image, Video, Music, FileType, Upload, Table, FileSpreadsheet, Loader2, Lightbulb, Play, Power } from 'lucide-react';
 import Link from 'next/link';
-import { ProtectedRoute } from '@/components/auth';
+import { ProtectedRoute, useAuth } from '@/components/auth';
 import ProjectSidebar from '@/components/workspace/ProjectSidebar';
 import DataBrowser from '@/components/workspace/DataBrowser';
-import { workspaceApi, WorkspaceProject, WorkspaceDataItem } from '@/lib/api';
+import { workspaceApi, WorkspaceProject, WorkspaceDataItem, getApiUrl } from '@/lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
@@ -14,6 +15,22 @@ import mermaid from 'mermaid';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
+
+// Dynamic import for CCResearchTerminal (client-only, xterm.js requires DOM)
+const CCResearchTerminal = dynamic(
+  () => import('@/components/ccresearch/CCResearchTerminal'),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-full flex items-center justify-center text-slate-400 bg-slate-900/50">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 mx-auto mb-2 animate-spin" />
+          <p>Loading terminal...</p>
+        </div>
+      </div>
+    )
+  }
+);
 
 // Initialize mermaid for notes preview
 if (typeof window !== 'undefined') {
@@ -464,40 +481,7 @@ function DocxViewer({ fileUrl, fileSize = 0 }: { fileUrl: string; fileSize?: num
   );
 }
 
-// Dynamic API URL based on hostname (production vs local)
-function getApiUrl() {
-  if (typeof window === 'undefined') {
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-  }
-  const hostname = window.location.hostname;
-  if (hostname === 'orpheuscore.uk' || hostname === 'www.orpheuscore.uk') {
-    return 'https://api.orpheuscore.uk';
-  }
-  if (hostname === 'ai.ultronsolar.in' || hostname === 'www.ultronsolar.in') {
-    return 'https://api.ultronsolar.in';
-  }
-  return process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
-}
-
-const API_URL = typeof window !== 'undefined' ? getApiUrl() : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
-
-type ViewMode = 'notes' | 'data' | 'research';
-type SourceType = 'web' | 'github';
-
-interface ResearchSession {
-  id: string;
-  project_name: string;
-  claude_session_id: string | null;
-  source_type: string;
-  urls: string[];
-  initial_prompt: string;
-  status: string;
-  error_message: string | null;
-  created_at: string;
-  last_activity: string;
-  conversation_turns: number;
-  last_response: string | null;
-}
+type ViewMode = 'notes' | 'data' | 'terminal';
 
 const LAST_PROJECT_KEY = 'workspace_last_project';
 
@@ -518,28 +502,18 @@ export default function WorkspacePage() {
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>('notes');
 
+  // Terminal state
+  const { user } = useAuth();
+  const [terminalSessionId, setTerminalSessionId] = useState<string | null>(null);
+  const [terminalConnected, setTerminalConnected] = useState(false);
+  const [isStartingTerminal, setIsStartingTerminal] = useState(false);
+  const [browserSessionId, setBrowserSessionId] = useState('');
+  const [projectSessions, setProjectSessions] = useState<any[]>([]);
+  const [loadingProjectSessions, setLoadingProjectSessions] = useState(false);
+
   // Search
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Import modal state
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [importSourceType, setImportSourceType] = useState<SourceType>('web');
-  const [importUrls, setImportUrls] = useState<string[]>(['']);
-  const [importPrompt, setImportPrompt] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-
-  // Research sessions state
-  const [researchSessions, setResearchSessions] = useState<ResearchSession[]>([]);
-  const [selectedSession, setSelectedSession] = useState<ResearchSession | null>(null);
-  const [loadingSessions, setLoadingSessions] = useState(false);
-  const [continuePrompt, setContinuePrompt] = useState('');
-  const [isContinuing, setIsContinuing] = useState(false);
-
-  // Streaming log state
-  const [streamingLog, setStreamingLog] = useState<string>('');
-  const [isStreaming, setIsStreaming] = useState(false);
-  const logContainerRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
 
   // Toast message
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -550,95 +524,109 @@ export default function WorkspacePage() {
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isCreatingNote, setIsCreatingNote] = useState(false);
 
-  // AI view files sidebar state
-  const [showAiFilesSidebar, setShowAiFilesSidebar] = useState(false);
-
   // Show toast
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Get WebSocket URL
-  const getWsUrl = () => {
-    const apiUrl = getApiUrl();
-    return apiUrl.replace('https://', 'wss://').replace('http://', 'ws://');
+  // Initialize browser session ID for terminal
+  useEffect(() => {
+    const storedId = localStorage.getItem('workspace-browser-session-id');
+    if (storedId) {
+      setBrowserSessionId(storedId);
+    } else {
+      const newId = `ws-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+      localStorage.setItem('workspace-browser-session-id', newId);
+      setBrowserSessionId(newId);
+    }
+  }, []);
+
+  // Start terminal session for current project
+  const startTerminalSession = async () => {
+    if (!selectedProject || !user?.email || !browserSessionId) return;
+
+    setIsStartingTerminal(true);
+    try {
+      const formData = new FormData();
+      formData.append('session_id', browserSessionId);
+      formData.append('email', user.email);
+      formData.append('project_name', selectedProject);
+      formData.append('title', selectedProject);
+
+      const res = await fetch(`${getApiUrl()}/ccresearch/sessions`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ detail: 'Failed to start terminal' }));
+        throw new Error(error.detail || 'Failed to start terminal');
+      }
+
+      const session = await res.json();
+      setTerminalSessionId(session.id);
+      showToast('Terminal started', 'success');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to start terminal', 'error');
+    } finally {
+      setIsStartingTerminal(false);
+    }
   };
 
-  // Connect to streaming WebSocket
-  const connectToStream = useCallback((sessionId: string) => {
-    // Close existing connection
-    if (wsRef.current) {
-      wsRef.current.close();
+  // Stop terminal session
+  const stopTerminalSession = async () => {
+    if (!terminalSessionId) return;
+
+    try {
+      await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/terminate`, {
+        method: 'POST',
+      });
+      setTerminalSessionId(null);
+      setTerminalConnected(false);
+      showToast('Terminal stopped', 'success');
+    } catch (error) {
+      // Ignore termination errors
     }
+  };
 
-    setStreamingLog('Connecting to session stream...\n');
-    setIsStreaming(true);
+  // Load sessions for the current project (for Terminal tab)
+  const loadProjectSessions = useCallback(async () => {
+    if (!selectedProject || !browserSessionId) return;
 
-    const wsUrl = `${getWsUrl()}/import-research/sessions/${sessionId}/stream`;
-    const ws = new WebSocket(wsUrl);
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      setStreamingLog(prev => prev + '=== Connected to stream ===\n\n');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-
-        if (data.type === 'log') {
-          setStreamingLog(prev => prev + data.content);
-          // Auto-scroll to bottom
-          if (logContainerRef.current) {
-            logContainerRef.current.scrollTop = logContainerRef.current.scrollHeight;
-          }
-        } else if (data.type === 'complete') {
-          setStreamingLog(prev => prev + `\n\n=== Session Complete (${data.status}) ===\n`);
-          setIsStreaming(false);
-        } else if (data.type === 'error') {
-          setStreamingLog(prev => prev + `\n\n=== Error: ${data.message} ===\n`);
-          setIsStreaming(false);
-        }
-      } catch (e) {
-        // Plain text message
-        setStreamingLog(prev => prev + event.data);
+    try {
+      setLoadingProjectSessions(true);
+      const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${browserSessionId}`, {
+        credentials: 'include',
+      });
+      if (res.ok) {
+        const sessions = await res.json();
+        // Filter to sessions that match this project name
+        const projectMatches = sessions.filter((s: any) =>
+          s.workspace_project === selectedProject || s.title === selectedProject
+        );
+        setProjectSessions(projectMatches);
       }
-    };
-
-    ws.onerror = () => {
-      setStreamingLog(prev => prev + '\n\n=== Connection error ===\n');
-      setIsStreaming(false);
-    };
-
-    ws.onclose = () => {
-      setStreamingLog(prev => prev + '\n\n=== Connection closed ===\n');
-      setIsStreaming(false);
-    };
-  }, []);
-
-  // Disconnect from stream
-  const disconnectStream = useCallback(() => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+    } catch (error) {
+      console.error('Failed to load project sessions:', error);
+    } finally {
+      setLoadingProjectSessions(false);
     }
-    setIsStreaming(false);
-  }, []);
+  }, [selectedProject, browserSessionId]);
 
-  // Auto-connect when viewing a processing session
+  // Reset terminal when project changes
   useEffect(() => {
-    if (selectedSession && (selectedSession.status === 'processing' || selectedSession.status === 'crawling')) {
-      connectToStream(selectedSession.id);
-    } else {
-      disconnectStream();
-      setStreamingLog('');
-    }
+    setTerminalSessionId(null);
+    setTerminalConnected(false);
+    setProjectSessions([]);
+  }, [selectedProject]);
 
-    return () => {
-      disconnectStream();
-    };
-  }, [selectedSession?.id, selectedSession?.status, connectToStream, disconnectStream]);
+  // Load project sessions when switching to terminal view or project changes
+  useEffect(() => {
+    if (viewMode === 'terminal' && selectedProject && browserSessionId) {
+      loadProjectSessions();
+    }
+  }, [viewMode, selectedProject, browserSessionId, loadProjectSessions]);
 
   // Save selected project to localStorage when it changes
   useEffect(() => {
@@ -720,38 +708,6 @@ export default function WorkspacePage() {
     }
   }, [selectedProject]);
 
-  // Load research sessions for selected project
-  const loadResearchSessions = useCallback(async () => {
-    if (!selectedProject) {
-      setResearchSessions([]);
-      setSelectedSession(null);
-      return;
-    }
-
-    try {
-      setLoadingSessions(true);
-      const res = await fetch(`${API_URL}/import-research/sessions?project_name=${encodeURIComponent(selectedProject)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setResearchSessions(data);
-        // Auto-select the first (only) session for this project
-        if (data.length > 0) {
-          setSelectedSession(data[0]);
-          // Connect to stream if session is processing
-          if (data[0].status === 'processing' || data[0].status === 'crawling') {
-            connectToStream(data[0].id);
-          }
-        } else {
-          setSelectedSession(null);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load research sessions:', error);
-    } finally {
-      setLoadingSessions(false);
-    }
-  }, [selectedProject]);
-
   // Initial load
   useEffect(() => {
     loadProjects();
@@ -764,11 +720,9 @@ export default function WorkspacePage() {
         loadTextFiles();
         setSelectedTextFile(null);
         setTextFileContent('');
-      } else if (viewMode === 'research') {
-        loadResearchSessions();
       }
     }
-  }, [selectedProject, viewMode, loadTextFiles, loadResearchSessions]);
+  }, [selectedProject, viewMode, loadTextFiles]);
 
   // Load file content when a text file is selected
   useEffect(() => {
@@ -794,24 +748,6 @@ export default function WorkspacePage() {
 
     return () => clearInterval(interval);
   }, [viewMode, selectedProject]);
-
-  // Refresh session status periodically
-  useEffect(() => {
-    if (viewMode !== 'research' || !selectedProject) return;
-
-    const interval = setInterval(() => {
-      loadResearchSessions();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [viewMode, selectedProject, loadResearchSessions]);
-
-  // Reload sessions when streaming completes
-  useEffect(() => {
-    if (!isStreaming && streamingLog.includes('=== Session Complete')) {
-      loadResearchSessions();
-    }
-  }, [isStreaming, streamingLog, loadResearchSessions]);
 
   // Create project
   const handleCreateProject = async (name: string) => {
@@ -894,173 +830,11 @@ export default function WorkspacePage() {
     }
   };
 
-  // Add URL input
-  const handleAddUrl = () => {
-    setImportUrls(prev => [...prev, '']);
-  };
-
-  // Update URL
-  const handleUpdateUrl = (index: number, value: string) => {
-    setImportUrls(prev => prev.map((url, i) => i === index ? value : url));
-  };
-
-  // Remove URL
-  const handleRemoveUrl = (index: number) => {
-    if (importUrls.length > 1) {
-      setImportUrls(prev => prev.filter((_, i) => i !== index));
-    }
-  };
-
-  // Start import or chat
-  const handleStartImport = async () => {
-    if (!selectedProject) {
-      showToast('Select a project first', 'error');
-      return;
-    }
-
-    if (!importPrompt.trim()) {
-      showToast('Enter a prompt', 'error');
-      return;
-    }
-
-    const validUrls = importUrls.filter(url => url.trim());
-    const hasUrls = validUrls.length > 0;
-
-    try {
-      setIsImporting(true);
-
-      const res = await fetch(`${API_URL}/import-research/sessions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          project_name: selectedProject,
-          urls: validUrls,
-          prompt: importPrompt.trim(),
-          source_type: hasUrls ? importSourceType : 'chat',
-          auto_process: true, // Always true - chat mode skips crawling automatically
-          auto_run: true
-        })
-      });
-
-      if (!res.ok) {
-        const error = await res.json().catch(() => ({ detail: 'Failed to create session' }));
-        throw new Error(error.detail || 'Failed to create session');
-      }
-
-      const session = await res.json();
-
-      showToast(hasUrls ? 'Import started! Processing sources...' : 'Starting conversation...');
-      setShowImportModal(false);
-      setImportUrls(['']);
-      setImportPrompt('');
-      setViewMode('research');
-      loadResearchSessions();
-
-    } catch (error: any) {
-      showToast(error.message || 'Failed to start', 'error');
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  // Continue conversation
-  const handleContinueConversation = async () => {
-    if (!selectedSession || !continuePrompt.trim()) return;
-
-    try {
-      setIsContinuing(true);
-      const sessionId = selectedSession.id;
-      const prompt = continuePrompt.trim();
-      setContinuePrompt('');
-
-      // Update session status locally to show processing state
-      setSelectedSession(prev => prev ? { ...prev, status: 'processing' } : null);
-
-      // Connect to stream immediately to see live output
-      connectToStream(sessionId);
-
-      // Send the continue request (don't wait for it to complete)
-      fetch(`${API_URL}/import-research/sessions/${sessionId}/continue`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt })
-      }).then(async (res) => {
-        if (!res.ok) {
-          const error = await res.json().catch(() => ({ detail: 'Failed to continue' }));
-          showToast(error.detail || 'Failed to continue conversation', 'error');
-        }
-        // Refresh sessions when done
-        loadResearchSessions();
-      }).catch((error) => {
-        showToast(error.message || 'Failed to continue', 'error');
-      }).finally(() => {
-        setIsContinuing(false);
-      });
-
-    } catch (error: any) {
-      showToast(error.message || 'Failed to continue', 'error');
-      setIsContinuing(false);
-    }
-  };
-
-  // Delete session
-  const handleDeleteSession = async (sessionId: string) => {
-    if (!confirm('Delete this research session?')) return;
-
-    try {
-      await fetch(`${API_URL}/import-research/sessions/${sessionId}`, { method: 'DELETE' });
-      setResearchSessions(prev => prev.filter(s => s.id !== sessionId));
-      if (selectedSession?.id === sessionId) {
-        setSelectedSession(null);
-      }
-      showToast('Session deleted');
-    } catch (error: any) {
-      showToast('Failed to delete session', 'error');
-    }
-  };
-
-  // Stop a running session
-  const handleStopSession = async (sessionId: string) => {
-    try {
-      const res = await fetch(`${API_URL}/import-research/sessions/${sessionId}/stop`, {
-        method: 'POST'
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to stop session');
-      }
-
-      showToast('Session stopped');
-      disconnectStream();
-      loadResearchSessions();
-
-      // Refresh the selected session
-      const updated = await fetch(`${API_URL}/import-research/sessions/${sessionId}`);
-      if (updated.ok) {
-        const sessionData = await updated.json();
-        setSelectedSession(sessionData);
-      }
-    } catch (error: any) {
-      showToast(error.message || 'Failed to stop session', 'error');
-    }
-  };
-
-  // Filter notes by search
   // Filter text files by search query
   const filteredTextFiles = textFiles.filter(file =>
     file.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     file.path.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  // Get status color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'ready': return 'text-green-400';
-      case 'processing': case 'crawling': return 'text-yellow-400';
-      case 'error': return 'text-red-400';
-      default: return 'text-slate-400';
-    }
-  };
 
   return (
     <ProtectedRoute>
@@ -1162,235 +936,6 @@ export default function WorkspacePage() {
         </div>
       )}
 
-      {/* Ask AI Modal */}
-      {showImportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg border border-slate-700 shadow-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <Sparkles size={20} className="text-indigo-400" />
-                Ask AI
-              </h2>
-              <button
-                onClick={() => setShowImportModal(false)}
-                className="text-slate-400 hover:text-white"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {/* URL/Repo Input (Optional) */}
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  URL or GitHub repo <span className="text-slate-500 font-normal">(optional)</span>
-                </label>
-                <div className="space-y-2">
-                  {importUrls.map((url, index) => (
-                    <div key={index} className="flex gap-2">
-                      <div className="relative flex-1">
-                        {url.includes('github.com') ? (
-                          <Github size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        ) : url.trim() ? (
-                          <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        ) : (
-                          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        )}
-                        <input
-                          type="text"
-                          value={url}
-                          onChange={(e) => {
-                            handleUpdateUrl(index, e.target.value);
-                            // Auto-detect source type
-                            if (e.target.value.includes('github.com')) {
-                              setImportSourceType('github');
-                            } else if (e.target.value.startsWith('http')) {
-                              setImportSourceType('web');
-                            }
-                          }}
-                          placeholder="https://docs.example.com or github.com/owner/repo"
-                          className="w-full bg-slate-700 border border-slate-600 rounded-lg pl-10 pr-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-                        />
-                      </div>
-                      {importUrls.length > 1 && (
-                        <button
-                          onClick={() => handleRemoveUrl(index)}
-                          className="px-2 text-slate-400 hover:text-red-400"
-                          title="Remove URL"
-                        >
-                          <X size={16} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  {importUrls.some(u => u.trim()) && (
-                    <button
-                      onClick={handleAddUrl}
-                      className="text-indigo-400 hover:text-indigo-300 text-sm flex items-center gap-1"
-                    >
-                      <Plus size={14} />
-                      Add another URL
-                    </button>
-                  )}
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1.5">
-                  Leave empty to chat about project files • Paste URL to import & analyze
-                </p>
-              </div>
-
-              {/* Quick Suggestions */}
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Quick actions</label>
-                <div className="flex flex-wrap gap-1.5">
-                  {importUrls.some(u => u.includes('github.com')) ? (
-                    // GitHub suggestions
-                    <>
-                      <button
-                        onClick={() => setImportPrompt('Clone the repository and analyze the codebase. Create a summary of the architecture, main components, and how to get started.')}
-                        className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1.5 rounded-full transition-colors"
-                      >
-                        Analyze repo structure
-                      </button>
-                      <button
-                        onClick={() => setImportPrompt('Clone and review the code for [FEATURE]. Explain how it works and suggest improvements.')}
-                        className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1.5 rounded-full transition-colors"
-                      >
-                        Review feature
-                      </button>
-                      <button
-                        onClick={() => setImportPrompt('Clone the repo and create documentation including README, API docs, and usage examples.')}
-                        className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1.5 rounded-full transition-colors"
-                      >
-                        Generate docs
-                      </button>
-                    </>
-                  ) : importUrls.some(u => u.trim()) ? (
-                    // Website suggestions
-                    <>
-                      <button
-                        onClick={() => setImportPrompt('Crawl and extract all content from the website. Create a comprehensive summary of the key information.')}
-                        className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1.5 rounded-full transition-colors"
-                      >
-                        Scrape all pages
-                      </button>
-                      <button
-                        onClick={() => setImportPrompt('Crawl the website and extract data about [TOPIC]. Format as a structured report.')}
-                        className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1.5 rounded-full transition-colors"
-                      >
-                        Extract specific data
-                      </button>
-                      <button
-                        onClick={() => setImportPrompt('Import the documentation and create a getting started guide with code examples.')}
-                        className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1.5 rounded-full transition-colors"
-                      >
-                        Create guide from docs
-                      </button>
-                    </>
-                  ) : (
-                    // Project analysis suggestions
-                    <>
-                      <button
-                        onClick={() => setImportPrompt('Read all files in this project and summarize what it does, its structure, and key components.')}
-                        className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1.5 rounded-full transition-colors"
-                      >
-                        Summarize project
-                      </button>
-                      <button
-                        onClick={() => setImportPrompt('Analyze the uploaded data files and create a detailed report with insights and visualizations.')}
-                        className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1.5 rounded-full transition-colors"
-                      >
-                        Analyze data
-                      </button>
-                      <button
-                        onClick={() => setImportPrompt('Search PubMed and bioRxiv for recent papers about [TOPIC] and create a literature review.')}
-                        className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1.5 rounded-full transition-colors"
-                      >
-                        Literature search
-                      </button>
-                      <button
-                        onClick={() => setImportPrompt('Query the AACT clinical trials database for studies related to [CONDITION/DRUG] and summarize findings.')}
-                        className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-2.5 py-1.5 rounded-full transition-colors"
-                      >
-                        Clinical trials
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Prompt */}
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  What would you like Claude to do?
-                </label>
-                <textarea
-                  value={importPrompt}
-                  onChange={(e) => setImportPrompt(e.target.value)}
-                  placeholder={importUrls.some(u => u.includes('github.com'))
-                    ? "e.g., Clone and analyze the repo structure, review specific features..."
-                    : importUrls.some(u => u.trim())
-                    ? "e.g., Crawl and summarize the docs, extract data from pages..."
-                    : "e.g., Summarize project files, analyze data, search literature..."
-                  }
-                  rows={4}
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 resize-none"
-                />
-                {importPrompt.includes('[') && (
-                  <p className="text-[11px] text-amber-400 mt-1.5 flex items-center gap-1">
-                    <span>💡</span> Replace [PLACEHOLDERS] with your specific values
-                  </p>
-                )}
-              </div>
-
-              {/* Capabilities hint - collapsed by default */}
-              <details className="bg-slate-700/30 rounded-lg text-xs text-slate-400">
-                <summary className="p-3 cursor-pointer hover:text-slate-300 flex items-center gap-2">
-                  <span className="font-medium text-slate-300">What Claude can do</span>
-                  <span className="text-slate-500">• Click to expand</span>
-                </summary>
-                <div className="px-3 pb-3 pt-1 border-t border-slate-600/50">
-                  <ul className="list-disc list-inside space-y-1">
-                    <li>Read and analyze all files in your project</li>
-                    <li>Import websites, docs, or GitHub repos</li>
-                    <li>Connect to databases (AACT clinical trials, external DBs)</li>
-                    <li>Search PubMed, bioRxiv, ChEMBL, and 15+ sources</li>
-                    <li>Generate reports, summaries, and documentation</li>
-                    <li>Create files, scripts, and visualizations</li>
-                  </ul>
-                  <Link
-                    href="/ccresearch/tips"
-                    target="_blank"
-                    className="inline-flex items-center gap-1 mt-2 text-amber-400 hover:text-amber-300"
-                  >
-                    <Lightbulb size={12} />
-                    View prompting tips & best practices
-                  </Link>
-                </div>
-              </details>
-
-              {/* Start button */}
-              <button
-                onClick={handleStartImport}
-                disabled={isImporting || !importPrompt.trim()}
-                className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed text-white py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/25"
-              >
-                {isImporting ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Starting...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles size={16} />
-                    {importUrls.some(u => u.trim()) ? 'Import & Analyze' : 'Start'}
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <header className="bg-slate-800/50 border-b border-slate-700 px-4 py-3">
         <div className="flex items-center justify-between">
@@ -1461,20 +1006,15 @@ export default function WorkspacePage() {
                 Files
               </button>
               <button
-                onClick={() => {
-                  setViewMode('research');
-                  if (!researchSessions.length) {
-                    setShowImportModal(true);
-                  }
-                }}
+                onClick={() => setViewMode('terminal')}
                 className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                  viewMode === 'research'
-                    ? 'bg-indigo-600 text-white'
+                  viewMode === 'terminal'
+                    ? 'bg-emerald-600 text-white'
                     : 'text-slate-300 hover:text-white'
                 }`}
               >
-                <Sparkles size={16} className="inline-block mr-1" />
-                AI
+                <Terminal size={16} className="inline-block mr-1" />
+                Terminal
               </button>
             </div>
 
@@ -1867,270 +1407,150 @@ export default function WorkspacePage() {
           ) : viewMode === 'data' ? (
             <DataBrowser projectName={selectedProject} />
           ) : (
-            /* AI Research View - Single Session Per Project */
+            /* Terminal View - Embedded Claude Code Terminal */
             <div className="h-full flex flex-col">
-              {loadingSessions ? (
-                <div className="flex items-center justify-center h-32">
-                  <RefreshCw size={24} className="text-slate-400 animate-spin" />
+              {/* Terminal Header */}
+              <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-slate-800/50 border-b border-slate-700">
+                <div className="flex items-center gap-3">
+                  <Terminal size={18} className="text-emerald-400" />
+                  <span className="text-white font-medium">{selectedProject}</span>
+                  {terminalConnected && (
+                    <span className="flex items-center gap-1 text-emerald-400 text-xs">
+                      <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                      Connected
+                    </span>
+                  )}
                 </div>
-              ) : !selectedSession ? (
-                /* No session - show start button */
-                <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                  <Bot size={48} className="mb-4 opacity-50" />
-                  <p className="text-lg mb-2">No AI conversation yet</p>
-                  <p className="text-sm text-slate-500 mb-4 text-center max-w-md">
-                    Start a conversation with Claude to analyze your project files,
-                    import external content, or connect to databases.
-                  </p>
+                <div className="flex items-center gap-2">
+                  {terminalSessionId ? (
+                    <button
+                      onClick={stopTerminalSession}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded text-sm transition-colors"
+                    >
+                      <Power size={14} />
+                      Stop
+                    </button>
+                  ) : (
+                    <button
+                      onClick={startTerminalSession}
+                      disabled={isStartingTerminal || !user?.email}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-600 text-white rounded text-sm transition-colors"
+                    >
+                      {isStartingTerminal ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Play size={14} />
+                      )}
+                      Start Terminal
+                    </button>
+                  )}
                   <button
-                    onClick={() => setShowImportModal(true)}
-                    className="flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white px-6 py-3 rounded-lg text-sm font-medium transition-all shadow-lg shadow-indigo-500/25"
+                    onClick={() => setViewMode('data')}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors"
+                    title="View project files"
                   >
-                    <Sparkles size={18} />
-                    Start AI Conversation
+                    <FolderOpen size={14} />
+                    File View
                   </button>
                 </div>
-              ) : (
-                /* Session exists - show terminal/output */
-                <div className="h-full flex flex-col">
-                  {/* Session Header */}
-                  <div className="p-4 border-b border-slate-700">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          {selectedSession.source_type === 'chat' ? (
-                            <Bot size={16} className="text-purple-400" />
-                          ) : selectedSession.source_type === 'web' ? (
-                            <Globe size={16} className="text-indigo-400" />
-                          ) : (
-                            <Github size={16} className="text-slate-400" />
-                          )}
-                          <span className={`text-sm font-medium ${getStatusColor(selectedSession.status)}`}>
-                            {selectedSession.status.toUpperCase()}
-                          </span>
-                          {selectedSession.error_message && (
-                            <span className="text-red-400 text-xs">{selectedSession.error_message}</span>
-                          )}
-                        </div>
-                        <p className="text-white font-medium">{selectedSession.initial_prompt}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {/* Files toggle button */}
-                        <button
-                          onClick={() => setShowAiFilesSidebar(!showAiFilesSidebar)}
-                          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${
-                            showAiFilesSidebar
-                              ? 'bg-indigo-600 text-white'
-                              : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                          }`}
-                          title={showAiFilesSidebar ? 'Hide files' : 'Show files'}
-                        >
-                          <FolderOpen size={14} />
-                          Files
-                        </button>
-                        {/* Stop button - only show when processing */}
-                        {(selectedSession.status === 'processing' || selectedSession.status === 'crawling') && (
-                          <button
-                            onClick={() => handleStopSession(selectedSession.id)}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
-                          >
-                            <Square size={12} fill="currentColor" />
-                            Stop
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleDeleteSession(selectedSession.id)}
-                          className="text-slate-400 hover:text-red-400 p-2"
-                          title="Delete session"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    </div>
+              </div>
 
-                    {selectedSession.urls && selectedSession.urls.length > 0 ? (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {selectedSession.urls.map((url, i) => (
-                          <a
-                            key={i}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs bg-slate-700 text-indigo-400 hover:text-indigo-300 px-2 py-1 rounded"
-                          >
-                            {url}
-                          </a>
-                        ))}
-                      </div>
-                    ) : selectedSession.source_type === 'chat' ? (
-                      <div className="mt-2">
-                        <span className="text-xs bg-purple-900/30 text-purple-400 px-2 py-1 rounded">
-                          Analyzing project files
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {/* Response / Live Terminal with optional files sidebar */}
-                  <div className="flex-1 overflow-hidden flex">
-                    {/* Main content area */}
-                    <div className="flex-1 p-4 overflow-hidden">
-                    {selectedSession.status === 'processing' || selectedSession.status === 'crawling' ? (
-                      /* Live Terminal View - Human Readable */
-                      <div className="h-full flex flex-col">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2 text-slate-400">
-                            <Terminal size={16} className="text-emerald-400" />
-                            <span className="text-sm font-medium">Claude Working</span>
-                            {isStreaming && (
-                              <span className="flex items-center gap-1 text-emerald-400 text-xs">
-                                <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
-                                Live
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs text-slate-500">
-                            {selectedSession.status === 'crawling' ? 'Fetching sources...' : 'Analyzing...'}
-                          </span>
-                        </div>
-                        <div
-                          ref={logContainerRef}
-                          className="flex-1 bg-slate-950 rounded-lg p-4 font-mono text-sm overflow-y-auto border border-slate-700/50 shadow-inner"
-                          style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}
-                        >
-                          {streamingLog ? (
-                            <div className="text-slate-200 leading-relaxed">
-                              {streamingLog.split('\n').map((line, i) => {
-                                // Color-code different line types
-                                if (line.startsWith('╔') || line.startsWith('╚') || line.startsWith('║')) {
-                                  return <div key={i} className="text-indigo-400">{line}</div>;
-                                }
-                                if (line.startsWith('🔧')) {
-                                  return <div key={i} className="text-amber-400 mt-2">{line}</div>;
-                                }
-                                if (line.startsWith('   $')) {
-                                  return <div key={i} className="text-cyan-400 text-xs ml-4">{line}</div>;
-                                }
-                                if (line.startsWith('   📄') || line.startsWith('   🔍')) {
-                                  return <div key={i} className="text-cyan-400 text-xs ml-4">{line}</div>;
-                                }
-                                if (line.startsWith('   ✅')) {
-                                  return <div key={i} className="text-green-400 text-xs ml-4">{line}</div>;
-                                }
-                                if (line.startsWith('   ❌')) {
-                                  return <div key={i} className="text-red-400 text-xs ml-4">{line}</div>;
-                                }
-                                if (line.startsWith('✨') || line.startsWith('🏁')) {
-                                  return <div key={i} className="text-emerald-400 mt-2">{line}</div>;
-                                }
-                                if (line.startsWith('─') || line.startsWith('═')) {
-                                  return <div key={i} className="text-slate-600">{line}</div>;
-                                }
-                                if (line.startsWith('📅') || line.startsWith('📝')) {
-                                  return <div key={i} className="text-slate-400 text-xs">{line}</div>;
-                                }
-                                if (line.includes('===')) {
-                                  return <div key={i} className="text-slate-500 text-xs">{line}</div>;
-                                }
-                                // Regular text - Claude's response
-                                return <div key={i} className="text-slate-100">{line}</div>;
-                              })}
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center h-32 text-slate-500">
-                              <Loader2 size={24} className="animate-spin mb-2" />
-                              <span>
-                                {selectedSession.status === 'crawling'
-                                  ? 'Crawling sources...'
-                                  : 'Starting Claude...'}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ) : selectedSession.last_response ? (
-                      <div className="h-full overflow-y-auto">
-                        <div className="prose prose-invert max-w-none">
-                          <pre className="whitespace-pre-wrap text-sm text-slate-300 bg-slate-800/50 p-4 rounded-lg">
-                            {selectedSession.last_response}
-                          </pre>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                        <p>No response yet</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Continue Input - Show when ready or error */}
-                  {(selectedSession.status === 'ready' || selectedSession.status === 'error') && (
-                    <div className="p-4 border-t border-slate-700">
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={continuePrompt}
-                          onChange={(e) => setContinuePrompt(e.target.value)}
-                          placeholder={selectedSession.claude_session_id
-                            ? "Continue the conversation..."
-                            : "Ask a follow-up question..."
-                          }
-                          className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !isContinuing) {
-                              handleContinueConversation();
-                            }
-                          }}
-                        />
-                        <button
-                          onClick={handleContinueConversation}
-                          disabled={isContinuing || !continuePrompt.trim()}
-                          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-                        >
-                          {isContinuing ? (
+              {/* Terminal Content */}
+              <div className="flex-1 overflow-hidden">
+                {terminalSessionId ? (
+                  <CCResearchTerminal
+                    sessionId={terminalSessionId}
+                    onStatusChange={(connected) => setTerminalConnected(connected)}
+                  />
+                ) : (
+                  <div className="h-full flex flex-col bg-slate-900/50 overflow-y-auto">
+                    {/* Start New Session Section */}
+                    <div className="flex flex-col items-center justify-center py-8 px-4 border-b border-slate-800">
+                      <Terminal size={40} className="mb-3 text-emerald-400 opacity-50" />
+                      <h3 className="text-lg font-medium text-white mb-2">Claude Code Terminal</h3>
+                      <p className="text-sm text-slate-500 mb-4 text-center max-w-md">
+                        Start a terminal session with 140+ skills and 26 MCP servers.
+                      </p>
+                      <button
+                        onClick={startTerminalSession}
+                        disabled={isStartingTerminal || !user?.email}
+                        className="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:from-slate-600 disabled:to-slate-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-all shadow-lg shadow-emerald-500/25"
+                      >
+                        {isStartingTerminal ? (
+                          <>
                             <Loader2 size={16} className="animate-spin" />
-                          ) : (
-                            <ChevronRight size={16} />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => {
-                            handleDeleteSession(selectedSession.id);
-                            setShowImportModal(true);
-                          }}
-                          className="bg-slate-600 hover:bg-slate-500 text-white px-3 py-2 rounded-lg flex items-center gap-2 text-sm"
-                          title="Start new conversation"
-                        >
-                          <Plus size={16} />
-                          New
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                            Starting...
+                          </>
+                        ) : (
+                          <>
+                            <Plus size={16} />
+                            New Session
+                          </>
+                        )}
+                      </button>
+                      {!user?.email && (
+                        <p className="text-xs text-red-400 mt-3">
+                          Please log in to use the terminal
+                        </p>
+                      )}
                     </div>
 
-                    {/* Files Sidebar - collapsible */}
-                    {showAiFilesSidebar && (
-                      <div className="w-80 border-l border-slate-700 bg-slate-900 overflow-hidden flex flex-col">
-                        <div className="p-3 border-b border-slate-700 flex items-center justify-between">
-                          <span className="text-sm font-medium text-white flex items-center gap-2">
-                            <FolderOpen size={14} />
-                            Project Files
-                          </span>
-                          <button
-                            onClick={() => setShowAiFilesSidebar(false)}
-                            className="text-slate-400 hover:text-white p-1"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                        <div className="flex-1 overflow-hidden">
-                          <DataBrowser projectName={selectedProject || ''} />
-                        </div>
+                    {/* Existing Sessions Section */}
+                    <div className="flex-1 px-4 py-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-medium text-slate-400 uppercase tracking-wide">
+                          Project Sessions
+                        </h4>
+                        <button
+                          onClick={loadProjectSessions}
+                          className="text-slate-500 hover:text-slate-300 p-1"
+                          title="Refresh sessions"
+                        >
+                          <RefreshCw size={14} className={loadingProjectSessions ? 'animate-spin' : ''} />
+                        </button>
                       </div>
-                    )}
-                </div>
-              )}
+
+                      {loadingProjectSessions ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 size={20} className="text-slate-400 animate-spin" />
+                        </div>
+                      ) : projectSessions.length === 0 ? (
+                        <div className="text-center py-8 text-slate-500 text-sm">
+                          No previous sessions for this project
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {projectSessions.map(session => (
+                            <button
+                              key={session.id}
+                              onClick={() => setTerminalSessionId(session.id)}
+                              className="w-full flex items-center gap-3 p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg text-left transition-colors group"
+                            >
+                              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                session.status === 'active' ? 'bg-green-500' :
+                                session.status === 'disconnected' ? 'bg-yellow-500' :
+                                'bg-slate-500'
+                              }`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-white text-sm font-medium truncate">
+                                  {session.title || `Session #${session.session_number}`}
+                                </p>
+                                <p className="text-slate-500 text-xs">
+                                  {new Date(session.last_activity_at || session.created_at).toLocaleString()}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <span className="text-emerald-400 text-xs">Resume</span>
+                                <Play size={14} className="text-emerald-400" />
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </main>

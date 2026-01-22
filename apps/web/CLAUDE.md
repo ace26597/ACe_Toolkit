@@ -27,13 +27,10 @@ apps/web/
 │   ├── page.tsx                   # Home page
 │   ├── layout.tsx                 # Root layout
 │   ├── ccresearch/
-│   │   ├── page.tsx               # CCResearch Terminal
+│   │   ├── page.tsx               # CCResearch Terminal (Create Project flow)
 │   │   └── share/[token]/page.tsx # Public share view
-│   ├── workspace/page.tsx         # Workspace
-│   ├── analyst/page.tsx           # Data Analyst
-│   ├── video-factory/page.tsx     # Video Factory
-│   ├── logs/page.tsx              # Logs viewer
-│   └── notes/page.tsx             # Notes app
+│   ├── workspace/page.tsx         # Workspace (Notes, Files, Terminal tabs)
+│   └── video-factory/page.tsx     # Video Factory
 ├── components/
 │   ├── auth/                      # Authentication
 │   │   ├── AuthProvider.tsx       # React Context
@@ -41,11 +38,11 @@ apps/web/
 │   │   ├── ProtectedRoute.tsx     # Auth wrapper
 │   │   └── ExperimentalBanner.tsx # Disclaimer
 │   ├── ccresearch/                # CCResearch components
-│   │   ├── SessionPicker.tsx      # Session list/create view
+│   │   ├── SessionPicker.tsx      # Project list/create view (not sessions)
 │   │   ├── CCResearchTerminal.tsx # Terminal component
 │   │   └── FileBrowser.tsx        # File browser panel
 │   ├── home/                      # Home page components
-│   │   └── RecentSessions.tsx     # Unified session view
+│   │   └── RecentSessions.tsx     # Unified project view
 │   ├── workspace/                 # Workspace components
 │   │   ├── ProjectSidebar.tsx
 │   │   ├── NoteCard.tsx
@@ -112,7 +109,11 @@ Project-based file management with notes.
 **Views:**
 - **Notes:** Markdown notes with "New Note" button for manual creation
 - **Files:** Full file explorer with navigation
-- **AI:** Import Research (web crawling, GitHub analysis) with collapsible files sidebar
+- **Terminal:** Embedded Claude Code terminal (CCResearchTerminal component)
+  - Shows existing project sessions with Resume option
+  - Start new session button
+  - "File View" button to switch to Files tab
+  - Real-time connection status indicator
 
 **File Preview Support:**
 | Type | Features |
@@ -126,29 +127,6 @@ Project-based file management with notes.
 | Excel | XLSX/XLS table (SheetJS) |
 | DOCX | HTML conversion (Mammoth.js) |
 | JSON | Syntax highlighted |
-
-### Data Analyst (`/analyst`)
-
-AI-powered data analysis with charts.
-
-**Features:**
-- AACT database connection (566K+ clinical trials)
-- CSV/Excel file upload
-- AI analysis via OpenAI
-- Interactive charts
-- SQL query interface
-
-### Logs Viewer (`/logs`)
-
-Real-time log monitoring.
-
-**Log Types:** Backend, Frontend, Cloudflare, CCResearch
-
-**Features:**
-- Auto-refresh
-- Search across files
-- Download logs
-- Configurable line limits
 
 ---
 

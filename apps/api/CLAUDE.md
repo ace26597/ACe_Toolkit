@@ -30,24 +30,18 @@ apps/api/
 │   │   └── models.py              # SQLAlchemy models
 │   ├── routers/
 │   │   ├── auth.py                # Authentication
-│   │   ├── ccresearch.py          # CCResearch Terminal
+│   │   ├── ccresearch.py          # CCResearch Terminal + Unified Projects
 │   │   ├── workspace.py           # Workspace API
-│   │   ├── analyst.py             # Data Analyst
 │   │   ├── video_factory.py       # Video Factory
-│   │   ├── research.py            # Import Research (web/GitHub)
-│   │   ├── research_chat.py       # Research Chat (LangGraph)
-│   │   ├── notes.py               # Notes app
-│   │   ├── projects.py            # Session projects
-│   │   ├── logs.py                # Log viewer
 │   │   └── public_api.py          # Public endpoints
 │   └── core/
 │       ├── config.py              # Settings (Pydantic)
 │       ├── database.py            # SQLAlchemy async setup
 │       ├── security.py            # JWT, passwords
 │       ├── ccresearch_manager.py  # CCResearch PTY manager
+│       ├── project_manager.py     # Unified project manager (NEW)
 │       ├── workspace_manager.py   # Workspace file manager
-│       ├── analyst_manager.py     # Data analyst manager
-│       ├── research_manager.py    # Import research manager
+│       ├── session_manager.py     # Session management
 │       ├── notifications.py       # Discord/ntfy alerts
 │       └── user_access.py         # Per-user data access
 ├── requirements.txt
@@ -113,50 +107,15 @@ apps/api/
 | GET | `/projects/{name}/data/content` | Read file content |
 | PUT | `/projects/{name}/data/content` | Save file content |
 
-### Data Analyst (`/analyst`)
+### Unified Projects (`/ccresearch/unified-projects`)
+
+Cross-app project management for authenticated users.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/projects` | List analyst projects |
-| POST | `/projects` | Create project |
-| DELETE | `/projects/{id}` | Delete project |
-| POST | `/projects/{id}/upload` | Upload data files |
-| POST | `/projects/{id}/connect-aact` | Connect to AACT database |
-| POST | `/projects/{id}/analyze` | Run AI analysis |
-| POST | `/projects/{id}/query` | Run SQL query |
-| GET | `/projects/{id}/charts` | Get chart configurations |
-
-### Import Research (`/import-research`)
-
-Web crawling and GitHub clone for Workspace projects.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/sessions` | Create session (project_name, urls, prompt, source_type) |
-| GET | `/sessions` | List sessions |
-| GET | `/sessions/{id}` | Get session details |
-| POST | `/sessions/{id}/process` | Start crawl/clone (background) |
-| POST | `/sessions/{id}/run` | Run Claude Code on sources |
-| POST | `/sessions/{id}/continue` | Continue conversation (--resume) |
-| POST | `/sessions/{id}/stop` | Stop running session |
-| GET | `/sessions/{id}/history` | Get conversation history |
-| GET | `/sessions/{id}/log` | Get session log (tail N lines) |
-| WS | `/sessions/{id}/stream` | Stream log output |
-| DELETE | `/sessions/{id}` | Delete session |
-| GET | `/status` | Get overall research system status |
-
-**Source Types:** `web` (crawl websites), `github` (clone repos), `chat` (existing files)
-
-### Logs (`/logs`)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/list` | List all log files |
-| GET | `/backend` | Backend logs |
-| GET | `/frontend` | Frontend logs |
-| GET | `/cloudflare` | Cloudflare logs |
-| GET | `/ccresearch` | CCResearch logs |
-| GET | `/search` | Search across logs |
+| GET | `/unified-projects` | List all user projects |
+| POST | `/unified-projects` | Create project |
+| DELETE | `/unified-projects/{name}` | Delete project |
 
 ---
 
@@ -346,13 +305,13 @@ Manages user workspace files:
 - Note management
 - Per-user data isolation
 
-### AnalystManager (`core/analyst_manager.py`)
+### ProjectManager (`core/project_manager.py`)
 
-Manages data analyst projects:
-- AACT database connection (with URL-encoded passwords)
-- CSV/Excel file handling
-- AI analysis via OpenAI
-- Chart generation
+Unified project operations across apps:
+- Project CRUD (create, list, get, delete)
+- Terminal status tracking
+- Project metadata (.project.json)
+- Cross-app visibility (CCResearch + Workspace)
 
 ---
 

@@ -112,6 +112,17 @@ interface CCResearchSession {
   uploaded_files?: string[];
 }
 
+interface UnifiedProject {
+  id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  path: string;
+  terminal_session_id?: string;
+  terminal_status?: string;
+}
+
 interface CapabilitiesData {
   version: string;
   plugins: {
@@ -194,6 +205,7 @@ const ccresearchApi = {
     email?: string,
     accessKey?: string,
     title?: string,
+    projectName?: string,
     files?: File[]
   ): Promise<CCResearchSession> => {
     const formData = new FormData();
@@ -201,6 +213,7 @@ const ccresearchApi = {
     if (email) formData.append('email', email);
     if (accessKey) formData.append('access_key', accessKey);
     if (title) formData.append('title', title);
+    if (projectName) formData.append('project_name', projectName);
     if (files) {
       files.forEach(file => formData.append('files', file));
     }
@@ -374,6 +387,36 @@ const ccresearchApi = {
     if (!res.ok) return { is_shared: false };
     return res.json();
   },
+
+  // Unified Projects API
+  listUnifiedProjects: async (email: string): Promise<UnifiedProject[]> => {
+    if (!email) return [];
+    const res = await fetch(`${API_URL}/ccresearch/unified-projects?email=${encodeURIComponent(email)}`);
+    if (!res.ok) return [];
+    return res.json();
+  },
+
+  createProjectSession: async (
+    browserSessionId: string,
+    email: string,
+    projectName: string
+  ): Promise<CCResearchSession> => {
+    const formData = new FormData();
+    formData.append('session_id', browserSessionId);
+    formData.append('email', email);
+    formData.append('project_name', projectName);
+    formData.append('title', projectName);
+
+    const res = await fetch(`${API_URL}/ccresearch/sessions`, {
+      method: 'POST',
+      body: formData,
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: 'Failed to create session' }));
+      throw new Error(error.detail || 'Failed to create session');
+    }
+    return res.json();
+  },
 };
 
 // Generate browser session ID
@@ -391,6 +434,7 @@ function CCResearchPageContent() {
   const { user } = useAuth();
   const searchParams = useSearchParams();
   const [sessions, setSessions] = useState<CCResearchSession[]>([]);
+  const [unifiedProjects, setUnifiedProjects] = useState<UnifiedProject[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [initialSessionLoaded, setInitialSessionLoaded] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -412,6 +456,7 @@ function CCResearchPageContent() {
   const [showNewSessionModal, setShowNewSessionModal] = useState(false);
   const [newSessionAccessKey, setNewSessionAccessKey] = useState('');
   const [newSessionTitle, setNewSessionTitle] = useState('');
+  const [newProjectName, setNewProjectName] = useState('');  // Project name for unified storage
   const [newSessionFiles, setNewSessionFiles] = useState<File[]>([]);
   const [accessKeyError, setAccessKeyError] = useState('');
   const [uploadMode, setUploadMode] = useState<'files' | 'directory'>('files');
@@ -652,7 +697,7 @@ function CCResearchPageContent() {
     setCapabilities(capabilitiesData);
   }, []);
 
-  // Load sessions on mount and periodically - filter by user email
+  // Load sessions and unified projects on mount and periodically
   const loadSessions = useCallback(async () => {
     if (!userEmail) {
       // No email set yet - don't load sessions (user needs to create one first)
@@ -660,8 +705,13 @@ function CCResearchPageContent() {
       return;
     }
     try {
-      const data = await ccresearchApi.listSessionsByEmail(userEmail);
-      setSessions(data);
+      // Fetch both sessions and unified projects in parallel
+      const [sessionsData, projectsData] = await Promise.all([
+        ccresearchApi.listSessionsByEmail(userEmail),
+        ccresearchApi.listUnifiedProjects(userEmail)
+      ]);
+      setSessions(sessionsData);
+      setUnifiedProjects(projectsData);
     } catch (error) {
       console.error('Failed to load sessions:', error);
     } finally {
@@ -829,6 +879,45 @@ function CCResearchPageContent() {
     setShowNewSessionModal(true);
   };
 
+  // Open a Workspace project in terminal (create session for it)
+  const openWorkspaceProject = async (projectName: string) => {
+    if (!browserSessionId || !userEmail) {
+      showToast({ message: 'Please log in to open a project', type: 'error' });
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      // Terminate current session if one is active
+      if (activeSessionId) {
+        try {
+          await ccresearchApi.terminateSession(activeSessionId);
+        } catch (error) {
+          // Ignore termination errors for cleanup
+        }
+      }
+
+      // Create session for the workspace project
+      const session = await ccresearchApi.createProjectSession(
+        browserSessionId,
+        userEmail,
+        projectName
+      );
+
+      setActiveSessionId(session.id);
+      setTerminalConnected(false);
+      await loadSessions();
+      showToast({ message: `Opened project: ${projectName}`, type: 'success' });
+    } catch (error) {
+      showToast({
+        message: error instanceof Error ? error.message : 'Failed to open project',
+        type: 'error'
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   // Handle file selection
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
@@ -880,6 +969,7 @@ function CCResearchPageContent() {
         userEmail,
         hasAccessKey ? newSessionAccessKey.trim() : undefined,
         newSessionTitle.trim() || undefined,
+        newProjectName.trim() || undefined,  // Use project name for unified storage
         newSessionFiles.length > 0 ? newSessionFiles : undefined
       );
 
@@ -918,6 +1008,8 @@ function CCResearchPageContent() {
       setShowNewSessionModal(false);
       setShowSessionDropdown(false);
       // Reset form
+      setNewProjectName('');
+      setNewSessionTitle('');
       setNewSessionGithubUrl('');
       setNewSessionGithubBranch('');
       showToast({
@@ -1526,12 +1618,14 @@ function CCResearchPageContent() {
           /* Session Picker - Shows existing sessions and create new option */
           <SessionPicker
             sessions={sessions}
+            unifiedProjects={unifiedProjects}
             isLoading={isLoading}
             isCreating={isCreating}
             editingSessionId={editingSessionId}
             editingTitle={editingTitle}
             onSelectSession={(id) => setActiveSessionId(id)}
             onCreateSession={openNewSessionModal}
+            onOpenProject={openWorkspaceProject}
             onDeleteSession={deleteSession}
             onStartRename={startRenameSession}
             onSaveRename={saveRenamedSession}
@@ -1561,8 +1655,8 @@ function CCResearchPageContent() {
             {/* Compact Header */}
             <div className="p-3 sm:p-4 border-b border-gray-800 flex items-center justify-between gap-2 flex-shrink-0">
               <div className="flex items-center gap-2">
-                <SquarePlus className="w-5 h-5 text-blue-400" />
-                <h2 className="text-base sm:text-lg font-semibold text-white">New Research Session</h2>
+                <SquarePlus className="w-5 h-5 text-emerald-400" />
+                <h2 className="text-base sm:text-lg font-semibold text-white">Create Project</h2>
               </div>
               <button
                 onClick={() => setShowNewSessionModal(false)}
@@ -1603,14 +1697,28 @@ function CCResearchPageContent() {
                     <p className="text-[10px] text-gray-500 mt-1">With key = Direct Pi terminal • Without = Claude Code</p>
                   </div>
 
-                  {/* Session Title */}
+                  {/* Project Name - Primary field */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-300 mb-1">Project Name</label>
+                    <input
+                      type="text"
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      placeholder="e.g., CRISPR Gene Analysis"
+                      className="w-full px-3 py-2 text-sm bg-gray-800 border border-emerald-600 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      autoFocus
+                    />
+                    <p className="text-[10px] text-gray-500 mt-1">Project directory persists across sessions</p>
+                  </div>
+
+                  {/* Session Title - Optional override */}
                   <div>
                     <label className="block text-xs font-medium text-gray-300 mb-1">Session Title <span className="text-gray-500">(optional)</span></label>
                     <input
                       type="text"
                       value={newSessionTitle}
                       onChange={(e) => setNewSessionTitle(e.target.value)}
-                      placeholder="e.g., CRISPR Gene Analysis"
+                      placeholder="Defaults to project name"
                       className="w-full px-3 py-2 text-sm bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>

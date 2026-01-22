@@ -163,19 +163,55 @@ class WorkspaceManager:
         return True
 
     async def _read_project_meta(self, name: str) -> Optional[Dict[str, Any]]:
-        """Read project metadata file."""
-        meta_path = self._get_project_path(name) / ".meta.json"
+        """Read project metadata file.
+
+        Checks for .project.json first (unified format), falls back to .meta.json for backward compatibility.
+        """
+        project_path = self._get_project_path(name)
+
+        # Try unified format first (.project.json - same as ProjectManager)
+        unified_path = project_path / ".project.json"
         try:
-            async with aiofiles.open(meta_path, 'r') as f:
+            async with aiofiles.open(unified_path, 'r') as f:
+                data = json.loads(await f.read())
+                # Convert from ProjectManager format if needed
+                return {
+                    "name": data.get("name", name),
+                    "createdAt": data.get("created_at", data.get("createdAt", "")),
+                    "updatedAt": data.get("updated_at", data.get("updatedAt", "")),
+                    "noteCount": 0,  # Will be calculated dynamically
+                    "dataSize": "0 B",  # Will be calculated dynamically
+                    "created_by": data.get("created_by", "workspace"),
+                    "owner_email": data.get("owner_email", ""),
+                    "terminal": data.get("terminal", {}),
+                }
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+
+        # Fallback to legacy format (.meta.json)
+        legacy_path = project_path / ".meta.json"
+        try:
+            async with aiofiles.open(legacy_path, 'r') as f:
                 return json.loads(await f.read())
         except (FileNotFoundError, json.JSONDecodeError):
             return None
 
     async def _write_project_meta(self, name: str, meta: Dict[str, Any]):
-        """Write project metadata file."""
-        meta_path = self._get_project_path(name) / ".meta.json"
+        """Write project metadata file in unified format (.project.json)."""
+        meta_path = self._get_project_path(name) / ".project.json"
+        # Convert to unified format
+        unified_meta = {
+            "id": meta.get("id", str(uuid.uuid4())),
+            "name": meta.get("name", name),
+            "created_at": meta.get("createdAt", meta.get("created_at", datetime.now().isoformat())),
+            "updated_at": meta.get("updatedAt", meta.get("updated_at", datetime.now().isoformat())),
+            "created_by": meta.get("created_by", "workspace"),
+            "owner_email": meta.get("owner_email", ""),
+            "tags": meta.get("tags", []),
+            "terminal": meta.get("terminal", {"enabled": True, "status": "ready"}),
+        }
         async with aiofiles.open(meta_path, 'w') as f:
-            await f.write(json.dumps(meta, indent=2))
+            await f.write(json.dumps(unified_meta, indent=2))
 
     async def _count_notes(self, project_name: str) -> int:
         """Count all viewable files in a project (text, media, etc.).

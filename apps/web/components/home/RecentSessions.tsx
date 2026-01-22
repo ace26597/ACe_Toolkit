@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   Terminal,
   FolderOpen,
-  BarChart3,
   Clock,
   ChevronRight,
   Loader2,
@@ -27,12 +26,6 @@ const APP_CONFIG: Record<string, { icon: typeof Terminal; color: string; bgColor
     color: 'text-indigo-500',
     bgColor: 'bg-indigo-500/10',
     route: '/workspace'
-  },
-  analyst: {
-    icon: BarChart3,
-    color: 'text-blue-500',
-    bgColor: 'bg-blue-500/10',
-    route: '/analyst'
   }
 };
 
@@ -71,7 +64,6 @@ function getAppName(createdBy: string): string {
   switch (createdBy) {
     case 'ccresearch': return 'CCResearch';
     case 'workspace': return 'Workspace';
-    case 'analyst': return 'Analyst';
     default: return createdBy;
   }
 }
@@ -164,7 +156,7 @@ export function RecentSessions({ maxSessions = 5 }: RecentSessionsProps) {
     <div className="w-full max-w-2xl mt-8">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-          Recent Sessions
+          Recent Projects
         </h2>
         {!loading && sessions.length > 0 && (
           <button

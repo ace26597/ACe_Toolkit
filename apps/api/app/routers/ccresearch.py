@@ -48,6 +48,7 @@ from app.core.database import get_db
 from app.core.config import settings
 from app.core.ccresearch_manager import ccresearch_manager
 from app.core.session_manager import session_manager, get_user_id_from_email
+from app.core.project_manager import get_project_manager
 from app.core.notifications import notify_access_request, notify_plugin_skill_request
 from app.models.models import CCResearchSession
 from collections import defaultdict
@@ -268,7 +269,8 @@ async def create_session(
     email: str = Form(...),  # Email from authenticated user
     access_key: Optional[str] = Form(None),  # Optional - if provided, grants direct terminal access
     title: Optional[str] = Form(None),
-    workspace_project: Optional[str] = Form(None),  # Optional link to Workspace project
+    project_name: Optional[str] = Form(None),  # New: Create/use unified project
+    workspace_project: Optional[str] = Form(None),  # Legacy: link to old Workspace project
     files: List[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db)
 ):
@@ -281,7 +283,10 @@ async def create_session(
     - Valid access key = Direct terminal access to Pi (SSD)
     - Wrong access key = Error
 
-    If workspace_project is provided, creates workspace in the project's data/ directory.
+    Project handling (priority order):
+    1. If project_name is provided: Create/use unified project at /data/users/{user-id}/projects/{name}/
+    2. If workspace_project is provided: Link to legacy Workspace project
+    3. Otherwise: Create session-specific directory
     """
     # Determine session mode based on access key
     session_mode = "claude"  # Default: Claude Code
@@ -315,7 +320,38 @@ async def create_session(
 
     # Determine workspace location
     workspace_dir = None
-    if workspace_project:
+    linked_project_name = None  # Track the project name for the response
+
+    # Priority 1: Unified project (new architecture)
+    if project_name and user_id:
+        pm = get_project_manager(user_id)
+
+        # Check if project already exists
+        existing_project = await pm.get_project(project_name)
+        if existing_project:
+            # Use existing project
+            workspace_dir = Path(existing_project["path"])
+            linked_project_name = existing_project["name"]
+            logger.info(f"Using existing project '{project_name}' at {workspace_dir}")
+
+            # Update terminal status
+            await pm.update_terminal_status(project_name, ccresearch_id, "active")
+        else:
+            # Create new project
+            project = await pm.create_project(
+                name=project_name,
+                created_by="ccresearch",
+                owner_email=email.lower()
+            )
+            workspace_dir = await pm.get_project_path(project_name)
+            linked_project_name = project["name"]
+
+            # Update terminal status
+            await pm.update_terminal_status(project_name, ccresearch_id, "active")
+            logger.info(f"Created unified project '{project_name}' at {workspace_dir}")
+
+    # Priority 2: Legacy workspace project link
+    elif workspace_project:
         # Create workspace in Workspace project's data/ directory
         from app.core.config import settings
         project_data_path = Path(settings.WORKSPACE_PROJECTS_DIR) / workspace_project / "data" / f"research-{ccresearch_id[:8]}"
@@ -338,6 +374,8 @@ Files created here will appear in the Workspace Files tab.
 *CCResearch - Claude Code Research Platform*
 """
         claude_md_path.write_text(claude_md_content)
+
+    # Priority 3: Session-specific directory for authenticated users
     elif user_id:
         # Use unified session manager for registered users
         mode_label = "Terminal" if session_mode == "terminal" else "Claude"
@@ -370,8 +408,9 @@ Files created here will appear in the Workspace Files tab.
         # Write CCResearch permissions with comprehensive deny rules
         settings_local_path = workspace_dir / ".claude" / "settings.local.json"
         settings_local_path.write_text(json.dumps(CCRESEARCH_PERMISSIONS_TEMPLATE, indent=2))
+
+    # Fallback: Create workspace in default location (for users not in DB)
     else:
-        # Fallback: Create workspace in default location (for users not in DB)
         workspace_dir = ccresearch_manager.create_workspace(
             ccresearch_id,
             email=email,
@@ -410,14 +449,18 @@ Files created here will appear in the Workspace Files tab.
     default_title = f"{mode_label} #{next_session_number} - {datetime.utcnow().strftime('%b %d')}"
 
     # Create database entry (store email lowercase for consistent matching)
+    # Use project name as title if provided, otherwise use default
+    mode_label = "Terminal" if session_mode == "terminal" else "Claude"
+    default_title = f"{mode_label} #{next_session_number} - {datetime.utcnow().strftime('%b %d')}"
+
     session = CCResearchSession(
         id=ccresearch_id,
         session_id=session_id,
         email=email.lower(),
         session_number=next_session_number,
-        title=title or default_title,
+        title=title or linked_project_name or default_title,
         workspace_dir=str(workspace_dir),
-        workspace_project=workspace_project,  # Link to Workspace project
+        workspace_project=linked_project_name or workspace_project,  # Unified project or legacy
         status="created",
         session_mode=session_mode,  # "claude" or "terminal"
         uploaded_files=json.dumps(uploaded_files_list) if uploaded_files_list else None,
@@ -1282,9 +1325,119 @@ async def list_projects(email: Optional[str] = None):
     """List saved projects on SSD, optionally filtered by email.
 
     If email is provided, only returns projects owned by that user.
+    Legacy endpoint - prefer /unified-projects for authenticated users.
     """
     projects = ccresearch_manager.list_saved_projects(email=email or "")
     return [ProjectInfo(**p) for p in projects]
+
+
+class UnifiedProjectResponse(BaseModel):
+    """Response model for unified projects."""
+    id: str
+    name: str
+    dir_name: str
+    created_at: str
+    updated_at: str
+    created_by: str
+    owner_email: str
+    tags: List[str] = []
+    terminal_enabled: bool = True
+    terminal_status: str = "ready"
+    last_session_id: Optional[str] = None
+    path: Optional[str] = None
+
+
+@router.get("/unified-projects", response_model=List[UnifiedProjectResponse])
+async def list_unified_projects(email: str):
+    """List all unified projects for an authenticated user.
+
+    This is the preferred endpoint for listing projects in the new architecture.
+    Projects are stored at /data/users/{user-id}/projects/
+    """
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    # Get user ID from email
+    user_id = await get_user_id_from_email(email.lower())
+    if not user_id:
+        return []
+
+    pm = get_project_manager(user_id)
+    projects = await pm.list_projects()
+
+    result = []
+    for p in projects:
+        terminal_info = p.get("terminal", {})
+        result.append(UnifiedProjectResponse(
+            id=p.get("id", ""),
+            name=p.get("name", ""),
+            dir_name=p.get("dir_name", ""),
+            created_at=p.get("created_at", ""),
+            updated_at=p.get("updated_at", ""),
+            created_by=p.get("created_by", "unknown"),
+            owner_email=p.get("owner_email", ""),
+            tags=p.get("tags", []),
+            terminal_enabled=terminal_info.get("enabled", True),
+            terminal_status=terminal_info.get("status", "ready"),
+            last_session_id=terminal_info.get("last_session_id"),
+            path=p.get("path")
+        ))
+
+    return result
+
+
+@router.post("/unified-projects")
+async def create_unified_project(
+    email: str = Form(...),
+    name: str = Form(...),
+    tags: Optional[str] = Form(None)  # Comma-separated tags
+):
+    """Create a new unified project without starting a session.
+
+    This is useful for creating projects from Workspace.
+    """
+    if not email or not name:
+        raise HTTPException(status_code=400, detail="Email and name are required")
+
+    # Get user ID from email
+    user_id = await get_user_id_from_email(email.lower())
+    if not user_id:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    pm = get_project_manager(user_id)
+
+    # Parse tags
+    tag_list = [t.strip() for t in tags.split(",")] if tags else []
+
+    try:
+        project = await pm.create_project(
+            name=name,
+            created_by="workspace",
+            owner_email=email.lower(),
+            tags=tag_list
+        )
+        return project
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/unified-projects/{project_name}")
+async def delete_unified_project(project_name: str, email: str):
+    """Delete a unified project."""
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    user_id = await get_user_id_from_email(email.lower())
+    if not user_id:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    pm = get_project_manager(user_id)
+    success = await pm.delete_project(project_name)
+
+    if not success:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    return {"status": "deleted", "name": project_name}
 
 
 @router.post("/sessions/from-project", response_model=SessionResponse)

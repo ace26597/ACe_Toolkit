@@ -55,8 +55,12 @@ def get_user_data_dir(user: User) -> Path:
 
 
 def get_user_workspace_dir(user: User) -> Path:
-    """Get user's workspace directory for the Workspace app."""
-    return get_user_data_dir(user) / "workspace"
+    """Get user's workspace directory for the Workspace app.
+
+    NOTE: Changed from /workspace to /projects for unified project storage.
+    Both Workspace and CCResearch now share the same project directories.
+    """
+    return get_user_data_dir(user) / "projects"
 
 
 def get_user_analyst_dir(user: User) -> Path:
@@ -88,7 +92,9 @@ def ensure_user_directories(user: User) -> Path:
     user_dir = get_user_data_dir(user)
     user_dir.mkdir(parents=True, exist_ok=True)
 
-    for subdir in ["workspace", "analyst", "video-factory", "ccresearch", "research"]:
+    # Create user subdirectories
+    # NOTE: "projects" is the unified directory for both Workspace and CCResearch
+    for subdir in ["projects", "analyst", "video-factory", "ccresearch", "research"]:
         (user_dir / subdir).mkdir(exist_ok=True)
 
     return user_dir

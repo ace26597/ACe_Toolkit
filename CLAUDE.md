@@ -37,13 +37,15 @@ lsof -i :3000 -i :8000  # Check our ports
 
 | App | Route | Description |
 |-----|-------|-------------|
-| **CCResearch** | `/ccresearch` | Claude Code terminal with 140+ scientific MCP tools |
-| **Workspace** | `/workspace` | Project-based file management with notes |
-| **Data Analyst** | `/analyst` | AI data analysis with charts (AACT, CSV, Excel) |
+| **CCResearch** | `/ccresearch` | Claude Code terminal with 140+ scientific MCP tools - "Create Project" flow |
+| **Workspace** | `/workspace` | Project-based file management with notes + Terminal tab |
 | **Video Factory** | `/video-factory` | AI video production pipeline |
-| **Import Research** | (Workspace AI tab) | Web crawling & GitHub analysis for projects |
-| **Logs** | `/logs` | Real-time log viewer |
-| **Notes** | `/notes` | Markdown note-taking |
+
+**Unified Project Architecture:**
+- Projects live at `/data/users/{user-id}/projects/{project-name}/`
+- Same project accessible from both CCResearch and Workspace
+- Terminal tab in Workspace links to CCResearch
+- `--continue` works across sessions (same project directory)
 
 **For detailed app documentation, see:**
 - `apps/web/CLAUDE.md` - Frontend details
@@ -61,9 +63,9 @@ lsof -i :3000 -i :8000  # Check our ports
 | Approved | Full access | 30 days |
 | Trial | Full for 24h | 1 day |
 
-**Protected Routes:** `/workspace`, `/analyst`, `/video-factory`, `/ccresearch`
+**Protected Routes:** `/workspace`, `/video-factory`, `/ccresearch`
 
-**Per-User Data:** `/data/users/{user-uuid}/` (workspace, analyst, ccresearch, etc.)
+**Per-User Data:** `/data/users/{user-uuid}/projects/` (unified project storage)
 
 ---
 
@@ -178,9 +180,17 @@ journalctl -u cloudflared -f
 ```
 /data/
 ├── users/              # Per-user data
-├── ccresearch-projects/
-├── ccresearch-logs/
-└── claude-workspaces/
+│   └── {user-id}/
+│       ├── projects/   # Unified project storage (CCResearch + Workspace)
+│       │   └── {project-name}/
+│       │       ├── .project.json  # Project metadata
+│       │       ├── data/          # User files
+│       │       ├── notes/         # Workspace notes
+│       │       ├── output/        # Generated outputs
+│       │       └── .claude/       # Claude Code config
+│       └── video-factory/
+├── ccresearch-logs/    # Session logs
+└── claude-workspaces/  # Legacy (deprecated)
 ```
 
 **Credentials:** `~/.credentials/credentials.json` (AACT, API keys)
@@ -191,12 +201,12 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
-| 2026-01-22 | **SessionPicker:** CCResearch shows session list first (not New Session form) |
-| 2026-01-22 | **RecentSessions:** Home page shows unified sessions from all apps |
-| 2026-01-22 | **Workspace AI:** Collapsible files sidebar in AI tab |
-| 2026-01-22 | **Session Manager:** Unified session management across apps |
-| 2026-01-22 | Removed Research Assistant (to be integrated as Research Workspace later) |
-| 2026-01-22 | **Import Research:** Web crawling & GitHub clone for Workspace projects |
+| 2026-01-22 | **MAJOR: Unified Project Architecture** - Projects shared between CCResearch and Workspace |
+| 2026-01-22 | **CCResearch:** "Create Project" flow replaces "New Session" |
+| 2026-01-22 | **Workspace:** Terminal tab links to CCResearch (replaces Import Research) |
+| 2026-01-22 | **Removed Apps:** Data Analyst, Logs Viewer, Notes, Import Research |
+| 2026-01-22 | **Backend Cleanup:** Removed analyst, notes, logs, projects, research routers |
+| 2026-01-22 | **Project Manager:** New unified `/data/users/{user-id}/projects/` storage |
 | 2026-01-21 | Session rename without changing directories |
 | 2026-01-21 | Remove saved session logic, add date grouping |
 | 2026-01-21 | Fix AACT password handling (URL encoding) |

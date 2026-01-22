@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
-from app.routers import auth, notes, projects, research_chat, logs, ccresearch, workspace, public_api, research, analyst, video_factory
+from app.routers import auth, ccresearch, workspace, public_api, video_factory
 from app.core.database import engine
 from app.models.models import Base
 import uuid
@@ -106,8 +106,10 @@ async def create_initial_admin():
             # Create admin's data directory structure
             admin_dir = Path(settings.USER_DATA_BASE_DIR) / str(admin.id)
             admin_dir.mkdir(parents=True, exist_ok=True)
-            for subdir in ["workspace", "analyst", "video-factory", "ccresearch", "research"]:
-                (admin_dir / subdir).mkdir(exist_ok=True)
+            # Create projects directory for unified project storage
+            (admin_dir / "projects").mkdir(exist_ok=True)
+            # Video Factory still uses its own directory
+            (admin_dir / "video-factory").mkdir(exist_ok=True)
 
             logger.info(f"Admin user created with ID: {admin.id}")
         else:
@@ -206,15 +208,9 @@ app.add_middleware(FileSizeLimitMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(notes.router, prefix="/notes", tags=["notes"])
-app.include_router(projects.router, prefix="/projects", tags=["projects"])
-app.include_router(research_chat.router, prefix="/research", tags=["Research Assistant"])
-app.include_router(logs.router, prefix="/logs", tags=["Logs"])
 app.include_router(ccresearch.router, prefix="/ccresearch", tags=["CCResearch"])
 app.include_router(workspace.router, prefix="/workspace", tags=["Workspace"])
 app.include_router(public_api.router, tags=["Public API"])
-app.include_router(research.router, tags=["Import Research"])
-app.include_router(analyst.router, prefix="/analyst", tags=["Data Analyst"])
 app.include_router(video_factory.router, tags=["Video Factory"])
 
 @app.get("/")
@@ -283,7 +279,7 @@ async def get_metrics():
     """
     from app.core.ccresearch_manager import ccresearch_manager
     from app.core.database import AsyncSessionLocal
-    from app.models.models import CCResearchSession, ResearchConversation
+    from app.models.models import CCResearchSession
     from sqlalchemy import select, func
 
     async with AsyncSessionLocal() as db:
@@ -300,21 +296,12 @@ async def get_metrics():
         )
         active_sessions = active_sessions.scalar() or 0
 
-        # Research conversation counts
-        total_conversations = await db.execute(
-            select(func.count(ResearchConversation.id))
-        )
-        total_conversations = total_conversations.scalar() or 0
-
     return {
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "ccresearch": {
             "total_sessions_all_time": total_sessions,
             "active_sessions_db": active_sessions,
             "active_sessions_memory": len(ccresearch_manager.processes)
-        },
-        "research_assistant": {
-            "total_conversations": total_conversations
         },
         "system": {
             "uptime_seconds": int((datetime.utcnow() - STARTUP_TIME).total_seconds()) if STARTUP_TIME else 0,

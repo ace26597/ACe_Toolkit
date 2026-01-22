@@ -15,7 +15,9 @@ import {
   Database,
   FlaskConical,
   Plug,
-  ArrowRight
+  ArrowRight,
+  FolderOpen,
+  Play
 } from 'lucide-react';
 
 interface CCResearchSession {
@@ -30,14 +32,27 @@ interface CCResearchSession {
   last_activity_at: string;
 }
 
+interface UnifiedProject {
+  id: string;
+  name: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  path: string;
+  terminal_session_id?: string;
+  terminal_status?: string;
+}
+
 interface SessionPickerProps {
   sessions: CCResearchSession[];
+  unifiedProjects?: UnifiedProject[];
   isLoading: boolean;
   isCreating: boolean;
   editingSessionId: string | null;
   editingTitle: string;
   onSelectSession: (sessionId: string) => void;
   onCreateSession: () => void;
+  onOpenProject: (projectName: string) => void;
   onDeleteSession: (sessionId: string, e: React.MouseEvent) => void;
   onStartRename: (sessionId: string, currentTitle: string, e: React.MouseEvent) => void;
   onSaveRename: (sessionId: string, e?: React.KeyboardEvent | React.MouseEvent) => void;
@@ -105,12 +120,14 @@ const groupSessionsByDate = (sessions: CCResearchSession[]) => {
 
 export function SessionPicker({
   sessions,
+  unifiedProjects = [],
   isLoading,
   isCreating,
   editingSessionId,
   editingTitle,
   onSelectSession,
   onCreateSession,
+  onOpenProject,
   onDeleteSession,
   onStartRename,
   onSaveRename,
@@ -119,6 +136,12 @@ export function SessionPicker({
   onRefresh
 }: SessionPickerProps) {
   const groupedSessions = groupSessionsByDate(sessions);
+
+  // Filter out projects that already have active CCResearch sessions
+  const sessionProjectNames = new Set(sessions.map(s => s.title));
+  const workspaceOnlyProjects = unifiedProjects.filter(
+    p => p.created_by === 'workspace' && !sessionProjectNames.has(p.name) && !p.terminal_session_id
+  );
 
   return (
     <div className="h-full flex flex-col bg-gray-950">
@@ -130,7 +153,7 @@ export function SessionPicker({
               <Terminal className="w-6 h-6 text-emerald-500" />
               CCResearch Terminal
             </h1>
-            <p className="text-sm text-gray-400 mt-1">Select a session to continue or create a new one</p>
+            <p className="text-sm text-gray-400 mt-1">Select a project to continue or create a new one</p>
           </div>
           <button
             onClick={onRefresh}
@@ -173,7 +196,7 @@ export function SessionPicker({
             </div>
           </div>
 
-          {/* Create New Session - Prominent */}
+          {/* Create New Project - Prominent */}
           <button
             onClick={onCreateSession}
             disabled={isCreating}
@@ -189,8 +212,8 @@ export function SessionPicker({
                   )}
                 </div>
                 <div className="text-left">
-                  <h3 className="text-lg font-semibold text-white">New Research Session</h3>
-                  <p className="text-sm text-gray-400">Start with Claude Code or direct terminal access</p>
+                  <h3 className="text-lg font-semibold text-white">Create Project</h3>
+                  <p className="text-sm text-gray-400">Start a new research project with Claude Code</p>
                 </div>
               </div>
               <ArrowRight className="w-5 h-5 text-emerald-400 group-hover:translate-x-1 transition-transform" />
@@ -200,7 +223,7 @@ export function SessionPicker({
           {/* Sessions List */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide">Recent Sessions</h2>
+              <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide">Recent Projects</h2>
               <span className="text-xs text-gray-500">{sessions.length} total</span>
             </div>
 
@@ -211,8 +234,8 @@ export function SessionPicker({
             ) : sessions.length === 0 ? (
               <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-gray-800">
                 <Sparkles className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-300 mb-2">No sessions yet</h3>
-                <p className="text-sm text-gray-500">Create your first research session to get started</p>
+                <h3 className="text-lg font-medium text-gray-300 mb-2">No projects yet</h3>
+                <p className="text-sm text-gray-500">Create your first research project to get started</p>
               </div>
             ) : (
               <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden divide-y divide-gray-800">
@@ -314,6 +337,56 @@ export function SessionPicker({
               </div>
             )}
           </div>
+
+          {/* Workspace Projects - can be opened in terminal */}
+          {workspaceOnlyProjects.length > 0 && (
+            <div className="space-y-4 mt-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide flex items-center gap-2">
+                  <FolderOpen className="w-4 h-4 text-indigo-400" />
+                  Workspace Projects
+                </h2>
+                <span className="text-xs text-gray-500">{workspaceOnlyProjects.length} available</span>
+              </div>
+
+              <div className="bg-gray-900 rounded-xl border border-indigo-800/50 overflow-hidden divide-y divide-gray-800">
+                {workspaceOnlyProjects.map(project => (
+                  <div
+                    key={project.id}
+                    onClick={() => onOpenProject(project.name)}
+                    className="group flex items-center gap-4 px-4 py-3 hover:bg-indigo-900/20 cursor-pointer transition-colors"
+                  >
+                    {/* Folder icon */}
+                    <div className="p-2 bg-indigo-600/20 rounded-lg">
+                      <FolderOpen className="w-4 h-4 text-indigo-400" />
+                    </div>
+
+                    {/* Project info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-white truncate font-medium">{project.name}</span>
+                        <span className="px-1.5 py-0.5 bg-indigo-600/30 text-indigo-300 text-xs rounded">
+                          workspace
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                        <Clock className="w-3 h-3" />
+                        <span>{formatTimeAgo(project.updated_at)}</span>
+                      </div>
+                    </div>
+
+                    {/* Open in Terminal button */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                        Open in Terminal
+                      </span>
+                      <Play className="w-4 h-4 text-indigo-400 group-hover:text-indigo-300 transition-colors" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
