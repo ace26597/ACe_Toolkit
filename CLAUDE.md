@@ -54,8 +54,10 @@ lsof -i :3000 -i :8000  # Check our ports
 - Real-time streaming of thinking, tool calls, and outputs
 - Chat interface for data analysis requests
 - Dashboard canvas with draggable widgets (Plotly.js)
-- Uses workspace project data files
-- No terminal UI - clean visual interface
+- Uses workspace project data files (shared access)
+- Interactive file browser - click to analyze
+- Quick actions: List files, Overview, Patterns, Charts
+- Session isolation (`.data-studio/` separate from `.claude/`)
 
 **Unified Project Architecture:**
 - Projects live at `/data/users/{user-id}/projects/{project-name}/`
