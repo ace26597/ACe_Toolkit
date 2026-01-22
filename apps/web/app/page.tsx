@@ -149,24 +149,19 @@ export default function Home() {
               </p>
             </Link>
 
-            <div className="opacity-40 rounded-lg border border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-4 sm:py-5">
+            <div className="opacity-50 rounded-lg border border-cyan-200 dark:border-cyan-800 px-4 sm:px-6 py-4 sm:py-5 bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-900/10 dark:to-blue-900/10">
               <h2 className="mb-2 text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                Drive
-                <span className="text-[10px] sm:text-xs ml-2 bg-gray-200 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 rounded">Soon</span>
+                Headless C3 Researcher
+                <span className="text-[10px] sm:text-xs ml-2 bg-cyan-500 text-white px-1.5 sm:px-2 py-0.5 rounded">Soon</span>
               </h2>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                File storage and sharing
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
+                Interactive headless Claude Code sessions with real-time streaming responses and programmatic control.
               </p>
-            </div>
-
-            <div className="opacity-40 rounded-lg border border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-4 sm:py-5">
-              <h2 className="mb-2 text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                Tasks
-                <span className="text-[10px] sm:text-xs ml-2 bg-gray-200 dark:bg-gray-700 px-1.5 sm:px-2 py-0.5 rounded">Soon</span>
-              </h2>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                Task management and to-do lists
-              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <span className="text-[10px] sm:text-xs bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 px-2 py-0.5 rounded">API Access</span>
+                <span className="text-[10px] sm:text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded">Streaming</span>
+                <span className="text-[10px] sm:text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded">Headless</span>
+              </div>
             </div>
           </div>
 
