@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { User, LogOut, Shield, Clock } from 'lucide-react';
+import { User, LogOut, Shield, Clock, Wrench } from 'lucide-react';
 import { useAuth, LoginModal, ExperimentalBanner } from '@/components/auth';
 import { RecentSessions } from '@/components/home/RecentSessions';
 
@@ -131,8 +131,30 @@ export default function Home() {
             </Link>
 
             <Link
+              href="/customize-c3"
+              className="group rounded-lg border border-amber-200 dark:border-amber-700 px-4 sm:px-6 py-4 sm:py-5 transition-all hover:border-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20 hover:shadow-lg bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/10 dark:to-orange-900/10"
+            >
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
+                  Customize C3
+                  <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
+                </h2>
+                <span className="text-[10px] sm:text-xs bg-amber-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-medium">AUTH</span>
+                <span className="text-[10px] sm:text-xs bg-green-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-medium">NEW</span>
+              </div>
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
+                Create custom skills, plugins, MCP servers, and agents. Claude helps you research, design, and build extensions.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <span className="text-[10px] sm:text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded">Skills</span>
+                <span className="text-[10px] sm:text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 px-2 py-0.5 rounded">Plugins</span>
+                <span className="text-[10px] sm:text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded">MCP</span>
+              </div>
+            </Link>
+
+            <Link
               href="/video-factory"
-              className="group rounded-lg border border-purple-200 dark:border-purple-700 px-4 sm:px-6 py-4 sm:py-5 transition-all hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:shadow-lg md:col-span-2 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/10 dark:to-pink-900/10"
+              className="group rounded-lg border border-purple-200 dark:border-purple-700 px-4 sm:px-6 py-4 sm:py-5 transition-all hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:shadow-lg bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/10 dark:to-pink-900/10"
             >
               <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">

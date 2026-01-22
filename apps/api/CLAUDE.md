@@ -13,7 +13,7 @@
 | ORM | SQLAlchemy 2.0 (async) |
 | Database | SQLite (aiosqlite) |
 | Auth | python-jose (JWT), passlib (Argon2) |
-| AI | OpenAI SDK, Anthropic SDK, LangGraph |
+| AI | OpenAI SDK, Anthropic SDK |
 | Terminal PTY | pexpect |
 | File Processing | pypdf, openpyxl, pandas, pillow |
 
@@ -110,6 +110,7 @@ apps/api/
 | GET | `/projects/{name}/data/download` | Download file |
 | GET | `/projects/{name}/data/content` | Read file content |
 | PUT | `/projects/{name}/data/content` | Save file content |
+| POST | `/extensions/submit` | Submit extension for admin review |
 
 ### Unified Projects (`/ccresearch/unified-projects`)
 
@@ -337,6 +338,24 @@ open http://localhost:8000/docs
 
 ---
 
+## Removed Modules (2026-01-22)
+
+The following modules were removed during cleanup:
+
+| Module | Reason |
+|--------|--------|
+| `core/ai_provider.py` | Was used by Research Assistant (removed) |
+| `core/file_processor.py` | Was used by Research Assistant (removed) |
+| `core/langgraph_workflows.py` | Was used by Research Assistant (removed) |
+| `core/report_generator.py` | Was used by Research Assistant (removed) |
+| `routers/analyst.py` | Data Analyst app removed |
+| `routers/research_chat.py` | Research Assistant app removed |
+| `routers/notes.py` | Standalone notes removed (now in workspace) |
+| `routers/logs.py` | Logs viewer app removed |
+| `routers/projects.py` | Legacy projects removed |
+
+---
+
 ## Notes
 
 - All authenticated endpoints require `credentials: 'include'` in fetch
@@ -344,3 +363,5 @@ open http://localhost:8000/docs
 - Access tokens expire in 15 minutes, refresh handles renewal
 - AACT passwords with special chars need `quote_plus()` encoding
 - Session rename updates DB only, not filesystem (preserves `--continue`)
+- Project names sanitized with hyphens (not spaces) for directory compatibility
+- GitHub clone uses module-level `re` import (not inside conditionals - Python 3.13 scoping)

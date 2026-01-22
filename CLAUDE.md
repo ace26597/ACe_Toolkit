@@ -38,6 +38,7 @@ lsof -i :3000 -i :8000  # Check our ports
 | App | Route | Description |
 |-----|-------|-------------|
 | **C3 Researcher Workspace** | `/workspace` | Claude Code Custom Researcher - AI-powered research terminal |
+| **Customize C3** | `/customize-c3` | Create skills, plugins, MCP servers, and agents |
 | **Video Factory** | `/video-factory` | AI video production pipeline |
 
 **C3 Researcher Workspace Features:**
@@ -207,14 +208,18 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
+| 2026-01-22 | **Code Cleanup:** Removed unused core modules (ai_provider, file_processor, langgraph_workflows, report_generator) |
+| 2026-01-22 | **Frontend Cleanup:** Removed unused APIs (analystApi, researchApi, notesApi, projectsApi, chartsApi, mermaidDiskApi) |
+| 2026-01-22 | **Fix:** GitHub clone `re` module error (Python 3.13 scoping issue) |
+| 2026-01-22 | **Fix:** Project name sanitization - use hyphens instead of spaces for directory names |
+| 2026-01-22 | **Terminal Default:** Terminal tab now default view when opening workspace |
+| 2026-01-22 | **Import Data:** Multi-URL support, file upload tab, GitHub clone in workspace |
 | 2026-01-22 | **RENAME: C3 Researcher Workspace** - Claude Code Custom Researcher |
 | 2026-01-22 | **Welcome Page:** Comprehensive capabilities view when no project selected |
 | 2026-01-22 | **No Auto-Select:** User must explicitly choose/create project to start |
 | 2026-01-22 | **MAJOR: CCResearch merged into Workspace** - /ccresearch redirects to /workspace?tab=terminal |
 | 2026-01-22 | **Terminal Tab:** Claude Code or SSH mode with stats bar (145+ skills, 26 MCP servers, etc.) |
-| 2026-01-22 | **Import Data:** GitHub clone and web URL fetch in Workspace terminal |
 | 2026-01-22 | **Unified Project Architecture** - Projects shared across all apps |
-| 2026-01-22 | **Workspace:** Terminal tab links to CCResearch (replaces Import Research) |
 | 2026-01-22 | **Removed Apps:** Data Analyst, Logs Viewer, Notes, Import Research |
 | 2026-01-22 | **Backend Cleanup:** Removed analyst, notes, logs, projects, research routers |
 | 2026-01-22 | **Project Manager:** New unified `/data/users/{user-id}/projects/` storage |

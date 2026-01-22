@@ -724,7 +724,6 @@ async def clone_github_repo(
     cmd = ['git', 'clone', '--depth', '1']  # Shallow clone for speed
     if request.branch:
         # Validate branch name - only allow safe characters
-        import re
         if not re.match(r'^[a-zA-Z0-9._/-]+$', request.branch):
             raise HTTPException(status_code=400, detail="Invalid branch name - only alphanumeric, dots, underscores, slashes and dashes allowed")
         if request.branch.startswith('-'):

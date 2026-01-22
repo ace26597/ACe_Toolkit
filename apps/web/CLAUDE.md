@@ -72,6 +72,23 @@ apps/web/
 The CCResearch terminal functionality has been fully integrated into the Workspace Terminal tab.
 Legacy share links still work at `/ccresearch/share/[token]`.
 
+### Customize C3 (`/customize-c3`)
+
+**Status:** NEW (2026-01-22)
+
+Interface for creating custom skills, plugins, MCP servers, and agents.
+
+**Features:**
+- Four extension types: Skill, Plugin, MCP Server, Agent
+- Start Fresh - opens workspace in customize mode
+- From Template - clone existing template from GitHub
+- Links to documentation: Claude Code Docs, MCP Specification, GitHub
+
+**How it works:**
+- User selects extension type
+- Links to `/workspace?mode=customize&type={skill|plugin|mcp|agent}`
+- Claude Code session gets specialized guidance for extension development
+
 ### C3 Researcher Workspace (`/workspace`)
 
 Claude Code Custom Researcher - AI-powered research terminal with comprehensive scientific capabilities.
@@ -167,14 +184,26 @@ fetch(url, {
 
 Centralized API methods for all backends.
 
+**Active Exports:**
+- `authApi` - Authentication (login, register, logout, refresh)
+- `workspaceApi` - Projects, notes, files, sessions
+
+**Removed Exports (2026-01-22):**
+- `analystApi` - Data Analyst (app removed)
+- `researchApi` - Research Assistant (app removed)
+- `notesApi` - Standalone notes (now in workspace)
+- `projectsApi` - Legacy projects (replaced by workspace)
+- `chartsApi` - Mermaid charts (app removed)
+- `mermaidDiskApi` - Disk export (app removed)
+- `fetchWithAuth` - Legacy auth wrapper (unused)
+
 ```typescript
 // Example usage
-import { ccresearchApi, workspaceApi } from '@/lib/api';
+import { authApi, workspaceApi } from '@/lib/api';
 
-// CCResearch
-await ccresearchApi.createSession(sessionId, email, title, files);
-await ccresearchApi.renameSession(id, newTitle);
-await ccresearchApi.shareSession(id);
+// Authentication
+await authApi.login(email, password);
+await authApi.logout();
 
 // Workspace
 await workspaceApi.listProjects();
@@ -306,3 +335,33 @@ npm run start
 | Components | PascalCase | `CCResearchTerminal.tsx` |
 | Utilities | camelCase | `api.ts` |
 | Data files | kebab-case | `use-cases.json` |
+
+---
+
+## Removed Code (2026-01-22)
+
+**Components:**
+- `components/analyst/` - Data Analyst UI (entire directory removed)
+
+**Pages:**
+- `app/analyst/page.tsx` - Data Analyst page (removed)
+- `app/notes/page.tsx` - Standalone notes (removed)
+- `app/logs/page.tsx` - Logs viewer (removed)
+
+**API Cleanup:**
+- Reduced `lib/api.ts` from 823 to 510 lines
+- Removed 6 unused API clients and related interfaces
+- Removed `fetchWithAuth` and legacy `API_URL` constant
+
+---
+
+## Recent Updates
+
+| Date | Change |
+|------|--------|
+| 2026-01-22 | Terminal as default view when opening workspace |
+| 2026-01-22 | Import Data modal with multi-URL support and file upload tab |
+| 2026-01-22 | Code cleanup - removed unused APIs and components |
+| 2026-01-22 | Project name sanitization uses hyphens instead of spaces |
+| 2026-01-22 | Welcome page redesign with video, tabs, bento grid |
+| 2026-01-22 | CCResearch merged into Workspace Terminal tab |
