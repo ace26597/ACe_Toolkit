@@ -768,7 +768,85 @@ export const workspaceApi = {
             throw new Error(error.detail || 'Failed to save file');
         }
     },
+
+    // ============ Unified Sessions ============
+
+    listSessions: async (createdBy?: string): Promise<WorkspaceSession[]> => {
+        const params = createdBy ? `?created_by=${encodeURIComponent(createdBy)}` : '';
+        const res = await fetch(`${getApiUrl()}/workspace/sessions${params}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to list sessions');
+        return res.json();
+    },
+
+    getSession: async (sessionId: string): Promise<WorkspaceSession> => {
+        const res = await fetch(`${getApiUrl()}/workspace/sessions/${sessionId}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to get session');
+        return res.json();
+    },
+
+    listSessionFiles: async (sessionId: string, path: string = ''): Promise<SessionFile[]> => {
+        const params = path ? `?path=${encodeURIComponent(path)}` : '';
+        const res = await fetch(`${getApiUrl()}/workspace/sessions/${sessionId}/files${params}`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to list session files');
+        return res.json();
+    },
+
+    getSessionFileContent: async (sessionId: string, path: string): Promise<string> => {
+        const res = await fetch(`${getApiUrl()}/workspace/sessions/${sessionId}/files/content?path=${encodeURIComponent(path)}`, { credentials: 'include' });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Failed to read file' }));
+            throw new Error(error.detail || 'Failed to read file');
+        }
+        return res.text();
+    },
+
+    downloadSessionFile: (sessionId: string, path: string): string => {
+        return `${getApiUrl()}/workspace/sessions/${sessionId}/files/download?path=${encodeURIComponent(path)}`;
+    },
+
+    updateSession: async (sessionId: string, data: { title?: string; tags?: string[]; description?: string }): Promise<void> => {
+        const params = new URLSearchParams();
+        if (data.title) params.set('title', data.title);
+        if (data.description) params.set('description', data.description);
+        if (data.tags) params.set('tags', JSON.stringify(data.tags));
+
+        const res = await fetch(`${getApiUrl()}/workspace/sessions/${sessionId}?${params}`, {
+            method: 'PATCH',
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to update session');
+    },
+
+    deleteSession: async (sessionId: string): Promise<void> => {
+        const res = await fetch(`${getApiUrl()}/workspace/sessions/${sessionId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to delete session');
+    },
 };
+
+// Session types
+export interface WorkspaceSession {
+    id: string;
+    title: string;
+    created_by: string;
+    created_at: string;
+    last_accessed: string;
+    tags: string[];
+    terminal_enabled: boolean;
+    description?: string;
+    email?: string;
+    status: string;
+}
+
+export interface SessionFile {
+    name: string;
+    path: string;
+    is_dir: boolean;
+    size: number;
+    modified_at: string;
+}
 
 // ============ Analyst API (Data Analysis with Auth) ============
 
@@ -1059,186 +1137,3 @@ export const analystApi = {
     },
 };
 
-// ============ Research Assistant API (Claude Code Headless) ============
-
-export interface ResearchAssistantSession {
-    id: string;
-    user_id: string;
-    claude_session_id?: string;
-    title: string;
-    workspace_dir: string;
-    response_format: string;
-    status: string;
-    turn_count: number;
-    share_id?: string;
-    shared_at?: string;
-    uploaded_files?: string[];
-    created_at: string;
-    last_activity: string;
-}
-
-export interface ResearchAssistantMessage {
-    id: string;
-    session_id: string;
-    role: 'user' | 'assistant';
-    content: string;
-    response_format: string;
-    tool_calls_json?: string;
-    thinking_json?: string;
-    input_tokens: number;
-    output_tokens: number;
-    created_at: string;
-}
-
-export interface ResearchStreamEvent {
-    type: 'connected' | 'system' | 'thinking' | 'tool_use' | 'tool_result' | 'text' | 'complete' | 'error' | 'pong';
-    content?: string;
-    name?: string;
-    input?: Record<string, any>;
-    tool_use_id?: string;
-    is_error?: boolean;
-    response?: string;
-    session_id?: string;
-    tool_calls?: any[];
-    thinking?: string[];
-    usage?: { input_tokens: number; output_tokens: number };
-    error?: string;
-}
-
-export const researchAssistantApi = {
-    // Sessions
-    createSession: async (title?: string, responseFormat?: string, files?: File[]): Promise<ResearchAssistantSession> => {
-        const formData = new FormData();
-        formData.append('title', title || 'New Research');
-        formData.append('response_format', responseFormat || 'markdown');
-        if (files) {
-            files.forEach(file => formData.append('files', file));
-        }
-
-        const res = await fetch(`${getApiUrl()}/research-assistant/sessions`, {
-            method: 'POST',
-            credentials: 'include',
-            body: formData,
-        });
-        if (!res.ok) {
-            const error = await res.json().catch(() => ({ detail: 'Failed to create session' }));
-            throw new Error(error.detail || 'Failed to create session');
-        }
-        return res.json();
-    },
-
-    listSessions: async (): Promise<ResearchAssistantSession[]> => {
-        const res = await fetch(`${getApiUrl()}/research-assistant/sessions`, {
-            credentials: 'include',
-        });
-        if (!res.ok) throw new Error('Failed to list sessions');
-        return res.json();
-    },
-
-    getSession: async (sessionId: string): Promise<ResearchAssistantSession> => {
-        const res = await fetch(`${getApiUrl()}/research-assistant/sessions/${sessionId}`, {
-            credentials: 'include',
-        });
-        if (!res.ok) throw new Error('Failed to get session');
-        return res.json();
-    },
-
-    getMessages: async (sessionId: string): Promise<ResearchAssistantMessage[]> => {
-        const res = await fetch(`${getApiUrl()}/research-assistant/sessions/${sessionId}/messages`, {
-            credentials: 'include',
-        });
-        if (!res.ok) throw new Error('Failed to get messages');
-        return res.json();
-    },
-
-    uploadFiles: async (sessionId: string, files: File[]): Promise<{ uploaded_files: string[] }> => {
-        const formData = new FormData();
-        files.forEach(file => formData.append('files', file));
-
-        const res = await fetch(`${getApiUrl()}/research-assistant/sessions/${sessionId}/upload`, {
-            method: 'POST',
-            credentials: 'include',
-            body: formData,
-        });
-        if (!res.ok) throw new Error('Failed to upload files');
-        return res.json();
-    },
-
-    updateSession: async (sessionId: string, data: { title?: string; response_format?: string }): Promise<void> => {
-        const params = new URLSearchParams();
-        if (data.title) params.append('title', data.title);
-        if (data.response_format) params.append('response_format', data.response_format);
-
-        const res = await fetch(`${getApiUrl()}/research-assistant/sessions/${sessionId}?${params}`, {
-            method: 'PATCH',
-            credentials: 'include',
-        });
-        if (!res.ok) throw new Error('Failed to update session');
-    },
-
-    deleteSession: async (sessionId: string): Promise<void> => {
-        const res = await fetch(`${getApiUrl()}/research-assistant/sessions/${sessionId}`, {
-            method: 'DELETE',
-            credentials: 'include',
-        });
-        if (!res.ok) throw new Error('Failed to delete session');
-    },
-
-    // Sharing
-    shareSession: async (sessionId: string): Promise<{ share_id: string; share_url: string; shared_at: string }> => {
-        const res = await fetch(`${getApiUrl()}/research-assistant/sessions/${sessionId}/share`, {
-            method: 'POST',
-            credentials: 'include',
-        });
-        if (!res.ok) throw new Error('Failed to share session');
-        return res.json();
-    },
-
-    revokeShare: async (sessionId: string): Promise<void> => {
-        const res = await fetch(`${getApiUrl()}/research-assistant/sessions/${sessionId}/share`, {
-            method: 'DELETE',
-            credentials: 'include',
-        });
-        if (!res.ok) throw new Error('Failed to revoke share');
-    },
-
-    // Public (no auth)
-    getSharedSession: async (shareId: string): Promise<{ id: string; title: string; created_at: string; shared_at: string; message_count: number }> => {
-        const res = await fetch(`${getApiUrl()}/research-assistant/shared/${shareId}`);
-        if (!res.ok) throw new Error('Shared session not found');
-        return res.json();
-    },
-
-    getSharedMessages: async (shareId: string): Promise<ResearchAssistantMessage[]> => {
-        const res = await fetch(`${getApiUrl()}/research-assistant/shared/${shareId}/messages`);
-        if (!res.ok) throw new Error('Failed to get shared messages');
-        return res.json();
-    },
-
-    // Files
-    listFiles: async (sessionId: string): Promise<{ files: Array<{ name: string; path: string; is_dir: boolean; size: number; modified_at: string }> }> => {
-        const res = await fetch(`${getApiUrl()}/research-assistant/sessions/${sessionId}/files`, {
-            credentials: 'include',
-        });
-        if (!res.ok) throw new Error('Failed to list files');
-        return res.json();
-    },
-
-    getFileDownloadUrl: (sessionId: string, path: string): string => {
-        return `${getApiUrl()}/research-assistant/sessions/${sessionId}/files/download?path=${encodeURIComponent(path)}`;
-    },
-
-    downloadFile: async (sessionId: string, path: string): Promise<Blob> => {
-        const res = await fetch(`${getApiUrl()}/research-assistant/sessions/${sessionId}/files/download?path=${encodeURIComponent(path)}`, {
-            credentials: 'include',
-        });
-        if (!res.ok) throw new Error('Failed to download file');
-        return res.blob();
-    },
-
-    // WebSocket
-    connectWebSocket: (sessionId: string): WebSocket => {
-        const wsUrl = getApiUrl().replace(/^http/, 'ws') + `/research-assistant/sessions/${sessionId}/stream`;
-        return new WebSocket(wsUrl);
-    },
-};

@@ -35,7 +35,6 @@ apps/api/
 │   │   ├── analyst.py             # Data Analyst
 │   │   ├── video_factory.py       # Video Factory
 │   │   ├── research.py            # Import Research (web/GitHub)
-│   │   ├── research_assistant.py  # Research Assistant (headless)
 │   │   ├── research_chat.py       # Research Chat (LangGraph)
 │   │   ├── notes.py               # Notes app
 │   │   ├── projects.py            # Session projects
@@ -49,7 +48,6 @@ apps/api/
 │       ├── workspace_manager.py   # Workspace file manager
 │       ├── analyst_manager.py     # Data analyst manager
 │       ├── research_manager.py    # Import research manager
-│       ├── research_assistant_manager.py  # Headless Claude Code
 │       ├── notifications.py       # Discord/ntfy alerts
 │       └── user_access.py         # Per-user data access
 ├── requirements.txt
@@ -127,38 +125,6 @@ apps/api/
 | POST | `/projects/{id}/analyze` | Run AI analysis |
 | POST | `/projects/{id}/query` | Run SQL query |
 | GET | `/projects/{id}/charts` | Get chart configurations |
-
-### Research Assistant (`/research-assistant`)
-
-Claude Code in headless mode for QA-style research.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/sessions` | Create session (FormData: title, files[]) |
-| GET | `/sessions` | List user sessions |
-| GET | `/sessions/{id}` | Get session details |
-| GET | `/sessions/{id}/messages` | Get message history |
-| POST | `/sessions/{id}/upload` | Upload additional files |
-| PATCH | `/sessions/{id}` | Update title/format |
-| DELETE | `/sessions/{id}` | Delete session |
-| POST | `/sessions/{id}/share` | Create public share link |
-| DELETE | `/sessions/{id}/share` | Revoke share link |
-| GET | `/shared/{share_id}` | Public: Get shared session |
-| GET | `/shared/{share_id}/messages` | Public: Get messages |
-| WS | `/sessions/{id}/stream` | WebSocket for streaming queries |
-
-**WebSocket Protocol:**
-```json
-// Client sends
-{"type": "query", "prompt": "...", "response_format": "markdown"}
-
-// Server streams
-{"type": "thinking", "content": "..."}
-{"type": "tool_use", "name": "...", "input": {...}}
-{"type": "tool_result", "content": "...", "is_error": false}
-{"type": "text", "content": "..."}
-{"type": "complete", "response": "...", "usage": {...}}
-```
 
 ### Import Research (`/import-research`)
 

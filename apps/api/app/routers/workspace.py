@@ -513,3 +513,184 @@ async def delete_data(name: str, path: str = Query(...), user: User = Depends(re
     if not deleted:
         raise HTTPException(status_code=404, detail="File not found")
     return {"status": "deleted", "path": path}
+
+
+# ==================== UNIFIED SESSIONS ENDPOINTS ====================
+
+from app.core.session_manager import session_manager, SessionMetadata
+
+
+class SessionResponse(BaseModel):
+    id: str
+    title: str
+    created_by: str
+    created_at: str
+    last_accessed: str
+    tags: List[str]
+    terminal_enabled: bool
+    description: Optional[str] = None
+    email: Optional[str] = None
+    status: str
+
+
+class SessionFileResponse(BaseModel):
+    name: str
+    path: str
+    is_dir: bool
+    size: int
+    modified_at: str
+
+
+@router.get("/sessions", response_model=List[SessionResponse])
+async def list_sessions(
+    created_by: Optional[str] = Query(None, description="Filter by app (ccresearch, workspace, analyst)"),
+    user: User = Depends(require_valid_access)
+):
+    """List all sessions for the current user across all apps."""
+    sessions = session_manager.list_sessions(
+        user_id=str(user.id),
+        created_by=created_by,
+        status="active"
+    )
+    return [
+        SessionResponse(
+            id=s.id,
+            title=s.title,
+            created_by=s.created_by,
+            created_at=s.created_at,
+            last_accessed=s.last_accessed or s.created_at,
+            tags=s.tags or [],
+            terminal_enabled=s.terminal_enabled,
+            description=s.description,
+            email=s.email,
+            status=s.status
+        )
+        for s in sessions
+    ]
+
+
+@router.get("/sessions/{session_id}", response_model=SessionResponse)
+async def get_session(session_id: str, user: User = Depends(require_valid_access)):
+    """Get details for a specific session."""
+    metadata = session_manager.get_session(str(user.id), session_id)
+    if not metadata:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    return SessionResponse(
+        id=metadata.id,
+        title=metadata.title,
+        created_by=metadata.created_by,
+        created_at=metadata.created_at,
+        last_accessed=metadata.last_accessed or metadata.created_at,
+        tags=metadata.tags or [],
+        terminal_enabled=metadata.terminal_enabled,
+        description=metadata.description,
+        email=metadata.email,
+        status=metadata.status
+    )
+
+
+@router.get("/sessions/{session_id}/files", response_model=List[SessionFileResponse])
+async def list_session_files(
+    session_id: str,
+    path: str = Query(default=""),
+    user: User = Depends(require_valid_access)
+):
+    """List files in a session's data directory."""
+    metadata = session_manager.get_session(str(user.id), session_id)
+    if not metadata:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    files = session_manager.list_files(str(user.id), session_id, path)
+    return [SessionFileResponse(**f) for f in files]
+
+
+@router.get("/sessions/{session_id}/files/content")
+async def get_session_file_content(
+    session_id: str,
+    path: str = Query(...),
+    user: User = Depends(require_valid_access)
+):
+    """Read text content of a file in a session."""
+    metadata = session_manager.get_session(str(user.id), session_id)
+    if not metadata:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    file_path = session_manager.get_file_path(str(user.id), session_id, path)
+    if not file_path:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    import aiofiles.os
+    if await aiofiles.os.path.isdir(file_path):
+        raise HTTPException(status_code=400, detail="Cannot read content of a directory")
+
+    stat = await aiofiles.os.stat(file_path)
+    if stat.st_size > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large for preview (max 5MB)")
+
+    try:
+        import aiofiles
+        async with aiofiles.open(file_path, 'r', encoding='utf-8') as f:
+            content = await f.read()
+        return PlainTextResponse(content)
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=400, detail="File is not a text file")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read file: {str(e)}")
+
+
+@router.get("/sessions/{session_id}/files/download")
+async def download_session_file(
+    session_id: str,
+    path: str = Query(...),
+    user: User = Depends(require_valid_access)
+):
+    """Download a file from a session."""
+    metadata = session_manager.get_session(str(user.id), session_id)
+    if not metadata:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    file_path = session_manager.get_file_path(str(user.id), session_id, path)
+    if not file_path:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    mime_type, _ = mimetypes.guess_type(str(file_path))
+    if not mime_type:
+        mime_type = "application/octet-stream"
+
+    return FileResponse(
+        file_path,
+        media_type=mime_type,
+        filename=file_path.name
+    )
+
+
+@router.patch("/sessions/{session_id}")
+async def update_session(
+    session_id: str,
+    title: Optional[str] = None,
+    tags: Optional[List[str]] = None,
+    description: Optional[str] = None,
+    user: User = Depends(require_valid_access)
+):
+    """Update session metadata."""
+    metadata = session_manager.update_session(
+        user_id=str(user.id),
+        session_id=session_id,
+        title=title,
+        tags=tags,
+        description=description
+    )
+    if not metadata:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    return {"status": "updated", "id": session_id}
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(session_id: str, user: User = Depends(require_valid_access)):
+    """Delete a session."""
+    deleted = session_manager.delete_session(str(user.id), session_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"status": "deleted", "id": session_id}

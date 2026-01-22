@@ -118,8 +118,8 @@
       "Bash(claude mcp:*)",
       "WebFetch(domain:aact.ctti-clinicaltrials.org)",
       "WebFetch(domain:fastmcp.me)",
-      "Bash(DB_USER=acetech DB_PASSWORD='ACe26597!!' uvx mcp-server-aact:*)",
-      "Bash(PGPASSWORD='ACe26597!!' psql:*)",
+      "Bash(DB_USER=* DB_PASSWORD=* uvx mcp-server-aact:*)",
+      "Bash(PGPASSWORD=* psql:*)",
       "Bash(sudo dmesg:*)",
       "Bash(ulimit:*)",
       "Bash(cat:*)",
@@ -130,7 +130,12 @@
       "Bash(sudo systemd-resolve:*)",
       "Bash(sudo resolvectl:*)",
       "mcp__memory__create_entities",
-      "mcp__memory__create_relations"
+      "mcp__memory__create_relations",
+      "Bash(claude doctor:*)",
+      "Bash(/dev/null -exec cat {} ;)",
+      "Bash(# Restart backend cd /home/ace/dev/ACe_Toolkit/apps/api && source .venv/bin/activate && fuser -k 8000/tcp sleep 1 nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 2>&1 & # Restart frontend fuser -k 3000/tcp sleep 1 nohup npm run start 2>&1 & sleep 4 echo \"\"Checking services...\"\" curl -s http://localhost:8000/health)",
+      "mcp__filesystem__list_directory",
+      "Bash(wc:*)"
     ]
   }
 }

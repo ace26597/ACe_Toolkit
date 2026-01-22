@@ -1,0 +1,323 @@
+"use client";
+
+import React from 'react';
+import {
+  Plus,
+  Trash2,
+  RefreshCw,
+  Terminal,
+  Clock,
+  Pencil,
+  Check,
+  X,
+  Sparkles,
+  Server,
+  Database,
+  FlaskConical,
+  Plug,
+  ArrowRight
+} from 'lucide-react';
+
+interface CCResearchSession {
+  id: string;
+  session_id: string;
+  email: string;
+  session_number: number;
+  title: string;
+  workspace_dir: string;
+  status: 'created' | 'active' | 'disconnected' | 'terminated' | 'error';
+  created_at: string;
+  last_activity_at: string;
+}
+
+interface SessionPickerProps {
+  sessions: CCResearchSession[];
+  isLoading: boolean;
+  isCreating: boolean;
+  editingSessionId: string | null;
+  editingTitle: string;
+  onSelectSession: (sessionId: string) => void;
+  onCreateSession: () => void;
+  onDeleteSession: (sessionId: string, e: React.MouseEvent) => void;
+  onStartRename: (sessionId: string, currentTitle: string, e: React.MouseEvent) => void;
+  onSaveRename: (sessionId: string, e?: React.KeyboardEvent | React.MouseEvent) => void;
+  onCancelRename: (e: React.MouseEvent) => void;
+  setEditingTitle: (title: string) => void;
+  onRefresh: () => void;
+}
+
+// Get status color
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'active': return 'bg-green-500';
+    case 'disconnected': return 'bg-yellow-500';
+    case 'created': return 'bg-blue-500';
+    case 'terminated': return 'bg-gray-500';
+    case 'error': return 'bg-red-500';
+    default: return 'bg-gray-500';
+  }
+};
+
+// Format relative time
+const formatTimeAgo = (dateStr: string) => {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString();
+};
+
+// Group sessions by date
+const groupSessionsByDate = (sessions: CCResearchSession[]) => {
+  const grouped: Record<string, CCResearchSession[]> = {};
+
+  sessions.forEach(session => {
+    const date = new Date(session.created_at);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    let label: string;
+    if (date.toDateString() === today.toDateString()) {
+      label = 'Today';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      label = 'Yesterday';
+    } else if (date > new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)) {
+      label = 'This Week';
+    } else {
+      label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    }
+
+    if (!grouped[label]) grouped[label] = [];
+    grouped[label].push(session);
+  });
+
+  return grouped;
+};
+
+export function SessionPicker({
+  sessions,
+  isLoading,
+  isCreating,
+  editingSessionId,
+  editingTitle,
+  onSelectSession,
+  onCreateSession,
+  onDeleteSession,
+  onStartRename,
+  onSaveRename,
+  onCancelRename,
+  setEditingTitle,
+  onRefresh
+}: SessionPickerProps) {
+  const groupedSessions = groupSessionsByDate(sessions);
+
+  return (
+    <div className="h-full flex flex-col bg-gray-950">
+      {/* Header */}
+      <div className="p-4 sm:p-6 border-b border-gray-800 flex-shrink-0">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+              <Terminal className="w-6 h-6 text-emerald-500" />
+              CCResearch Terminal
+            </h1>
+            <p className="text-sm text-gray-400 mt-1">Select a session to continue or create a new one</p>
+          </div>
+          <button
+            onClick={onRefresh}
+            className="p-2 hover:bg-gray-800 rounded-lg transition-colors text-gray-400 hover:text-white"
+            title="Refresh sessions"
+          >
+            <RefreshCw className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="max-w-4xl mx-auto">
+          {/* Stats Bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-emerald-400">140+</div>
+              <div className="text-xs text-gray-500 flex items-center justify-center gap-1">
+                <FlaskConical className="w-3 h-3" /> Skills
+              </div>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-blue-400">26</div>
+              <div className="text-xs text-gray-500 flex items-center justify-center gap-1">
+                <Server className="w-3 h-3" /> MCP Servers
+              </div>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-purple-400">13</div>
+              <div className="text-xs text-gray-500 flex items-center justify-center gap-1">
+                <Plug className="w-3 h-3" /> Plugins
+              </div>
+            </div>
+            <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 text-center">
+              <div className="text-2xl font-bold text-amber-400">566K+</div>
+              <div className="text-xs text-gray-500 flex items-center justify-center gap-1">
+                <Database className="w-3 h-3" /> Trials (AACT)
+              </div>
+            </div>
+          </div>
+
+          {/* Create New Session - Prominent */}
+          <button
+            onClick={onCreateSession}
+            disabled={isCreating}
+            className="w-full mb-6 p-4 sm:p-6 bg-gradient-to-r from-emerald-900/30 to-teal-900/30 hover:from-emerald-900/50 hover:to-teal-900/50 border border-emerald-700/50 hover:border-emerald-500 rounded-xl transition-all group"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-emerald-600/20 rounded-lg group-hover:bg-emerald-600/30 transition-colors">
+                  {isCreating ? (
+                    <RefreshCw className="w-6 h-6 text-emerald-400 animate-spin" />
+                  ) : (
+                    <Plus className="w-6 h-6 text-emerald-400" />
+                  )}
+                </div>
+                <div className="text-left">
+                  <h3 className="text-lg font-semibold text-white">New Research Session</h3>
+                  <p className="text-sm text-gray-400">Start with Claude Code or direct terminal access</p>
+                </div>
+              </div>
+              <ArrowRight className="w-5 h-5 text-emerald-400 group-hover:translate-x-1 transition-transform" />
+            </div>
+          </button>
+
+          {/* Sessions List */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-gray-400 uppercase tracking-wide">Recent Sessions</h2>
+              <span className="text-xs text-gray-500">{sessions.length} total</span>
+            </div>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <RefreshCw className="w-6 h-6 animate-spin text-gray-400" />
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="text-center py-12 bg-gray-900/50 rounded-xl border border-gray-800">
+                <Sparkles className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-300 mb-2">No sessions yet</h3>
+                <p className="text-sm text-gray-500">Create your first research session to get started</p>
+              </div>
+            ) : (
+              <div className="bg-gray-900 rounded-xl border border-gray-800 overflow-hidden divide-y divide-gray-800">
+                {Object.entries(groupedSessions).map(([dateLabel, dateSessions]) => (
+                  <div key={dateLabel}>
+                    {/* Date Header */}
+                    <div className="px-4 py-2 bg-gray-800/50 text-xs font-medium text-gray-500 sticky top-0">
+                      {dateLabel}
+                    </div>
+
+                    {/* Sessions in this group */}
+                    {dateSessions.map(session => (
+                      <div
+                        key={session.id}
+                        onClick={() => {
+                          if (editingSessionId !== session.id) {
+                            onSelectSession(session.id);
+                          }
+                        }}
+                        className="group flex items-center gap-4 px-4 py-3 hover:bg-gray-800/50 cursor-pointer transition-colors"
+                      >
+                        {/* Status indicator */}
+                        <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${getStatusColor(session.status)}`} />
+
+                        {/* Session info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="px-1.5 py-0.5 bg-indigo-600/30 text-indigo-300 text-xs rounded font-medium">
+                              #{session.session_number}
+                            </span>
+                            {editingSessionId === session.id ? (
+                              <input
+                                type="text"
+                                value={editingTitle}
+                                onChange={(e) => setEditingTitle(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') onSaveRename(session.id, e);
+                                  if (e.key === 'Escape') onCancelRename(e as any);
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                                autoFocus
+                                className="flex-1 px-2 py-1 bg-gray-700 border border-blue-500 rounded text-white text-sm focus:outline-none"
+                              />
+                            ) : (
+                              <span className="text-white truncate font-medium">{session.title}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                            <Clock className="w-3 h-3" />
+                            <span>{formatTimeAgo(session.last_activity_at)}</span>
+                            <span>•</span>
+                            <span className="truncate">{session.email}</span>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        {editingSessionId === session.id ? (
+                          <div className="flex gap-1">
+                            <button
+                              onClick={(e) => onSaveRename(session.id, e)}
+                              className="p-2 hover:bg-green-900/50 rounded-lg transition-colors"
+                              title="Save"
+                            >
+                              <Check className="w-4 h-4 text-green-400" />
+                            </button>
+                            <button
+                              onClick={onCancelRename}
+                              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                              title="Cancel"
+                            >
+                              <X className="w-4 h-4 text-gray-400" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={(e) => onStartRename(session.id, session.title, e)}
+                              className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+                              title="Rename session"
+                            >
+                              <Pencil className="w-4 h-4 text-gray-400" />
+                            </button>
+                            <button
+                              onClick={(e) => onDeleteSession(session.id, e)}
+                              className="p-2 hover:bg-red-900/50 rounded-lg transition-colors"
+                              title="Delete session"
+                            >
+                              <Trash2 className="w-4 h-4 text-red-400" />
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Arrow */}
+                        <ArrowRight className="w-4 h-4 text-gray-600 group-hover:text-gray-400 transition-colors flex-shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default SessionPicker;

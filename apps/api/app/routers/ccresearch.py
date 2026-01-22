@@ -47,6 +47,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.config import settings
 from app.core.ccresearch_manager import ccresearch_manager
+from app.core.session_manager import session_manager, get_user_id_from_email
 from app.core.notifications import notify_access_request, notify_plugin_skill_request
 from app.models.models import CCResearchSession
 from collections import defaultdict
@@ -309,6 +310,9 @@ async def create_session(
     # Process uploaded files info
     uploaded_files_list = []
 
+    # Look up user_id from email for unified session storage
+    user_id = await get_user_id_from_email(email.lower())
+
     # Determine workspace location
     workspace_dir = None
     if workspace_project:
@@ -334,8 +338,40 @@ Files created here will appear in the Workspace Files tab.
 *CCResearch - Claude Code Research Platform*
 """
         claude_md_path.write_text(claude_md_content)
+    elif user_id:
+        # Use unified session manager for registered users
+        mode_label = "Terminal" if session_mode == "terminal" else "Claude"
+        default_title = f"{mode_label} #{next_session_number} - {datetime.utcnow().strftime('%b %d')}"
+
+        session_metadata = session_manager.create_session(
+            user_id=user_id,
+            title=title or default_title,
+            created_by="ccresearch",
+            email=email,
+            tags=["ccresearch"],
+            terminal_enabled=True,
+            session_id=ccresearch_id,
+        )
+        workspace_dir = session_manager.get_session_dir(user_id, ccresearch_id)
+        logger.info(f"Created unified session {ccresearch_id} for user {user_id} at {workspace_dir}")
+
+        # Override with CCResearch-specific CLAUDE.md and permissions
+        from app.core.ccresearch_manager import CLAUDE_MD_TEMPLATE, CCRESEARCH_PERMISSIONS_TEMPLATE
+        claude_md_path = workspace_dir / "CLAUDE.md"
+        claude_md_content = CLAUDE_MD_TEMPLATE.format(
+            session_id=ccresearch_id,
+            email=email or "Not provided",
+            created_at=datetime.utcnow().isoformat(),
+            workspace_dir=str(workspace_dir),
+            uploaded_files_section=""
+        )
+        claude_md_path.write_text(claude_md_content)
+
+        # Write CCResearch permissions with comprehensive deny rules
+        settings_local_path = workspace_dir / ".claude" / "settings.local.json"
+        settings_local_path.write_text(json.dumps(CCRESEARCH_PERMISSIONS_TEMPLATE, indent=2))
     else:
-        # Create workspace in default location
+        # Fallback: Create workspace in default location (for users not in DB)
         workspace_dir = ccresearch_manager.create_workspace(
             ccresearch_id,
             email=email,

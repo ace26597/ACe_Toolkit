@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { User, LogOut, Shield, Clock } from 'lucide-react';
 import { useAuth, LoginModal, ExperimentalBanner } from '@/components/auth';
+import { RecentSessions } from '@/components/home/RecentSessions';
 
 export default function Home() {
   const { user, loading, logout, trialInfo } = useAuth();
@@ -184,26 +185,6 @@ export default function Home() {
               </p>
             </Link>
 
-            <Link
-              href="/research"
-              className="group rounded-lg border border-cyan-200 dark:border-cyan-700 px-4 sm:px-6 py-4 sm:py-5 transition-all hover:border-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 hover:shadow-lg md:col-span-2 bg-gradient-to-r from-cyan-50 to-sky-50 dark:from-cyan-900/10 dark:to-sky-900/10"
-            >
-              <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                  Research Assistant
-                  <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
-                </h2>
-                <span className="text-[10px] sm:text-xs bg-cyan-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-medium">AUTH</span>
-              </div>
-              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
-                Claude Code Headless Mode - chat interface for AI research.
-                Upload files, search the web, and get comprehensive answers with MCP tools.
-              </p>
-              <p className="text-[10px] sm:text-xs text-cyan-600 dark:text-cyan-400 font-medium">
-                Requires login - per-user session tracking
-              </p>
-            </Link>
-
             <div className="opacity-40 rounded-lg border border-gray-200 dark:border-gray-700 px-4 sm:px-6 py-4 sm:py-5">
               <h2 className="mb-2 text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
                 Drive
@@ -224,6 +205,9 @@ export default function Home() {
               </p>
             </div>
           </div>
+
+          {/* Recent Sessions - shows sessions from all apps */}
+          {user && <RecentSessions maxSessions={5} />}
         </div>
       </main>
 

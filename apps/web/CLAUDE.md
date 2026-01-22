@@ -32,9 +32,6 @@ apps/web/
 │   ├── workspace/page.tsx         # Workspace
 │   ├── analyst/page.tsx           # Data Analyst
 │   ├── video-factory/page.tsx     # Video Factory
-│   ├── research/
-│   │   ├── page.tsx               # Research Assistant (LangGraph)
-│   │   └── share/[shareId]/page.tsx # Public share view
 │   ├── logs/page.tsx              # Logs viewer
 │   └── notes/page.tsx             # Notes app
 ├── components/
@@ -43,17 +40,17 @@ apps/web/
 │   │   ├── LoginModal.tsx         # Login/Signup modal
 │   │   ├── ProtectedRoute.tsx     # Auth wrapper
 │   │   └── ExperimentalBanner.tsx # Disclaimer
+│   ├── ccresearch/                # CCResearch components
+│   │   ├── SessionPicker.tsx      # Session list/create view
+│   │   ├── CCResearchTerminal.tsx # Terminal component
+│   │   └── FileBrowser.tsx        # File browser panel
+│   ├── home/                      # Home page components
+│   │   └── RecentSessions.tsx     # Unified session view
 │   ├── workspace/                 # Workspace components
 │   │   ├── ProjectSidebar.tsx
 │   │   ├── NoteCard.tsx
 │   │   ├── NoteEditor.tsx
 │   │   └── DataBrowser.tsx
-│   ├── research-assistant/        # Research Assistant (headless)
-│   │   ├── ResearchChat.tsx       # Main chat interface
-│   │   ├── SessionSidebar.tsx     # Session list
-│   │   ├── MessageBubble.tsx      # Chat messages
-│   │   ├── MiniTerminal.tsx       # Tool output display
-│   │   └── FormatSelector.tsx     # Response format picker
 │   └── ui/
 │       └── ToastProvider.tsx
 ├── lib/
@@ -77,19 +74,23 @@ Claude Code Research Platform with 140+ scientific MCP tools.
 
 **Features:**
 - Full PTY terminal (xterm.js + WebSocket)
+- **SessionPicker:** Project list shown first (not form) - select existing or create new
 - Email whitelist authentication
 - File upload on session creation
 - Session sharing (public read-only links)
 - Date-grouped session list (Today, Yesterday, This Week)
 - Inline session renaming
+- Collapsible file browser panel
 
 **Key Components:**
 - `app/ccresearch/page.tsx` - Main terminal page
+- `components/ccresearch/SessionPicker.tsx` - Session list/create view
+- `components/ccresearch/FileBrowser.tsx` - File browser panel
 - `app/ccresearch/share/[token]/page.tsx` - Public share view
 
 **Session Lifecycle:**
-1. User enters email (must be whitelisted)
-2. Optional: Upload data files
+1. See existing sessions OR create new (SessionPicker)
+2. For new: Enter access key (optional), upload files (optional)
 3. Session created with isolated workspace
 4. Claude Code or bash terminal starts
 5. Sessions persist until deleted (24h auto-cleanup)
@@ -111,7 +112,7 @@ Project-based file management with notes.
 **Views:**
 - **Notes:** Markdown notes with "New Note" button for manual creation
 - **Files:** Full file explorer with navigation
-- **AI:** Import Research (web crawling, GitHub analysis)
+- **AI:** Import Research (web crawling, GitHub analysis) with collapsible files sidebar
 
 **File Preview Support:**
 | Type | Features |
@@ -136,32 +137,6 @@ AI-powered data analysis with charts.
 - AI analysis via OpenAI
 - Interactive charts
 - SQL query interface
-
-### Research Assistant (`/research`)
-
-Claude Code headless mode for QA-style research.
-
-**Features:**
-- Claude Code in headless mode (`claude -p --output-format stream-json`)
-- Session continuation via `--resume` flag
-- File upload support
-- Public session sharing (like ChatGPT share links)
-- Markdown/Plain/JSON response format selection
-- Tool call display with mini-terminal view
-
-**Key Components:**
-- `app/research/page.tsx` - Main research interface
-- `app/research/share/[shareId]/page.tsx` - Public share view
-- `components/research-assistant/ResearchChat.tsx` - Chat interface
-- `components/research-assistant/SessionSidebar.tsx` - Session management
-
-**API Endpoints:**
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/research-assistant/sessions` | Create session |
-| GET | `/research-assistant/sessions` | List sessions |
-| WS | `/research-assistant/sessions/{id}/stream` | Stream query |
-| POST | `/research-assistant/sessions/{id}/share` | Create share link |
 
 ### Logs Viewer (`/logs`)
 

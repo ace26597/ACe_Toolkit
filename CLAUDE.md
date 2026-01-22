@@ -39,7 +39,6 @@ lsof -i :3000 -i :8000  # Check our ports
 |-----|-------|-------------|
 | **CCResearch** | `/ccresearch` | Claude Code terminal with 140+ scientific MCP tools |
 | **Workspace** | `/workspace` | Project-based file management with notes |
-| **Research Assistant** | `/research` | Claude Code headless QA with session sharing |
 | **Data Analyst** | `/analyst` | AI data analysis with charts (AACT, CSV, Excel) |
 | **Video Factory** | `/video-factory` | AI video production pipeline |
 | **Import Research** | (Workspace AI tab) | Web crawling & GitHub analysis for projects |
@@ -192,7 +191,11 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
-| 2026-01-22 | **Research Assistant:** Claude Code headless mode with WebSocket streaming |
+| 2026-01-22 | **SessionPicker:** CCResearch shows session list first (not New Session form) |
+| 2026-01-22 | **RecentSessions:** Home page shows unified sessions from all apps |
+| 2026-01-22 | **Workspace AI:** Collapsible files sidebar in AI tab |
+| 2026-01-22 | **Session Manager:** Unified session management across apps |
+| 2026-01-22 | Removed Research Assistant (to be integrated as Research Workspace later) |
 | 2026-01-22 | **Import Research:** Web crawling & GitHub clone for Workspace projects |
 | 2026-01-21 | Session rename without changing directories |
 | 2026-01-21 | Remove saved session logic, add date grouping |

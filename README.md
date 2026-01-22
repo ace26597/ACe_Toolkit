@@ -1,6 +1,6 @@
-# ACe_Toolkit
+# BlestLabs
 
-A full-stack productivity toolkit for creating, editing, and managing Mermaid diagrams and notes. Features AI-powered diagram generation using Claude (Anthropic), running on Raspberry Pi 5 with Cloudflare Tunnel for secure global access.
+A full-stack productivity platform for AI-powered research, diagram creation, and scientific workflows. Features Research Assistant with LangGraph, CCResearch Terminal with 140+ scientific tools, and Mermaid Studio for diagrams. Running on Raspberry Pi 5 with Cloudflare Tunnel for secure global access.
 
 ## 🌐 Live App
 
@@ -61,7 +61,7 @@ A full-stack productivity toolkit for creating, editing, and managing Mermaid di
 ## 📁 Project Structure
 
 ```
-ACe_Toolkit/
+BlestLabs/
 ├── apps/
 │   ├── web/                    # Next.js 16 Frontend (Turbopack)
 │   │   ├── app/                # App Router pages
@@ -102,8 +102,8 @@ ACe_Toolkit/
 
 ```bash
 # Clone the repository
-git clone https://github.com/ace26597/ACe_Toolkit.git
-cd ACe_Toolkit
+git clone https://github.com/ace26597/BlestLabs.git
+cd BlestLabs
 
 # Run automated setup (installs dependencies)
 ./infra/scripts/dev_setup.sh
@@ -200,13 +200,13 @@ For production with custom domain (e.g., `ai.ultronsolar.in`):
 cloudflared tunnel login
 
 # 2. Create tunnel
-cloudflared tunnel create acetoolkit
+cloudflared tunnel create blestlabs
 
 # 3. Configure tunnel (see infra/scripts/CUSTOM_DOMAIN_SETUP.md)
 nano ~/.cloudflared/config.yml
 
 # 4. Route DNS
-cloudflared tunnel route dns acetoolkit ai.ultronsolar.in
+cloudflared tunnel route dns blestlabs ai.ultronsolar.in
 
 # 5. Install as service (auto-start on boot)
 sudo cloudflared service install

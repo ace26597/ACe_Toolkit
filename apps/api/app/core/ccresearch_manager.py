@@ -35,6 +35,7 @@ except ImportError:
     pexpect = None  # Will be caught at runtime
 
 from app.core.config import settings
+from app.core.session_manager import session_manager, get_user_id_from_email
 
 # Resource limits for CCResearch sessions (prevent memory exhaustion)
 # These limits protect the Pi from OOM crashes during heavy research tasks

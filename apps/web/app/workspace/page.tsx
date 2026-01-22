@@ -550,6 +550,9 @@ export default function WorkspacePage() {
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isCreatingNote, setIsCreatingNote] = useState(false);
 
+  // AI view files sidebar state
+  const [showAiFilesSidebar, setShowAiFilesSidebar] = useState(false);
+
   // Show toast
   const showToast = (message: string, type: 'success' | 'error' = 'success') => {
     setToast({ message, type });
@@ -1912,6 +1915,19 @@ export default function WorkspacePage() {
                         <p className="text-white font-medium">{selectedSession.initial_prompt}</p>
                       </div>
                       <div className="flex items-center gap-2">
+                        {/* Files toggle button */}
+                        <button
+                          onClick={() => setShowAiFilesSidebar(!showAiFilesSidebar)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${
+                            showAiFilesSidebar
+                              ? 'bg-indigo-600 text-white'
+                              : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                          }`}
+                          title={showAiFilesSidebar ? 'Hide files' : 'Show files'}
+                        >
+                          <FolderOpen size={14} />
+                          Files
+                        </button>
                         {/* Stop button - only show when processing */}
                         {(selectedSession.status === 'processing' || selectedSession.status === 'crawling') && (
                           <button
@@ -1955,8 +1971,10 @@ export default function WorkspacePage() {
                     ) : null}
                   </div>
 
-                  {/* Response / Live Terminal */}
-                  <div className="flex-1 overflow-hidden p-4">
+                  {/* Response / Live Terminal with optional files sidebar */}
+                  <div className="flex-1 overflow-hidden flex">
+                    {/* Main content area */}
+                    <div className="flex-1 p-4 overflow-hidden">
                     {selectedSession.status === 'processing' || selectedSession.status === 'crawling' ? (
                       /* Live Terminal View - Human Readable */
                       <div className="h-full flex flex-col">
@@ -2089,6 +2107,28 @@ export default function WorkspacePage() {
                       </div>
                     </div>
                   )}
+                    </div>
+
+                    {/* Files Sidebar - collapsible */}
+                    {showAiFilesSidebar && (
+                      <div className="w-80 border-l border-slate-700 bg-slate-900 overflow-hidden flex flex-col">
+                        <div className="p-3 border-b border-slate-700 flex items-center justify-between">
+                          <span className="text-sm font-medium text-white flex items-center gap-2">
+                            <FolderOpen size={14} />
+                            Project Files
+                          </span>
+                          <button
+                            onClick={() => setShowAiFilesSidebar(false)}
+                            className="text-slate-400 hover:text-white p-1"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div className="flex-1 overflow-hidden">
+                          <DataBrowser projectName={selectedProject || ''} />
+                        </div>
+                      </div>
+                    )}
                 </div>
               )}
             </div>
