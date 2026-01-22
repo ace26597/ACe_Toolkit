@@ -171,8 +171,9 @@ function JsonViewer({ content }: { content: string }) {
 
 // Welcome Content Component - shows when no project selected
 function WelcomeContent() {
-  const [expandedSection, setExpandedSection] = useState<string | null>('getting-started');
+  const [activeTab, setActiveTab] = useState<'overview' | 'capabilities' | 'databases'>('overview');
   const [copiedPrompt, setCopiedPrompt] = useState<string | null>(null);
+  const [showAllServers, setShowAllServers] = useState(false);
 
   const stats = capabilitiesData.stats;
   const plugins = capabilitiesData.plugins;
@@ -185,360 +186,288 @@ function WelcomeContent() {
     setTimeout(() => setCopiedPrompt(null), 2000);
   };
 
-  const toggleSection = (section: string) => {
-    setExpandedSection(expandedSection === section ? null : section);
+  // Get icon for category
+  const getCategoryIcon = (id: string) => {
+    const icons: Record<string, React.ReactNode> = {
+      'databases': <Database className="w-5 h-5" />,
+      'bioinformatics': <Dna className="w-5 h-5" />,
+      'cheminformatics': <Pill className="w-5 h-5" />,
+      'ml': <Brain className="w-5 h-5" />,
+      'visualization': <BarChart3 className="w-5 h-5" />,
+      'documents': <FileText className="w-5 h-5" />,
+      'medical': <Beaker className="w-5 h-5" />,
+      'integrations': <Server className="w-5 h-5" />,
+    };
+    return icons[id] || <Sparkles className="w-5 h-5" />;
+  };
+
+  const getCategoryColor = (id: string) => {
+    const colors: Record<string, string> = {
+      'databases': 'from-blue-500 to-cyan-500',
+      'bioinformatics': 'from-green-500 to-emerald-500',
+      'cheminformatics': 'from-pink-500 to-rose-500',
+      'ml': 'from-purple-500 to-violet-500',
+      'visualization': 'from-amber-500 to-orange-500',
+      'documents': 'from-cyan-500 to-teal-500',
+      'medical': 'from-red-500 to-pink-500',
+      'integrations': 'from-indigo-500 to-purple-500',
+    };
+    return colors[id] || 'from-slate-500 to-slate-600';
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Hero Section */}
-      <div className="bg-gradient-to-r from-emerald-900/30 via-teal-900/20 to-cyan-900/30 border-b border-emerald-700/30 px-6 py-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="p-3 bg-emerald-600/20 rounded-xl">
-              <Beaker className="w-10 h-10 text-emerald-400" />
-            </div>
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-3">
-            C3 Researcher Workspace
-          </h1>
-          <p className="text-lg text-slate-300 mb-2">
-            Claude Code Custom Researcher
-          </p>
-          <p className="text-slate-400 max-w-2xl mx-auto">
-            AI-powered research terminal with {stats.totalSkills}+ scientific skills, {stats.totalMcpServers} MCP servers,
-            and access to {stats.totalDatabases}+ scientific databases including PubMed, ChEMBL, AACT, and more.
-          </p>
-        </div>
+    <div className="h-full overflow-y-auto bg-[#0a0a0f]">
+      {/* Animated Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute top-1/2 -left-40 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute -bottom-40 right-1/3 w-72 h-72 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
       </div>
 
-      {/* Stats Grid */}
-      <div className="max-w-6xl mx-auto px-6 py-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-center">
-            <Sparkles className="w-6 h-6 text-purple-400 mx-auto mb-2" />
-            <div className="text-2xl font-bold text-white">{stats.totalSkills}+</div>
-            <div className="text-sm text-slate-400">Scientific Skills</div>
-          </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-center">
-            <Server className="w-6 h-6 text-blue-400 mx-auto mb-2" />
-            <div className="text-2xl font-bold text-white">{stats.totalMcpServers}</div>
-            <div className="text-sm text-slate-400">MCP Servers</div>
-          </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-center">
-            <Wrench className="w-6 h-6 text-amber-400 mx-auto mb-2" />
-            <div className="text-2xl font-bold text-white">{stats.totalPlugins}</div>
-            <div className="text-sm text-slate-400">Plugins</div>
-          </div>
-          <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-4 text-center">
-            <Database className="w-6 h-6 text-emerald-400 mx-auto mb-2" />
-            <div className="text-2xl font-bold text-white">{stats.totalDatabases}+</div>
-            <div className="text-sm text-slate-400">Databases</div>
-          </div>
-        </div>
+      <div className="relative z-10">
+        {/* Hero Section */}
+        <div className="relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 via-transparent to-transparent" />
+          <div className="max-w-7xl mx-auto px-6 pt-12 pb-8">
+            <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
+              {/* Left: Text Content */}
+              <div className="flex-1 text-center lg:text-left">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-6">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-emerald-400 text-sm font-medium">Powered by Claude Code</span>
+                </div>
 
-        {/* Getting Started Section */}
-        <div className="mb-6">
-          <button
-            onClick={() => toggleSection('getting-started')}
-            className="w-full flex items-center justify-between p-4 bg-emerald-900/30 border border-emerald-700/50 rounded-xl hover:bg-emerald-900/40 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <Zap className="w-5 h-5 text-emerald-400" />
-              <span className="text-lg font-semibold text-white">Getting Started</span>
-            </div>
-            {expandedSection === 'getting-started' ? (
-              <ChevronDown className="w-5 h-5 text-slate-400" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-            )}
-          </button>
-          {expandedSection === 'getting-started' && (
-            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="bg-slate-900/50 rounded-lg p-4">
-                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
-                    <span className="w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-sm">1</span>
-                    Create a Project
-                  </h4>
-                  <p className="text-sm text-slate-400">Click "New Project" in the sidebar to create a workspace for your research.</p>
-                </div>
-                <div className="bg-slate-900/50 rounded-lg p-4">
-                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
-                    <span className="w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-sm">2</span>
-                    Start Terminal
-                  </h4>
-                  <p className="text-sm text-slate-400">Open the Terminal tab and click "Start Terminal" to launch Claude Code.</p>
-                </div>
-                <div className="bg-slate-900/50 rounded-lg p-4">
-                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
-                    <span className="w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-sm">3</span>
-                    Ask Questions
-                  </h4>
-                  <p className="text-sm text-slate-400">Type natural language queries - search PubMed, analyze data, or run code.</p>
-                </div>
-                <div className="bg-slate-900/50 rounded-lg p-4">
-                  <h4 className="font-medium text-white mb-2 flex items-center gap-2">
-                    <span className="w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-sm">4</span>
-                    Review Results
-                  </h4>
-                  <p className="text-sm text-slate-400">View outputs in Notes and Files tabs. Export reports and data.</p>
-                </div>
-              </div>
-              <div className="bg-amber-900/20 border border-amber-700/50 rounded-lg p-4">
-                <h4 className="font-medium text-amber-300 mb-2 flex items-center gap-2">
-                  <Key className="w-4 h-4" />
-                  SSH Mode (Advanced)
-                </h4>
-                <p className="text-sm text-slate-400">
-                  Select "SSH Terminal" mode and enter the access key for direct bash terminal access.
-                  This bypasses Claude Code for manual operations.
+                <h1 className="text-4xl lg:text-5xl font-bold mb-4">
+                  <span className="bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                    C3 Researcher
+                  </span>
+                  <br />
+                  <span className="bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                    Workspace
+                  </span>
+                </h1>
+
+                <p className="text-lg text-slate-400 mb-8 max-w-xl">
+                  AI-powered scientific research terminal with {stats.totalSkills}+ skills,
+                  {stats.totalMcpServers} MCP servers, and access to {stats.totalDatabases}+ databases.
                 </p>
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* Claude Commands Section */}
-        <div className="mb-6">
-          <button
-            onClick={() => toggleSection('commands')}
-            className="w-full flex items-center justify-between p-4 bg-blue-900/30 border border-blue-700/50 rounded-xl hover:bg-blue-900/40 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <Terminal className="w-5 h-5 text-blue-400" />
-              <span className="text-lg font-semibold text-white">Claude Commands & Tips</span>
-            </div>
-            {expandedSection === 'commands' ? (
-              <ChevronDown className="w-5 h-5 text-slate-400" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-            )}
-          </button>
-          {expandedSection === 'commands' && (
-            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl">
-              <div className="grid md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <h4 className="font-medium text-white mb-3">Slash Commands</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
-                      <code className="text-emerald-400">/help</code>
-                      <span className="text-slate-400">Show available commands</span>
-                    </div>
-                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
-                      <code className="text-emerald-400">/clear</code>
-                      <span className="text-slate-400">Clear conversation</span>
-                    </div>
-                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
-                      <code className="text-emerald-400">/compact</code>
-                      <span className="text-slate-400">Toggle compact mode</span>
-                    </div>
-                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
-                      <code className="text-emerald-400">/model</code>
-                      <span className="text-slate-400">Switch AI model</span>
+                {/* Stats Row */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+                  <div className="group relative bg-gradient-to-br from-purple-500/10 to-purple-500/5 border border-purple-500/20 rounded-xl p-4 hover:border-purple-500/40 transition-all">
+                    <div className="absolute inset-0 bg-purple-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <Sparkles className="w-5 h-5 text-purple-400 mb-2" />
+                    <div className="text-2xl font-bold text-white">{stats.totalSkills}+</div>
+                    <div className="text-xs text-slate-500">Scientific Skills</div>
+                  </div>
+                  <div className="group relative bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20 rounded-xl p-4 hover:border-blue-500/40 transition-all">
+                    <div className="absolute inset-0 bg-blue-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <Server className="w-5 h-5 text-blue-400 mb-2" />
+                    <div className="text-2xl font-bold text-white">{stats.totalMcpServers}</div>
+                    <div className="text-xs text-slate-500">MCP Servers</div>
+                  </div>
+                  <div className="group relative bg-gradient-to-br from-amber-500/10 to-amber-500/5 border border-amber-500/20 rounded-xl p-4 hover:border-amber-500/40 transition-all">
+                    <div className="absolute inset-0 bg-amber-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <Wrench className="w-5 h-5 text-amber-400 mb-2" />
+                    <div className="text-2xl font-bold text-white">{stats.totalPlugins}</div>
+                    <div className="text-xs text-slate-500">Plugins</div>
+                  </div>
+                  <div className="group relative bg-gradient-to-br from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20 rounded-xl p-4 hover:border-emerald-500/40 transition-all">
+                    <div className="absolute inset-0 bg-emerald-500/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <Database className="w-5 h-5 text-emerald-400 mb-2" />
+                    <div className="text-2xl font-bold text-white">{stats.totalDatabases}+</div>
+                    <div className="text-xs text-slate-500">Databases</div>
+                  </div>
+                </div>
+
+                {/* CTA Buttons */}
+                <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3">
+                  <Link
+                    href="/ccresearch/use-cases"
+                    className="group flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-white font-medium rounded-xl transition-all shadow-lg shadow-emerald-500/25"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Browse Use Cases
+                    <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                  <Link
+                    href="/ccresearch/tips"
+                    className="flex items-center gap-2 px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 text-white font-medium rounded-xl transition-all"
+                  >
+                    <Lightbulb className="w-4 h-4 text-amber-400" />
+                    Pro Tips
+                  </Link>
+                </div>
+              </div>
+
+              {/* Right: Video */}
+              <div className="flex-1 w-full max-w-xl">
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 via-cyan-500 to-blue-500 rounded-2xl blur opacity-25 group-hover:opacity-40 transition-opacity" />
+                  <div className="relative bg-slate-900 border border-slate-700/50 rounded-2xl overflow-hidden">
+                    <video
+                      controls
+                      className="w-full aspect-video object-contain bg-black"
+                      preload="metadata"
+                    >
+                      <source src="/mcp-protocol-video.mp4" type="video/mp4" />
+                    </video>
+                    <div className="p-4 bg-slate-900/80 backdrop-blur border-t border-slate-700/50">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-red-500/20 rounded-lg">
+                          <Play className="w-4 h-4 text-red-400" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-white text-sm">Claude Code, MCP & Skills</h4>
+                          <p className="text-xs text-slate-500">Learn how MCP extends capabilities</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
-                <div>
-                  <h4 className="font-medium text-white mb-3">Keyboard Shortcuts</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
-                      <code className="text-blue-400">Ctrl+C</code>
-                      <span className="text-slate-400">Cancel current operation</span>
-                    </div>
-                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
-                      <code className="text-blue-400">Ctrl+L</code>
-                      <span className="text-slate-400">Clear terminal</span>
-                    </div>
-                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
-                      <code className="text-blue-400">↑/↓</code>
-                      <span className="text-slate-400">History navigation</span>
-                    </div>
-                    <div className="flex justify-between bg-slate-900/50 px-3 py-2 rounded">
-                      <code className="text-blue-400">Tab</code>
-                      <span className="text-slate-400">Auto-complete</span>
-                    </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="sticky top-0 z-20 bg-[#0a0a0f]/80 backdrop-blur-xl border-b border-slate-800/50">
+          <div className="max-w-7xl mx-auto px-6">
+            <div className="flex gap-1 py-2">
+              {[
+                { id: 'overview', label: 'Getting Started', icon: <Zap className="w-4 h-4" /> },
+                { id: 'capabilities', label: 'Capabilities', icon: <Sparkles className="w-4 h-4" /> },
+                { id: 'databases', label: 'Databases & Servers', icon: <Database className="w-4 h-4" /> },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all ${
+                    activeTab === tab.id
+                      ? 'bg-white/10 text-white'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  {tab.icon}
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className="max-w-7xl mx-auto px-6 py-8">
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <div className="space-y-8">
+              {/* Quick Start Steps */}
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                  <div className="p-1.5 bg-emerald-500/20 rounded-lg">
+                    <Zap className="w-4 h-4 text-emerald-400" />
                   </div>
+                  Quick Start
+                </h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    { step: 1, title: 'Create Project', desc: 'Click "New Project" in sidebar', icon: <FolderOpen className="w-5 h-5" />, color: 'emerald' },
+                    { step: 2, title: 'Start Terminal', desc: 'Open Terminal tab, click Start', icon: <Terminal className="w-5 h-5" />, color: 'blue' },
+                    { step: 3, title: 'Ask Questions', desc: 'Type natural language queries', icon: <Sparkles className="w-5 h-5" />, color: 'purple' },
+                    { step: 4, title: 'Review Results', desc: 'View in Notes & Files tabs', icon: <FileText className="w-5 h-5" />, color: 'amber' },
+                  ].map((item) => (
+                    <div key={item.step} className="relative group">
+                      <div className={`absolute -inset-0.5 bg-gradient-to-r from-${item.color}-500/50 to-${item.color}-500/0 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity`} />
+                      <div className="relative bg-slate-900/50 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
+                        <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-${item.color}-500/20 text-${item.color}-400 mb-4`}>
+                          {item.icon}
+                        </div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-bold text-slate-500">STEP {item.step}</span>
+                        </div>
+                        <h3 className="font-semibold text-white mb-1">{item.title}</h3>
+                        <p className="text-sm text-slate-400">{item.desc}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-              <div className="bg-slate-900/50 rounded-lg p-4">
-                <h4 className="font-medium text-white mb-2">Pro Tips</h4>
-                <ul className="text-sm text-slate-400 space-y-1 list-disc list-inside">
-                  <li>Be specific about file formats and output locations</li>
-                  <li>Ask for plots to be saved to <code className="text-emerald-400">output/</code> folder</li>
-                  <li>Use <code className="text-emerald-400">data/</code> folder for uploaded files</li>
-                  <li>Request markdown reports for structured analysis</li>
-                  <li>Specify database names when querying (e.g., "search PubMed for...")</li>
-                </ul>
-              </div>
-            </div>
-          )}
-        </div>
 
-        {/* Scientific Capabilities Section */}
-        <div className="mb-6">
-          <button
-            onClick={() => toggleSection('scientific')}
-            className="w-full flex items-center justify-between p-4 bg-purple-900/30 border border-purple-700/50 rounded-xl hover:bg-purple-900/40 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <Dna className="w-5 h-5 text-purple-400" />
-              <span className="text-lg font-semibold text-white">Scientific Capabilities ({stats.totalSkills}+ Skills)</span>
-            </div>
-            {expandedSection === 'scientific' ? (
-              <ChevronDown className="w-5 h-5 text-slate-400" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-            )}
-          </button>
-          {expandedSection === 'scientific' && (
-            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl">
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {scientificCategories.map((cat: any) => (
-                  <div key={cat.id} className="bg-slate-900/50 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      {cat.id === 'databases' && <Database className="w-4 h-4 text-blue-400" />}
-                      {cat.id === 'bioinformatics' && <Dna className="w-4 h-4 text-green-400" />}
-                      {cat.id === 'cheminformatics' && <Pill className="w-4 h-4 text-pink-400" />}
-                      {cat.id === 'ml' && <Brain className="w-4 h-4 text-purple-400" />}
-                      {cat.id === 'visualization' && <BarChart3 className="w-4 h-4 text-amber-400" />}
-                      {cat.id === 'documents' && <FileText className="w-4 h-4 text-cyan-400" />}
-                      {cat.id === 'medical' && <Beaker className="w-4 h-4 text-red-400" />}
-                      {cat.id === 'integrations' && <Server className="w-4 h-4 text-indigo-400" />}
-                      <span className="font-medium text-white">{cat.name}</span>
-                      <span className="text-xs bg-slate-700 px-1.5 py-0.5 rounded text-slate-400">{cat.count}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {cat.examples.slice(0, 5).map((ex: string) => (
-                        <span key={ex} className="text-xs bg-slate-800 px-2 py-0.5 rounded text-slate-400">{ex}</span>
-                      ))}
-                      {cat.examples.length > 5 && (
-                        <span className="text-xs text-slate-500">+{cat.examples.length - 5} more</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* MCP Servers Section */}
-        <div className="mb-6">
-          <button
-            onClick={() => toggleSection('mcp')}
-            className="w-full flex items-center justify-between p-4 bg-cyan-900/30 border border-cyan-700/50 rounded-xl hover:bg-cyan-900/40 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <Server className="w-5 h-5 text-cyan-400" />
-              <span className="text-lg font-semibold text-white">MCP Servers ({mcpServers.length})</span>
-            </div>
-            {expandedSection === 'mcp' ? (
-              <ChevronDown className="w-5 h-5 text-slate-400" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-            )}
-          </button>
-          {expandedSection === 'mcp' && (
-            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl">
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {mcpServers.map((server: any) => (
-                  <div key={server.id} className="bg-slate-900/50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div className={`w-2 h-2 rounded-full ${server.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`} />
-                      <span className="font-medium text-white text-sm">{server.name}</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded ${
-                        server.category === 'scientific' ? 'bg-purple-500/20 text-purple-300' :
-                        server.category === 'ai' ? 'bg-blue-500/20 text-blue-300' :
-                        'bg-slate-600/50 text-slate-300'
-                      }`}>{server.category}</span>
-                    </div>
-                    <p className="text-xs text-slate-400 line-clamp-2">{server.description}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Plugins Section */}
-        <div className="mb-6">
-          <button
-            onClick={() => toggleSection('plugins')}
-            className="w-full flex items-center justify-between p-4 bg-amber-900/30 border border-amber-700/50 rounded-xl hover:bg-amber-900/40 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <Wrench className="w-5 h-5 text-amber-400" />
-              <span className="text-lg font-semibold text-white">Plugins ({plugins.length})</span>
-            </div>
-            {expandedSection === 'plugins' ? (
-              <ChevronDown className="w-5 h-5 text-slate-400" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-            )}
-          </button>
-          {expandedSection === 'plugins' && (
-            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl">
-              <div className="grid md:grid-cols-2 gap-3">
-                {plugins.map((plugin: any) => (
-                  <div key={plugin.id} className="bg-slate-900/50 rounded-lg p-3 flex items-start gap-3">
-                    <div className={`w-2 h-2 mt-1.5 rounded-full ${plugin.status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`} />
-                    <div>
-                      <div className="font-medium text-white text-sm">{plugin.name}</div>
-                      <p className="text-xs text-slate-400">{plugin.description}</p>
-                      {plugin.skillsCount && (
-                        <span className="text-xs text-purple-400">{plugin.skillsCount} skills</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Example Prompts Section */}
-        <div className="mb-6">
-          <button
-            onClick={() => toggleSection('examples')}
-            className="w-full flex items-center justify-between p-4 bg-indigo-900/30 border border-indigo-700/50 rounded-xl hover:bg-indigo-900/40 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <BookOpen className="w-5 h-5 text-indigo-400" />
-              <span className="text-lg font-semibold text-white">Example Prompts</span>
-            </div>
-            {expandedSection === 'examples' ? (
-              <ChevronDown className="w-5 h-5 text-slate-400" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-            )}
-          </button>
-          {expandedSection === 'examples' && (
-            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl space-y-4">
-              {useCasesData.categories.slice(0, 4).map((category: any) => (
-                <div key={category.id}>
-                  <h4 className="text-sm font-medium text-slate-300 mb-2">{category.title}</h4>
+              {/* Commands & Shortcuts */}
+              <div className="grid lg:grid-cols-2 gap-6">
+                <div className="bg-slate-900/30 border border-slate-800 rounded-xl p-6">
+                  <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                    <Terminal className="w-4 h-4 text-emerald-400" />
+                    Slash Commands
+                  </h3>
                   <div className="space-y-2">
-                    {category.examples.slice(0, 2).map((example: any) => (
-                      <div key={example.id} className="bg-slate-900/50 rounded-lg p-3">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm font-medium text-white">{example.title}</span>
-                              {example.verified && (
-                                <span className="text-xs bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">Verified</span>
+                    {[
+                      { cmd: '/help', desc: 'Show available commands' },
+                      { cmd: '/clear', desc: 'Clear conversation' },
+                      { cmd: '/compact', desc: 'Toggle compact mode' },
+                      { cmd: '/model', desc: 'Switch AI model' },
+                    ].map((item) => (
+                      <div key={item.cmd} className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg">
+                        <code className="text-emerald-400 font-mono text-sm">{item.cmd}</code>
+                        <span className="text-slate-500 text-sm">{item.desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/30 border border-slate-800 rounded-xl p-6">
+                  <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                    <Key className="w-4 h-4 text-blue-400" />
+                    Keyboard Shortcuts
+                  </h3>
+                  <div className="space-y-2">
+                    {[
+                      { key: 'Ctrl+C', desc: 'Cancel operation' },
+                      { key: 'Ctrl+L', desc: 'Clear terminal' },
+                      { key: '↑/↓', desc: 'History navigation' },
+                      { key: 'Tab', desc: 'Auto-complete' },
+                    ].map((item) => (
+                      <div key={item.key} className="flex items-center justify-between py-2 px-3 bg-slate-800/50 rounded-lg">
+                        <code className="text-blue-400 font-mono text-sm">{item.key}</code>
+                        <span className="text-slate-500 text-sm">{item.desc}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Example Prompts */}
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                  <div className="p-1.5 bg-indigo-500/20 rounded-lg">
+                    <BookOpen className="w-4 h-4 text-indigo-400" />
+                  </div>
+                  Try These Prompts
+                </h2>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {useCasesData.categories.slice(0, 2).flatMap((cat: any) =>
+                    cat.examples.slice(0, 2).map((ex: any) => (
+                      <div key={ex.id} className="group bg-slate-900/30 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-sm font-medium text-white">{ex.title}</span>
+                              {ex.verified && (
+                                <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">Verified</span>
                               )}
                             </div>
-                            <code className="text-xs text-emerald-400 block bg-slate-950 rounded p-2 mt-1">
-                              {example.prompt.length > 120 ? example.prompt.substring(0, 120) + '...' : example.prompt}
+                            <code className="text-xs text-emerald-400/80 block bg-slate-950 rounded-lg p-3 font-mono leading-relaxed">
+                              {ex.prompt.length > 100 ? ex.prompt.substring(0, 100) + '...' : ex.prompt}
                             </code>
                           </div>
                           <button
-                            onClick={() => copyPrompt(example.prompt, example.id)}
-                            className="p-1.5 hover:bg-slate-700 rounded transition-colors"
-                            title="Copy prompt"
+                            onClick={() => copyPrompt(ex.prompt, ex.id)}
+                            className="p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors flex-shrink-0"
                           >
-                            {copiedPrompt === example.id ? (
+                            {copiedPrompt === ex.id ? (
                               <Check className="w-4 h-4 text-green-400" />
                             ) : (
                               <Copy className="w-4 h-4 text-slate-400" />
@@ -546,94 +475,176 @@ function WelcomeContent() {
                           </button>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    ))
+                  )}
                 </div>
-              ))}
-              <Link
-                href="/ccresearch/use-cases"
-                className="flex items-center justify-center gap-2 text-indigo-400 hover:text-indigo-300 text-sm py-2"
-              >
-                View all {useCasesData.categories.reduce((sum: number, cat: any) => sum + cat.examples.length, 0)} examples
-                <ExternalLink className="w-4 h-4" />
-              </Link>
+              </div>
             </div>
           )}
-        </div>
 
-        {/* Video Gallery Section */}
-        <div className="mb-6">
-          <button
-            onClick={() => toggleSection('videos')}
-            className="w-full flex items-center justify-between p-4 bg-red-900/30 border border-red-700/50 rounded-xl hover:bg-red-900/40 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <Play className="w-5 h-5 text-red-400" />
-              <span className="text-lg font-semibold text-white">Video Tutorials</span>
-            </div>
-            {expandedSection === 'videos' ? (
-              <ChevronDown className="w-5 h-5 text-slate-400" />
-            ) : (
-              <ChevronRight className="w-5 h-5 text-slate-400" />
-            )}
-          </button>
-          {expandedSection === 'videos' && (
-            <div className="mt-2 p-5 bg-slate-800/50 border border-slate-700/50 rounded-xl">
-              <div className="grid md:grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* MCP Protocol Video */}
-                <div className="bg-slate-900/50 border border-slate-700/50 rounded-xl overflow-hidden">
-                  <video
-                    controls
-                    className="w-full aspect-video object-contain bg-black"
-                    preload="metadata"
-                    poster="/mcp-video-poster.png"
-                  >
-                    <source src="/mcp-protocol-video.mp4" type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
-                  <div className="p-4 border-t border-slate-700/50">
-                    <h4 className="font-medium text-white mb-1">Claude Code, MCP & Skills</h4>
-                    <p className="text-sm text-slate-400">
-                      Learn how Claude Code uses MCP (Model Context Protocol) servers and skills to extend capabilities for scientific research tasks.
-                    </p>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="text-xs bg-red-500/20 text-red-300 px-2 py-0.5 rounded">Introduction</span>
-                      <span className="text-xs bg-slate-600/50 text-slate-400 px-2 py-0.5 rounded">~5 min</span>
-                    </div>
+          {/* Capabilities Tab */}
+          {activeTab === 'capabilities' && (
+            <div className="space-y-8">
+              {/* Scientific Categories - Bento Grid */}
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                  <div className="p-1.5 bg-purple-500/20 rounded-lg">
+                    <Dna className="w-4 h-4 text-purple-400" />
                   </div>
+                  Scientific Capabilities
+                  <span className="text-sm font-normal text-slate-500">({stats.totalSkills}+ skills)</span>
+                </h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {scientificCategories.map((cat: any, idx: number) => (
+                    <div
+                      key={cat.id}
+                      className={`group relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/30 p-5 hover:border-slate-700 transition-all ${
+                        idx === 0 ? 'lg:col-span-2 lg:row-span-2' : ''
+                      }`}
+                    >
+                      <div className={`absolute inset-0 bg-gradient-to-br ${getCategoryColor(cat.id)} opacity-5 group-hover:opacity-10 transition-opacity`} />
+                      <div className="relative">
+                        <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br ${getCategoryColor(cat.id)} mb-4`}>
+                          {getCategoryIcon(cat.id)}
+                        </div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <h3 className="font-semibold text-white">{cat.name}</h3>
+                          <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full text-slate-400">{cat.count} skills</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mt-3">
+                          {cat.examples.slice(0, idx === 0 ? 8 : 4).map((ex: string) => (
+                            <span key={ex} className="text-xs bg-slate-800/80 px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-colors">
+                              {ex}
+                            </span>
+                          ))}
+                          {cat.examples.length > (idx === 0 ? 8 : 4) && (
+                            <span className="text-xs text-slate-600 px-2 py-1">+{cat.examples.length - (idx === 0 ? 8 : 4)} more</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
+              </div>
 
-                {/* Placeholder for future videos */}
-                <div className="bg-slate-900/30 border border-dashed border-slate-700/50 rounded-xl flex flex-col items-center justify-center p-8 min-h-[280px]">
-                  <Video className="w-12 h-12 text-slate-600 mb-3" />
-                  <p className="text-slate-500 text-center">More tutorials coming soon</p>
-                  <p className="text-xs text-slate-600 text-center mt-1">Advanced workflows, database queries, data analysis</p>
+              {/* Plugins */}
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                  <div className="p-1.5 bg-amber-500/20 rounded-lg">
+                    <Wrench className="w-4 h-4 text-amber-400" />
+                  </div>
+                  Installed Plugins
+                  <span className="text-sm font-normal text-slate-500">({plugins.length})</span>
+                </h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {plugins.slice(0, 9).map((plugin: any) => (
+                    <div key={plugin.id} className="flex items-start gap-3 bg-slate-900/30 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors">
+                      <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${plugin.status === 'active' ? 'bg-green-500' : 'bg-slate-600'}`} />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-white text-sm truncate">{plugin.name}</span>
+                          {plugin.skillsCount && (
+                            <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded flex-shrink-0">
+                              {plugin.skillsCount} skills
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 line-clamp-2">{plugin.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Databases Tab */}
+          {activeTab === 'databases' && (
+            <div className="space-y-8">
+              {/* MCP Servers */}
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                  <div className="p-1.5 bg-blue-500/20 rounded-lg">
+                    <Server className="w-4 h-4 text-blue-400" />
+                  </div>
+                  MCP Servers
+                  <span className="text-sm font-normal text-slate-500">({mcpServers.length} active)</span>
+                </h2>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {(showAllServers ? mcpServers : mcpServers.slice(0, 12)).map((server: any) => (
+                    <div key={server.id} className="group bg-slate-900/30 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-2 h-2 mt-2 rounded-full flex-shrink-0 ${server.status === 'active' ? 'bg-green-500 shadow-lg shadow-green-500/50' : 'bg-slate-600'}`} />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-medium text-white text-sm">{server.name}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                              server.category === 'scientific' ? 'bg-purple-500/20 text-purple-400' :
+                              server.category === 'ai' ? 'bg-blue-500/20 text-blue-400' :
+                              'bg-slate-700 text-slate-400'
+                            }`}>{server.category}</span>
+                          </div>
+                          <p className="text-xs text-slate-500 line-clamp-2">{server.description}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {mcpServers.length > 12 && (
+                  <button
+                    onClick={() => setShowAllServers(!showAllServers)}
+                    className="mt-4 flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors mx-auto"
+                  >
+                    {showAllServers ? 'Show less' : `Show all ${mcpServers.length} servers`}
+                    <ChevronDown className={`w-4 h-4 transition-transform ${showAllServers ? 'rotate-180' : ''}`} />
+                  </button>
+                )}
+              </div>
+
+              {/* Database Highlights */}
+              <div>
+                <h2 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
+                  <div className="p-1.5 bg-emerald-500/20 rounded-lg">
+                    <Database className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  Featured Databases
+                </h2>
+                <div className="grid md:grid-cols-3 gap-4">
+                  {[
+                    { name: 'PubMed', count: '36M+', desc: 'Biomedical literature', color: 'blue' },
+                    { name: 'ChEMBL', count: '2.4M', desc: 'Bioactive compounds', color: 'pink' },
+                    { name: 'AACT', count: '566K+', desc: 'Clinical trials', color: 'emerald' },
+                  ].map((db) => (
+                    <div key={db.name} className={`relative overflow-hidden bg-gradient-to-br from-${db.color}-500/10 to-transparent border border-${db.color}-500/20 rounded-xl p-5`}>
+                      <div className={`absolute top-0 right-0 w-20 h-20 bg-${db.color}-500/10 rounded-full blur-2xl`} />
+                      <div className="relative">
+                        <h3 className="font-bold text-white text-lg mb-1">{db.name}</h3>
+                        <div className={`text-2xl font-bold text-${db.color}-400 mb-2`}>{db.count}</div>
+                        <p className="text-sm text-slate-400">{db.desc}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Call to Action */}
-        <div className="text-center py-8">
-          <p className="text-slate-400 mb-4">
-            Select or create a project from the sidebar to begin your research
-          </p>
-          <div className="flex items-center justify-center gap-4">
-            <Link
-              href="/ccresearch/use-cases"
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
-            >
-              <BookOpen className="w-4 h-4" />
-              Browse Use Cases
-            </Link>
-            <Link
-              href="/ccresearch/tips"
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-            >
-              <Lightbulb className="w-4 h-4" />
-              View Tips
-            </Link>
+        {/* Bottom CTA */}
+        <div className="border-t border-slate-800/50 bg-slate-900/30">
+          <div className="max-w-7xl mx-auto px-6 py-8">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-1">Ready to start?</h3>
+                <p className="text-slate-400 text-sm">Select or create a project from the sidebar to begin your research</p>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <span className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                  All systems operational
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1300,8 +1311,9 @@ export default function WorkspacePage() {
       const data = await workspaceApi.listTextFiles(selectedProject);
       setTextFiles(data);
     } catch (error) {
-      showToast('Failed to load text files', 'error');
+      // Don't show toast for empty projects - just set empty array
       console.error('Failed to load text files:', error);
+      setTextFiles([]);
     } finally {
       setLoadingTextFiles(false);
     }
