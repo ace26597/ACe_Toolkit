@@ -32,6 +32,7 @@ apps/api/
 │   │   ├── auth.py                # Authentication
 │   │   ├── ccresearch.py          # CCResearch Terminal + Unified Projects
 │   │   ├── workspace.py           # Workspace API
+│   │   ├── data_studio.py         # C3 Data Studio (NEW)
 │   │   ├── video_factory.py       # Video Factory
 │   │   └── public_api.py          # Public endpoints
 │   └── core/
@@ -39,7 +40,8 @@ apps/api/
 │       ├── database.py            # SQLAlchemy async setup
 │       ├── security.py            # JWT, passwords
 │       ├── ccresearch_manager.py  # CCResearch PTY manager
-│       ├── project_manager.py     # Unified project manager (NEW)
+│       ├── data_studio_manager.py # Headless Claude manager (NEW)
+│       ├── project_manager.py     # Unified project manager
 │       ├── workspace_manager.py   # Workspace file manager
 │       ├── session_manager.py     # Session management
 │       ├── notifications.py       # Discord/ntfy alerts
@@ -120,6 +122,44 @@ Cross-app project management for authenticated users.
 | GET | `/unified-projects` | List all user projects |
 | POST | `/unified-projects` | Create project |
 | DELETE | `/unified-projects/{name}` | Delete project |
+
+### Data Studio (`/data-studio`) - NEW
+
+AI-powered data analysis using headless Claude Code.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/sessions` | Create session for project |
+| GET | `/sessions` | List active sessions |
+| GET | `/sessions/{id}` | Get session details |
+| DELETE | `/sessions/{id}` | Close session |
+| WS | `/ws/{session_id}` | Bidirectional Claude streaming |
+| GET | `/dashboards/{project}` | List saved dashboards |
+| GET | `/dashboards/{project}/{id}` | Get dashboard layout |
+| POST | `/dashboards/{project}` | Save dashboard |
+| DELETE | `/dashboards/{project}/{id}` | Delete dashboard |
+| GET | `/projects/{project}/files` | List data files |
+
+**WebSocket Protocol:**
+
+Client sends:
+```json
+{"type": "message", "content": "Analyze sales.csv"}
+{"type": "run_code", "code": "import pandas as pd..."}
+{"type": "ping"}
+```
+
+Server sends:
+```json
+{"type": "thinking", "content": "..."}
+{"type": "tool_call", "tool": "Read", "input": {...}}
+{"type": "tool_result", "content": "..."}
+{"type": "text", "content": "..."}
+{"type": "code", "language": "python", "content": "..."}
+{"type": "error", "message": "..."}
+{"type": "done"}
+{"type": "pong"}
+```
 
 ---
 
@@ -316,6 +356,34 @@ Unified project operations across apps:
 - Terminal status tracking
 - Project metadata (.project.json)
 - Cross-app visibility (CCResearch + Workspace)
+
+### DataStudioManager (`core/data_studio_manager.py`) - NEW
+
+Manages headless Claude Code sessions for Data Studio:
+- Spawns Claude with `-p --output-format stream-json`
+- Uses `--permission-mode bypassPermissions` for auto-approval
+- Parses JSON output stream into frontend events
+- Maintains session state in `.data-studio/sessions/`
+- Creates CLAUDE.md with data analysis guidelines
+
+**Key Methods:**
+```python
+async def create_session(user_id, project_name, session_id=None) -> DataStudioSession
+async def send_message(session_id, message) -> None
+async def stream_output(session_id) -> AsyncGenerator[Dict, None]
+async def close_session(session_id) -> bool
+def list_data_files(project_dir) -> List[dict]
+```
+
+**Claude Execution:**
+```bash
+claude -p \
+  --output-format stream-json \
+  --input-format stream-json \
+  --session-id {uuid} \
+  --permission-mode bypassPermissions \
+  --cwd {project_dir}/.data-studio
+```
 
 ---
 

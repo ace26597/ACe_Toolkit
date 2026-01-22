@@ -14,6 +14,8 @@
 | Styling | Tailwind CSS 4 |
 | Code Editor | Monaco Editor 4.6.0 |
 | Terminal | xterm.js 5.5.0 |
+| Charts | Plotly.js, react-plotly.js |
+| Dashboard | react-grid-layout |
 | Icons | Lucide React |
 | HTTP | Axios, fetch |
 
@@ -30,6 +32,10 @@ apps/web/
 │   │   ├── page.tsx               # CCResearch Terminal (Create Project flow)
 │   │   └── share/[token]/page.tsx # Public share view
 │   ├── workspace/page.tsx         # Workspace (Notes, Files, Terminal tabs)
+│   ├── data-studio/               # C3 Data Studio (NEW)
+│   │   ├── page.tsx               # Main page with chat + dashboard
+│   │   └── hooks/
+│   │       └── useDataStudioSession.ts  # WebSocket session hook
 │   └── video-factory/page.tsx     # Video Factory
 ├── components/
 │   ├── auth/                      # Authentication
@@ -126,6 +132,53 @@ When no project is selected, displays comprehensive capabilities overview:
 | DOCX | HTML conversion (Mammoth.js) |
 | JSON | Syntax highlighted |
 
+### C3 Data Studio (`/data-studio`) - NEW
+
+AI-powered data analysis and visualization using headless Claude Code.
+
+**Architecture:**
+- Runs Claude in headless mode (`-p --output-format stream-json`)
+- No terminal UI - clean chat + dashboard interface
+- Uses existing Workspace project data files
+- Separate `.data-studio/` directory to avoid session conflicts
+
+**Features:**
+- Real-time streaming of Claude's thinking, tool calls, and outputs
+- Interactive chat panel with message history
+- Dashboard canvas for pinned visualizations (Plotly.js)
+- Data file browser (CSV, JSON, Excel, Parquet)
+- Code execution display with syntax highlighting
+
+**Components:**
+- `ProjectSelector` - Select existing workspace project
+- `ChatPanel` - Send messages, view Claude's responses
+- `MessageBubble` - Renders text, tool calls, code blocks
+- `DashboardCanvas` - Draggable widget grid (react-grid-layout)
+- `DataFilesList` - Browse project data files
+
+**WebSocket Events:**
+| Event Type | Description |
+|------------|-------------|
+| `thinking` | Claude's reasoning process |
+| `tool_call` | Tool being invoked with input |
+| `tool_result` | Tool execution result |
+| `code` | Code block with language |
+| `text` / `text_delta` | Response text (streaming) |
+| `chart` | Plotly chart data for dashboard |
+| `table` | Table data for display |
+| `error` | Error message |
+| `done` | Response complete |
+
+**Storage:**
+```
+/data/users/{user-id}/projects/{project}/
+├── data/              # User data files (shared with Workspace)
+├── .data-studio/      # Data Studio specific
+│   ├── sessions/      # Claude session state
+│   └── dashboards/    # Saved dashboard layouts
+└── .claude/           # Workspace Claude config
+```
+
 ---
 
 ## Authentication
@@ -170,6 +223,7 @@ Centralized API methods for all backends.
 **Active Exports:**
 - `authApi` - Authentication (login, register, logout, refresh)
 - `workspaceApi` - Projects, notes, files, sessions
+- `dataStudioApi` - Data Studio sessions, dashboards, WebSocket (NEW)
 
 **Removed Exports (2026-01-22):**
 - `analystApi` - Data Analyst (app removed)
@@ -342,6 +396,8 @@ npm run start
 
 | Date | Change |
 |------|--------|
+| 2026-01-22 | **C3 Data Studio** - AI-powered data analysis with headless Claude |
+| 2026-01-22 | Added react-grid-layout, Plotly.js for dashboard visualizations |
 | 2026-01-22 | Terminal as default view when opening workspace |
 | 2026-01-22 | Import Data modal with multi-URL support and file upload tab |
 | 2026-01-22 | Code cleanup - removed unused APIs and components |

@@ -508,3 +508,133 @@ export interface SessionFile {
     modified_at: string;
 }
 
+// ============ Data Studio API ============
+
+export interface DataFile {
+    name: string;
+    path: string;
+    size: number;
+    modified: string;
+    type: string;
+}
+
+export interface DataStudioSession {
+    session_id: string;
+    project_name: string;
+    data_files: DataFile[];
+}
+
+export interface DashboardInfo {
+    id: string;
+    name: string;
+    widget_count: number;
+    updated_at: string;
+}
+
+export interface DashboardLayout {
+    name: string;
+    widgets: DashboardWidget[];
+    created_at?: string;
+    updated_at?: string;
+}
+
+export interface DashboardWidget {
+    id: string;
+    type: 'chart' | 'table' | 'code';
+    data: any;
+    layout: { x: number; y: number; w: number; h: number };
+}
+
+export const dataStudioApi = {
+    // Session management
+    createSession: async (projectName: string): Promise<DataStudioSession> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/sessions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ project_name: projectName }),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Failed to create session' }));
+            throw new Error(error.detail || 'Failed to create session');
+        }
+        return res.json();
+    },
+
+    listSessions: async (): Promise<DataStudioSession[]> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/sessions`, {
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to list sessions');
+        return res.json();
+    },
+
+    getSession: async (sessionId: string): Promise<any> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/sessions/${sessionId}`, {
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to get session');
+        return res.json();
+    },
+
+    closeSession: async (sessionId: string): Promise<void> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/sessions/${sessionId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to close session');
+    },
+
+    // Dashboard management
+    listDashboards: async (projectName: string): Promise<DashboardInfo[]> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/dashboards/${projectName}`, {
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to list dashboards');
+        return res.json();
+    },
+
+    getDashboard: async (projectName: string, dashboardId: string): Promise<DashboardLayout> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/dashboards/${projectName}/${dashboardId}`, {
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to get dashboard');
+        return res.json();
+    },
+
+    saveDashboard: async (projectName: string, dashboard: DashboardLayout): Promise<{ id: string }> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/dashboards/${projectName}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(dashboard),
+        });
+        if (!res.ok) throw new Error('Failed to save dashboard');
+        return res.json();
+    },
+
+    deleteDashboard: async (projectName: string, dashboardId: string): Promise<void> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/dashboards/${projectName}/${dashboardId}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to delete dashboard');
+    },
+
+    // Data files
+    listProjectFiles: async (projectName: string): Promise<{ files: DataFile[] }> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/projects/${projectName}/files`, {
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to list files');
+        return res.json();
+    },
+
+    // WebSocket URL helper
+    getWebSocketUrl: (sessionId: string): string => {
+        const apiUrl = getApiUrl();
+        const wsUrl = apiUrl.replace(/^http/, 'ws');
+        return `${wsUrl}/data-studio/ws/${sessionId}`;
+    },
+};
+

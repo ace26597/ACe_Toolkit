@@ -149,20 +149,27 @@ export default function Home() {
               </p>
             </Link>
 
-            <div className="opacity-50 rounded-lg border border-cyan-200 dark:border-cyan-800 px-4 sm:px-6 py-4 sm:py-5 bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-900/10 dark:to-blue-900/10">
-              <h2 className="mb-2 text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
-                Headless C3 Researcher
-                <span className="text-[10px] sm:text-xs ml-2 bg-cyan-500 text-white px-1.5 sm:px-2 py-0.5 rounded">Soon</span>
-              </h2>
+            <Link
+              href="/data-studio"
+              className="group rounded-lg border border-cyan-200 dark:border-cyan-700 px-4 sm:px-6 py-4 sm:py-5 transition-all hover:border-cyan-500 hover:bg-cyan-50 dark:hover:bg-cyan-900/20 hover:shadow-lg bg-gradient-to-r from-cyan-50 to-blue-50 dark:from-cyan-900/10 dark:to-blue-900/10"
+            >
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <h2 className="text-lg sm:text-xl font-semibold text-gray-800 dark:text-white">
+                  C3 Data Studio
+                  <span className="inline-block ml-2 transition-transform group-hover:translate-x-1">→</span>
+                </h2>
+                <span className="text-[10px] sm:text-xs bg-cyan-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-medium">AUTH</span>
+                <span className="text-[10px] sm:text-xs bg-green-500 text-white px-1.5 sm:px-2 py-0.5 rounded-full font-medium">NEW</span>
+              </div>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-2">
-                Interactive headless Claude Code sessions with real-time streaming responses and programmatic control.
+                AI-powered data analysis and visualization. Claude analyzes your data files, generates insights, and creates interactive dashboards.
               </p>
               <div className="flex flex-wrap gap-2 mt-2">
-                <span className="text-[10px] sm:text-xs bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 px-2 py-0.5 rounded">API Access</span>
-                <span className="text-[10px] sm:text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded">Streaming</span>
-                <span className="text-[10px] sm:text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded">Headless</span>
+                <span className="text-[10px] sm:text-xs bg-cyan-100 dark:bg-cyan-900/30 text-cyan-700 dark:text-cyan-400 px-2 py-0.5 rounded">Visual Analytics</span>
+                <span className="text-[10px] sm:text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 px-2 py-0.5 rounded">Dashboards</span>
+                <span className="text-[10px] sm:text-xs bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-0.5 rounded">Headless Claude</span>
               </div>
-            </div>
+            </Link>
           </div>
 
           {/* Recent Sessions - shows sessions from all apps */}

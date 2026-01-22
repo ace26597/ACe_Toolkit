@@ -38,6 +38,7 @@ lsof -i :3000 -i :8000  # Check our ports
 | App | Route | Description |
 |-----|-------|-------------|
 | **C3 Researcher Workspace** | `/workspace` | Claude Code Custom Researcher - AI-powered research terminal |
+| **C3 Data Studio** | `/data-studio` | AI-powered data analysis with headless Claude (NEW) |
 | **Video Factory** | `/video-factory` | AI video production pipeline |
 
 **C3 Researcher Workspace Features:**
@@ -48,10 +49,19 @@ lsof -i :3000 -i :8000  # Check our ports
 - Welcome page shows all capabilities when no project selected
 - `/ccresearch` redirects to `/workspace?tab=terminal`
 
+**C3 Data Studio Features (NEW):**
+- Headless Claude Code (`-p --output-format stream-json`)
+- Real-time streaming of thinking, tool calls, and outputs
+- Chat interface for data analysis requests
+- Dashboard canvas with draggable widgets (Plotly.js)
+- Uses workspace project data files
+- No terminal UI - clean visual interface
+
 **Unified Project Architecture:**
 - Projects live at `/data/users/{user-id}/projects/{project-name}/`
 - Terminal uses same project directory for `--continue` support
 - Files, notes, and terminal all share the same project context
+- Data Studio uses `.data-studio/` subdirectory for session isolation
 
 **For detailed app documentation, see:**
 - `apps/web/CLAUDE.md` - Frontend details
@@ -69,7 +79,7 @@ lsof -i :3000 -i :8000  # Check our ports
 | Approved | Full access | 30 days |
 | Trial | Full for 24h | 1 day |
 
-**Protected Routes:** `/workspace`, `/video-factory`, `/ccresearch`
+**Protected Routes:** `/workspace`, `/data-studio`, `/video-factory`, `/ccresearch`
 
 **Per-User Data:** `/data/users/{user-uuid}/projects/` (unified project storage)
 
@@ -187,13 +197,14 @@ journalctl -u cloudflared -f
 /data/
 ├── users/              # Per-user data
 │   └── {user-id}/
-│       ├── projects/   # Unified project storage (CCResearch + Workspace)
+│       ├── projects/   # Unified project storage (CCResearch + Workspace + Data Studio)
 │       │   └── {project-name}/
 │       │       ├── .project.json  # Project metadata
 │       │       ├── data/          # User files
 │       │       ├── notes/         # Workspace notes
 │       │       ├── output/        # Generated outputs
-│       │       └── .claude/       # Claude Code config
+│       │       ├── .claude/       # Workspace Claude config
+│       │       └── .data-studio/  # Data Studio sessions + dashboards
 │       └── video-factory/
 ├── ccresearch-logs/    # Session logs
 └── claude-workspaces/  # Legacy (deprecated)
@@ -207,6 +218,7 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
+| 2026-01-22 | **NEW: C3 Data Studio** - AI-powered data analysis with headless Claude, chat interface, dashboard canvas |
 | 2026-01-22 | **Code Cleanup:** Removed unused core modules (ai_provider, file_processor, langgraph_workflows, report_generator) |
 | 2026-01-22 | **Frontend Cleanup:** Removed unused APIs (analystApi, researchApi, notesApi, projectsApi, chartsApi, mermaidDiskApi) |
 | 2026-01-22 | **Fix:** GitHub clone `re` module error (Python 3.13 scoping issue) |
