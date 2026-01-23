@@ -233,7 +233,8 @@ Always explain what the data shows in plain language.
             return
 
         # Build command
-        cmd = ["claude", "-p", message, "--output-format", "stream-json"]
+        # Note: --output-format stream-json requires --verbose when using -p
+        cmd = ["claude", "-p", message, "--output-format", "stream-json", "--verbose"]
 
         if session.is_first_message:
             # First message: use --session-id to create new session
