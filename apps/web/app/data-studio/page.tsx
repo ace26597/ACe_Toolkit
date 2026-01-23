@@ -1,11 +1,344 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Database, FileSpreadsheet, Send, Pin, Trash2, Play, Loader2, Wifi, WifiOff, BarChart3, Table, Code, Search, FolderOpen } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { ArrowLeft, Database, FileSpreadsheet, Send, Pin, Trash2, Play, Loader2, Wifi, WifiOff, BarChart3, Table, Code, Search, FolderOpen, Copy, Check } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth';
 import { workspaceApi, DataFile } from '@/lib/api';
 import { useDataStudioSession, ChatMessage, DataStudioEvent } from './hooks/useDataStudioSession';
+import mermaid from 'mermaid';
+
+// Dynamic import for Plotly (client-side only)
+const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
+
+// Initialize mermaid
+if (typeof window !== 'undefined') {
+    mermaid.initialize({
+        startOnLoad: false,
+        theme: 'dark',
+        securityLevel: 'loose',
+    });
+}
+
+// ==================== Chart Components ====================
+
+interface ParsedBlock {
+    type: 'text' | 'plotly' | 'mermaid' | 'code' | 'table';
+    content: string;
+    language?: string;
+}
+
+function parseMarkdownContent(content: string): ParsedBlock[] {
+    const blocks: ParsedBlock[] = [];
+    // Match code blocks with language tags
+    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
+    let lastIndex = 0;
+    let match;
+
+    while ((match = codeBlockRegex.exec(content)) !== null) {
+        // Add text before this code block
+        if (match.index > lastIndex) {
+            const text = content.slice(lastIndex, match.index).trim();
+            if (text) {
+                blocks.push({ type: 'text', content: text });
+            }
+        }
+
+        const language = match[1]?.toLowerCase() || '';
+        const code = match[2].trim();
+
+        if (language === 'plotly') {
+            blocks.push({ type: 'plotly', content: code });
+        } else if (language === 'mermaid') {
+            blocks.push({ type: 'mermaid', content: code });
+        } else {
+            blocks.push({ type: 'code', content: code, language: language || 'text' });
+        }
+
+        lastIndex = match.index + match[0].length;
+    }
+
+    // Add remaining text
+    if (lastIndex < content.length) {
+        const text = content.slice(lastIndex).trim();
+        if (text) {
+            blocks.push({ type: 'text', content: text });
+        }
+    }
+
+    return blocks.length > 0 ? blocks : [{ type: 'text', content }];
+}
+
+function PlotlyChart({ content, onPin }: { content: string; onPin?: (data: any) => void }) {
+    const [error, setError] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
+
+    const chartData = useMemo(() => {
+        try {
+            const parsed = JSON.parse(content);
+            // Ensure dark theme
+            if (parsed.layout) {
+                parsed.layout.template = 'plotly_dark';
+                parsed.layout.paper_bgcolor = 'rgba(0,0,0,0)';
+                parsed.layout.plot_bgcolor = 'rgba(31,41,55,0.5)';
+                parsed.layout.font = { color: '#9ca3af' };
+            }
+            return parsed;
+        } catch (e) {
+            setError('Invalid Plotly JSON');
+            return null;
+        }
+    }, [content]);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(content);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    if (error) {
+        return (
+            <div className="bg-red-900/20 border border-red-700 rounded-lg p-3 text-red-400 text-sm">
+                {error}
+                <pre className="mt-2 text-xs overflow-auto max-h-32">{content}</pre>
+            </div>
+        );
+    }
+
+    if (!chartData) return null;
+
+    return (
+        <div className="bg-gray-800/50 rounded-lg border border-gray-700 overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700">
+                <span className="text-xs text-cyan-400 font-medium flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4" />
+                    Plotly Chart
+                </span>
+                <div className="flex gap-2">
+                    <button
+                        onClick={handleCopy}
+                        className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
+                    >
+                        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        {copied ? 'Copied' : 'Copy'}
+                    </button>
+                    {onPin && (
+                        <button
+                            onClick={() => onPin(chartData)}
+                            className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                        >
+                            <Pin className="w-3 h-3" /> Add to Dashboard
+                        </button>
+                    )}
+                </div>
+            </div>
+            <div className="p-2">
+                <Plot
+                    data={chartData.data}
+                    layout={{
+                        ...chartData.layout,
+                        autosize: true,
+                        margin: { t: 40, r: 20, b: 40, l: 50 },
+                    }}
+                    config={{ responsive: true, displayModeBar: false }}
+                    style={{ width: '100%', height: chartData.layout?.height || 350 }}
+                />
+            </div>
+        </div>
+    );
+}
+
+function MermaidDiagram({ content, onPin }: { content: string; onPin?: () => void }) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [svg, setSvg] = useState<string>('');
+    const [error, setError] = useState<string | null>(null);
+    const [copied, setCopied] = useState(false);
+
+    useEffect(() => {
+        const renderDiagram = async () => {
+            try {
+                const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
+                const { svg } = await mermaid.render(id, content);
+                setSvg(svg);
+                setError(null);
+            } catch (e: any) {
+                setError(e.message || 'Failed to render diagram');
+            }
+        };
+        renderDiagram();
+    }, [content]);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(content);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    if (error) {
+        return (
+            <div className="bg-red-900/20 border border-red-700 rounded-lg p-3 text-red-400 text-sm">
+                Mermaid Error: {error}
+                <pre className="mt-2 text-xs overflow-auto max-h-32 text-gray-400">{content}</pre>
+            </div>
+        );
+    }
+
+    return (
+        <div className="bg-gray-800/50 rounded-lg border border-gray-700 overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700">
+                <span className="text-xs text-purple-400 font-medium flex items-center gap-2">
+                    <Code className="w-4 h-4" />
+                    Mermaid Diagram
+                </span>
+                <div className="flex gap-2">
+                    <button
+                        onClick={handleCopy}
+                        className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
+                    >
+                        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        {copied ? 'Copied' : 'Copy'}
+                    </button>
+                    {onPin && (
+                        <button
+                            onClick={onPin}
+                            className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                        >
+                            <Pin className="w-3 h-3" /> Add to Dashboard
+                        </button>
+                    )}
+                </div>
+            </div>
+            <div
+                ref={containerRef}
+                className="p-4 flex justify-center bg-gray-900/50"
+                dangerouslySetInnerHTML={{ __html: svg }}
+            />
+        </div>
+    );
+}
+
+function InlineCodeBlock({ content, language, onPin }: { content: string; language: string; onPin?: () => void }) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = () => {
+        navigator.clipboard.writeText(content);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    return (
+        <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-700">
+            <div className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700">
+                <span className="text-xs text-gray-400 font-mono">{language}</span>
+                <div className="flex gap-2">
+                    <button
+                        onClick={handleCopy}
+                        className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
+                    >
+                        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                        {copied ? 'Copied' : 'Copy'}
+                    </button>
+                    {onPin && (
+                        <button
+                            onClick={onPin}
+                            className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                        >
+                            <Pin className="w-3 h-3" /> Pin
+                        </button>
+                    )}
+                </div>
+            </div>
+            <pre className="p-3 text-sm overflow-auto max-h-64">
+                <code className="text-gray-300">{content}</code>
+            </pre>
+        </div>
+    );
+}
+
+function RenderedContent({
+    content,
+    onPinChart,
+    onPinCode
+}: {
+    content: string;
+    onPinChart?: (chartData: any, type: 'plotly' | 'mermaid') => void;
+    onPinCode?: (code: string, language: string) => void;
+}) {
+    const blocks = useMemo(() => parseMarkdownContent(content), [content]);
+
+    return (
+        <div className="space-y-3">
+            {blocks.map((block, idx) => {
+                if (block.type === 'plotly') {
+                    return (
+                        <PlotlyChart
+                            key={idx}
+                            content={block.content}
+                            onPin={onPinChart ? (data) => onPinChart(data, 'plotly') : undefined}
+                        />
+                    );
+                }
+                if (block.type === 'mermaid') {
+                    return (
+                        <MermaidDiagram
+                            key={idx}
+                            content={block.content}
+                            onPin={onPinChart ? () => onPinChart({ mermaid: block.content }, 'mermaid') : undefined}
+                        />
+                    );
+                }
+                if (block.type === 'code') {
+                    return (
+                        <InlineCodeBlock
+                            key={idx}
+                            content={block.content}
+                            language={block.language || 'text'}
+                            onPin={onPinCode ? () => onPinCode(block.content, block.language || 'text') : undefined}
+                        />
+                    );
+                }
+                // Text block - render with basic markdown-like formatting
+                return (
+                    <div key={idx} className="text-gray-200 whitespace-pre-wrap">
+                        {block.content.split('\n').map((line, lineIdx) => {
+                            // Simple markdown table detection
+                            if (line.includes('|') && line.trim().startsWith('|')) {
+                                return <span key={lineIdx} className="font-mono text-sm">{line}<br/></span>;
+                            }
+                            // Headers
+                            if (line.startsWith('### ')) {
+                                return <h3 key={lineIdx} className="text-lg font-semibold text-white mt-3 mb-1">{line.slice(4)}</h3>;
+                            }
+                            if (line.startsWith('## ')) {
+                                return <h2 key={lineIdx} className="text-xl font-bold text-white mt-4 mb-2">{line.slice(3)}</h2>;
+                            }
+                            if (line.startsWith('# ')) {
+                                return <h1 key={lineIdx} className="text-2xl font-bold text-white mt-4 mb-2">{line.slice(2)}</h1>;
+                            }
+                            // Bold text
+                            if (line.includes('**')) {
+                                const parts = line.split(/(\*\*[^*]+\*\*)/g);
+                                return (
+                                    <span key={lineIdx}>
+                                        {parts.map((part, partIdx) => {
+                                            if (part.startsWith('**') && part.endsWith('**')) {
+                                                return <strong key={partIdx} className="text-white">{part.slice(2, -2)}</strong>;
+                                            }
+                                            return part;
+                                        })}
+                                        <br/>
+                                    </span>
+                                );
+                            }
+                            return <span key={lineIdx}>{line}<br/></span>;
+                        })}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
 
 // ==================== Components ====================
 
@@ -146,10 +479,12 @@ function CodeBlock({ event, onPin, onRun }: { event: DataStudioEvent; onPin?: ()
 function MessageBubble({
     message,
     onPinCode,
+    onPinChart,
     onRunCode
 }: {
     message: ChatMessage;
     onPinCode?: (code: string, language: string) => void;
+    onPinChart?: (chartData: any, type: 'plotly' | 'mermaid') => void;
     onRunCode?: (code: string) => void;
 }) {
     const isUser = message.role === 'user';
@@ -157,9 +492,17 @@ function MessageBubble({
     return (
         <div className={`mb-4 ${isUser ? 'ml-8' : 'mr-8'}`}>
             <div className={`rounded-lg p-3 ${isUser ? 'bg-cyan-900/30 border border-cyan-700' : 'bg-gray-800 border border-gray-700'}`}>
-                {/* Text content */}
+                {/* Text content - now with chart rendering */}
                 {message.content && (
-                    <p className="text-gray-200 whitespace-pre-wrap">{message.content}</p>
+                    isUser ? (
+                        <p className="text-gray-200 whitespace-pre-wrap">{message.content}</p>
+                    ) : (
+                        <RenderedContent
+                            content={message.content}
+                            onPinChart={onPinChart}
+                            onPinCode={onPinCode}
+                        />
+                    )
                 )}
 
                 {/* Events (tool calls, code blocks, etc.) */}
@@ -219,12 +562,14 @@ function ChatPanel({
     isConnected,
     onSendMessage,
     onPinCode,
+    onPinChart,
     onRunCode
 }: {
     messages: ChatMessage[];
     isConnected: boolean;
     onSendMessage: (content: string) => void;
     onPinCode: (code: string, language: string) => void;
+    onPinChart: (chartData: any, type: 'plotly' | 'mermaid') => void;
     onRunCode: (code: string) => void;
 }) {
     const [input, setInput] = useState('');
@@ -278,6 +623,7 @@ function ChatPanel({
                             key={message.id}
                             message={message}
                             onPinCode={onPinCode}
+                            onPinChart={onPinChart}
                             onRunCode={onRunCode}
                         />
                     ))
@@ -308,6 +654,82 @@ function ChatPanel({
     );
 }
 
+function DashboardWidget({ widget, onRemove }: { widget: { id: string; type: string; data: any }; onRemove: () => void }) {
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [mermaidSvg, setMermaidSvg] = useState<string>('');
+
+    // Render Mermaid diagram if type is mermaid
+    useEffect(() => {
+        if (widget.type === 'mermaid' && widget.data?.mermaid) {
+            const renderMermaid = async () => {
+                try {
+                    const id = `dashboard-mermaid-${widget.id}`;
+                    const { svg } = await mermaid.render(id, widget.data.mermaid);
+                    setMermaidSvg(svg);
+                } catch (e) {
+                    console.error('Mermaid render error:', e);
+                }
+            };
+            renderMermaid();
+        }
+    }, [widget.id, widget.type, widget.data]);
+
+    return (
+        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 bg-gray-900 border-b border-gray-700">
+                <span className="text-sm text-gray-400 flex items-center gap-2">
+                    {widget.type === 'chart' && <BarChart3 className="w-4 h-4 text-cyan-400" />}
+                    {widget.type === 'mermaid' && <Code className="w-4 h-4 text-purple-400" />}
+                    {widget.type === 'table' && <Table className="w-4 h-4" />}
+                    {widget.type === 'code' && <Code className="w-4 h-4" />}
+                    {widget.type === 'chart' ? 'Plotly Chart' : widget.type === 'mermaid' ? 'Diagram' : widget.type}
+                </span>
+                <button
+                    onClick={onRemove}
+                    className="text-gray-500 hover:text-red-400"
+                >
+                    <Trash2 className="w-4 h-4" />
+                </button>
+            </div>
+            <div className="p-2">
+                {widget.type === 'code' && (
+                    <pre className="text-xs text-gray-300 font-mono max-h-64 overflow-auto p-2">
+                        {widget.data?.content || JSON.stringify(widget.data, null, 2)}
+                    </pre>
+                )}
+                {widget.type === 'chart' && widget.data?.data && (
+                    <Plot
+                        data={widget.data.data}
+                        layout={{
+                            ...widget.data.layout,
+                            autosize: true,
+                            margin: { t: 40, r: 20, b: 40, l: 50 },
+                            template: 'plotly_dark',
+                            paper_bgcolor: 'rgba(0,0,0,0)',
+                            plot_bgcolor: 'rgba(31,41,55,0.5)',
+                            font: { color: '#9ca3af' },
+                        }}
+                        config={{ responsive: true, displayModeBar: false }}
+                        style={{ width: '100%', height: widget.data.layout?.height || 300 }}
+                    />
+                )}
+                {widget.type === 'mermaid' && mermaidSvg && (
+                    <div
+                        ref={containerRef}
+                        className="flex justify-center bg-gray-900/50 p-4 rounded"
+                        dangerouslySetInnerHTML={{ __html: mermaidSvg }}
+                    />
+                )}
+                {widget.type === 'table' && (
+                    <div className="text-gray-400 text-sm p-4">
+                        Table view coming soon
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 function DashboardCanvas({
     widgets,
     onRemoveWidget
@@ -319,53 +741,25 @@ function DashboardCanvas({
         return (
             <div className="flex items-center justify-center h-full text-gray-500">
                 <div className="text-center">
-                    <Table className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p>Pin charts and tables here</p>
-                    <p className="text-sm mt-2">Click the pin icon on code blocks to add widgets</p>
+                    <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p className="font-medium">Dashboard</p>
+                    <p className="text-sm mt-2">Charts will appear here</p>
+                    <p className="text-xs mt-4 text-gray-600">
+                        Click "Add to Dashboard" on charts to pin them
+                    </p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="p-4 grid grid-cols-2 gap-4">
+        <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
             {widgets.map(widget => (
-                <div
+                <DashboardWidget
                     key={widget.id}
-                    className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden"
-                >
-                    <div className="flex items-center justify-between px-3 py-2 bg-gray-900 border-b border-gray-700">
-                        <span className="text-sm text-gray-400 flex items-center gap-2">
-                            {widget.type === 'chart' && <BarChart3 className="w-4 h-4" />}
-                            {widget.type === 'table' && <Table className="w-4 h-4" />}
-                            {widget.type === 'code' && <Code className="w-4 h-4" />}
-                            {widget.type}
-                        </span>
-                        <button
-                            onClick={() => onRemoveWidget(widget.id)}
-                            className="text-gray-500 hover:text-red-400"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                    </div>
-                    <div className="p-4 h-48 overflow-auto">
-                        {widget.type === 'code' && (
-                            <pre className="text-xs text-gray-300 font-mono">
-                                {widget.data?.content || JSON.stringify(widget.data, null, 2)}
-                            </pre>
-                        )}
-                        {widget.type === 'chart' && (
-                            <div className="text-gray-400 text-sm">
-                                Chart visualization (Plotly integration coming soon)
-                            </div>
-                        )}
-                        {widget.type === 'table' && (
-                            <div className="text-gray-400 text-sm">
-                                Table view (AG Grid integration coming soon)
-                            </div>
-                        )}
-                    </div>
-                </div>
+                    widget={widget}
+                    onRemove={() => onRemoveWidget(widget.id)}
+                />
             ))}
         </div>
     );
@@ -586,6 +980,13 @@ function DataStudioContent() {
         });
     };
 
+    const handlePinChart = (chartData: any, type: 'plotly' | 'mermaid') => {
+        pinWidget({
+            type: type === 'plotly' ? 'chart' : 'mermaid',
+            data: chartData,
+        });
+    };
+
     const handleToggleFileSelect = (path: string) => {
         setSelectedFiles(prev => {
             const next = new Set(prev);
@@ -702,6 +1103,7 @@ function DataStudioContent() {
                         isConnected={isConnected}
                         onSendMessage={sendMessage}
                         onPinCode={handlePinCode}
+                        onPinChart={handlePinChart}
                         onRunCode={runCode}
                     />
                 </div>

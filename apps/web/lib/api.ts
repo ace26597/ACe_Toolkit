@@ -541,7 +541,7 @@ export interface DashboardLayout {
 
 export interface DashboardWidget {
     id: string;
-    type: 'chart' | 'table' | 'code';
+    type: 'chart' | 'table' | 'code' | 'mermaid';
     data: any;
     layout: { x: number; y: number; w: number; h: number };
 }
