@@ -498,8 +498,8 @@ If asked to create a visualization, output a Plotly JSON specification."""
 
     async def close_session(self, session_id: str) -> bool:
         """Close an active session."""
-        if session_id in self.sessions:
-            session = self.sessions[session_id]
+        session = self.sessions.get(session_id)
+        if session:
             if session.process and session.process.returncode is None:
                 try:
                     session.process.terminate()
@@ -508,7 +508,8 @@ If asked to create a visualization, output a Plotly JSON specification."""
                         session.process.kill()
                 except Exception as e:
                     logger.warning(f"Error killing process: {e}")
-            del self.sessions[session_id]
+            # Use pop to avoid KeyError if already deleted
+            self.sessions.pop(session_id, None)
             return True
         return False
 
