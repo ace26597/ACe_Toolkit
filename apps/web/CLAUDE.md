@@ -32,10 +32,8 @@ apps/web/
 │   │   ├── page.tsx               # CCResearch Terminal (Create Project flow)
 │   │   └── share/[token]/page.tsx # Public share view
 │   ├── workspace/page.tsx         # Workspace (Notes, Files, Terminal tabs)
-│   ├── data-studio/               # C3 Data Studio (NEW)
-│   │   ├── page.tsx               # Main page with chat + dashboard
-│   │   └── hooks/
-│   │       └── useDataStudioSession.ts  # WebSocket session hook
+│   ├── data-studio/               # C3 Data Studio V2 (REDESIGNED)
+│   │   └── page.tsx               # Project selector, import, analysis, dashboard
 │   └── video-factory/page.tsx     # Video Factory
 ├── components/
 │   ├── auth/                      # Authentication
@@ -132,63 +130,69 @@ When no project is selected, displays comprehensive capabilities overview:
 | DOCX | HTML conversion (Mammoth.js) |
 | JSON | Syntax highlighted |
 
-### C3 Data Studio (`/data-studio`) - NEW
+### C3 Data Studio (`/data-studio`) - REDESIGNED
 
-AI-powered data analysis and visualization using headless Claude Code.
+**All-rounder AI data analyst framework** with standalone project system, smart metadata extraction, auto-generated dashboards, and NLP-based editing.
 
-**Architecture:**
-- Runs Claude in headless mode (`-p --output-format stream-json`)
-- No terminal UI - clean chat + dashboard interface
-- Uses existing Workspace project data files
-- Separate `.data-studio/` directory to avoid session conflicts
-- Minimal MCP config (only filesystem) for reduced memory usage
-- Process tracking with automatic cleanup on new message/session close
+**Architecture (V2):**
+- **Standalone Projects**: Separate from Workspace projects at `/data/users/{user-id}/data-studio-projects/`
+- **Smart Analysis**: Python-based metadata extraction with pandas, scipy
+- **Auto Dashboards**: 5-10 widgets generated based on data characteristics
+- **NLP Editing**: Natural language control of individual widgets or entire dashboards
+- **Plotly.js Rendering**: Charts use Plotly specs with dark theme
 
-**Features:**
-- Real-time streaming of Claude's thinking, tool calls, and outputs
-- Interactive chat panel with message history
-- Dashboard canvas for pinned visualizations (Plotly.js)
-- Data file browser (CSV, JSON, Excel, Parquet)
-- Code execution display with syntax highlighting
-- 5-minute timeout for long-running operations
+**User Flow:**
+1. **Project Selection**: Create new or select existing Data Studio project
+2. **Data Import**: Upload files or import from Workspace projects
+3. **Analysis**: Automatic scanning and metadata extraction
+4. **Dashboard**: Auto-generated visualizations with NLP editing
 
 **Components:**
-- `ProjectSelector` - Select existing workspace project
-- `ChatPanel` - Send messages, view Claude's responses, quick actions
-- `MessageBubble` - Renders text, tool calls, code blocks
-- `DashboardCanvas` - Draggable widget grid (react-grid-layout)
-- `DataFilesList` - File browser with search, multi-select, folder grouping
+- `ProjectSelector` - Create/select Data Studio projects
+- `CreateProjectModal` - New project creation dialog
+- `DataImporter` - File upload and Workspace import
+- `AnalysisProgressView` - Animated analysis progress
+- `DashboardView` - Main dashboard with sidebar, canvas, and NLP bar
+- `WidgetCard` - Individual widget with edit/remove controls
+- `PlotlyWidget` - Renders Plotly specifications
+- `StatCard` - Metric display cards
 
-**Interactive Features:**
-- File search by name
-- Multi-select with checkboxes
-- Folder grouping with collapsible sections
-- File type icons: CSV (green), Excel (emerald), JSON (yellow), MD (blue)
-- "Analyze Selected" button for multi-file analysis
-- "Select All" / "Clear Selection" quick actions
-- Quick actions: List all, Data overview, Find patterns, Create chart
+**Widget Types:**
+| Type | Description |
+|------|-------------|
+| `stat_card` | Single metric with label |
+| `histogram` | Distribution chart |
+| `bar_chart` | Categorical comparison |
+| `line_chart` | Time series |
+| `pie_chart` | Proportions (donut style) |
+| `scatter` | Correlation plot |
+| `table` | Data table |
+| `mermaid` | Diagrams (data overview) |
 
-**WebSocket Events:**
-| Event Type | Description |
-|------------|-------------|
-| `thinking` | Claude's reasoning process |
-| `tool_call` | Tool being invoked with input |
-| `tool_result` | Tool execution result |
-| `code` | Code block with language |
-| `text` / `text_delta` | Response text (streaming) |
-| `chart` | Plotly chart data for dashboard |
-| `table` | Table data for display |
-| `error` | Error message |
-| `done` | Response complete |
+**NLP Edit Bar:**
+- Dashboard-wide edits: "Add a pie chart for categories"
+- Single widget edits: Click edit icon, then describe changes
+- Real-time processing with loading state
+
+**API Integration:**
+Uses `dataStudioV2Api` from `lib/api.ts`:
+- `listProjects()`, `createProject()`, `deleteProject()`
+- `listFiles()`, `uploadFiles()`, `importFromWorkspace()`
+- `analyzeProject()`, `getMetadata()`
+- `listDashboards()`, `getDashboard()`, `generateDashboard()`
+- `nlpEdit()`, `saveDashboard()`
 
 **Storage:**
 ```
-/data/users/{user-id}/projects/{project}/
-├── data/              # User data files (shared with Workspace)
-├── .data-studio/      # Data Studio specific
-│   ├── sessions/      # Claude session state
-│   └── dashboards/    # Saved dashboard layouts
-└── .claude/           # Workspace Claude config
+/data/users/{user-id}/data-studio-projects/{project}/
+├── .project.json          # Project metadata
+├── data/                  # Imported/uploaded files
+├── .analysis/             # Generated analysis
+│   ├── metadata.json      # Master metadata
+│   └── file_analyses/     # Per-file analysis
+├── .data-studio/          # Session state
+│   └── dashboards/        # Saved dashboards
+└── .claude/               # Claude config
 ```
 
 ---

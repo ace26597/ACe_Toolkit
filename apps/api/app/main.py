@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
-from app.routers import auth, ccresearch, workspace, public_api, video_factory, data_studio
+from app.routers import auth, ccresearch, workspace, public_api, video_factory, data_studio, data_studio_v2
 from app.core.database import engine
 from app.models.models import Base
 import uuid
@@ -213,6 +213,7 @@ app.include_router(workspace.router, prefix="/workspace", tags=["Workspace"])
 app.include_router(public_api.router, tags=["Public API"])
 app.include_router(video_factory.router, tags=["Video Factory"])
 app.include_router(data_studio.router, tags=["Data Studio"])
+app.include_router(data_studio_v2.router, tags=["Data Studio V2"])
 
 @app.get("/")
 def read_root():

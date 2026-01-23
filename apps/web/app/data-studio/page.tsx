@@ -3,10 +3,17 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { ArrowLeft, Database, FileSpreadsheet, Send, Pin, Trash2, Play, Loader2, Wifi, WifiOff, BarChart3, Table, Code, Search, FolderOpen, Copy, Check } from 'lucide-react';
+import {
+    ArrowLeft, Database, FileSpreadsheet, Trash2, Loader2,
+    BarChart3, Table, Code, Plus, Upload, RefreshCw, Sparkles, Edit3,
+    Hash, FileText, AlertCircle, CheckCircle,
+    Import, X, Wand2, LayoutDashboard, MessageSquare
+} from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth';
-import { workspaceApi, DataFile } from '@/lib/api';
-import { useDataStudioSession, ChatMessage, DataStudioEvent } from './hooks/useDataStudioSession';
+import {
+    dataStudioV2Api, workspaceApi,
+    DataStudioProject, DataFile, ProjectMetadata, Dashboard, DashboardWidget
+} from '@/lib/api';
 import mermaid from 'mermaid';
 
 // Dynamic import for Plotly (client-side only)
@@ -21,338 +28,56 @@ if (typeof window !== 'undefined') {
     });
 }
 
-// ==================== Chart Components ====================
+// ==================== Types ====================
 
-interface ParsedBlock {
-    type: 'text' | 'plotly' | 'mermaid' | 'code' | 'table';
-    content: string;
-    language?: string;
+type ViewMode = 'projects' | 'import' | 'analyzing' | 'dashboard';
+
+interface AnalysisProgress {
+    stage: 'scanning' | 'analyzing' | 'generating' | 'complete';
+    message: string;
+    progress: number;
 }
 
-function parseMarkdownContent(content: string): ParsedBlock[] {
-    const blocks: ParsedBlock[] = [];
-    // Match code blocks with language tags
-    const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
-    let lastIndex = 0;
-    let match;
+// ==================== Utility Components ====================
 
-    while ((match = codeBlockRegex.exec(content)) !== null) {
-        // Add text before this code block
-        if (match.index > lastIndex) {
-            const text = content.slice(lastIndex, match.index).trim();
-            if (text) {
-                blocks.push({ type: 'text', content: text });
-            }
-        }
-
-        const language = match[1]?.toLowerCase() || '';
-        const code = match[2].trim();
-
-        if (language === 'plotly') {
-            blocks.push({ type: 'plotly', content: code });
-        } else if (language === 'mermaid') {
-            blocks.push({ type: 'mermaid', content: code });
-        } else {
-            blocks.push({ type: 'code', content: code, language: language || 'text' });
-        }
-
-        lastIndex = match.index + match[0].length;
-    }
-
-    // Add remaining text
-    if (lastIndex < content.length) {
-        const text = content.slice(lastIndex).trim();
-        if (text) {
-            blocks.push({ type: 'text', content: text });
-        }
-    }
-
-    return blocks.length > 0 ? blocks : [{ type: 'text', content }];
+function formatBytes(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function PlotlyChart({ content, onPin }: { content: string; onPin?: (data: any) => void }) {
-    const [error, setError] = useState<string | null>(null);
-    const [copied, setCopied] = useState(false);
-
-    const chartData = useMemo(() => {
-        try {
-            const parsed = JSON.parse(content);
-            // Ensure dark theme
-            if (parsed.layout) {
-                parsed.layout.template = 'plotly_dark';
-                parsed.layout.paper_bgcolor = 'rgba(0,0,0,0)';
-                parsed.layout.plot_bgcolor = 'rgba(31,41,55,0.5)';
-                parsed.layout.font = { color: '#9ca3af' };
-            }
-            return parsed;
-        } catch (e) {
-            setError('Invalid Plotly JSON');
-            return null;
-        }
-    }, [content]);
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(content);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    if (error) {
-        return (
-            <div className="bg-red-900/20 border border-red-700 rounded-lg p-3 text-red-400 text-sm">
-                {error}
-                <pre className="mt-2 text-xs overflow-auto max-h-32">{content}</pre>
-            </div>
-        );
-    }
-
-    if (!chartData) return null;
-
-    return (
-        <div className="bg-gray-800/50 rounded-lg border border-gray-700 overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700">
-                <span className="text-xs text-cyan-400 font-medium flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4" />
-                    Plotly Chart
-                </span>
-                <div className="flex gap-2">
-                    <button
-                        onClick={handleCopy}
-                        className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
-                    >
-                        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                        {copied ? 'Copied' : 'Copy'}
-                    </button>
-                    {onPin && (
-                        <button
-                            onClick={() => onPin(chartData)}
-                            className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
-                        >
-                            <Pin className="w-3 h-3" /> Add to Dashboard
-                        </button>
-                    )}
-                </div>
-            </div>
-            <div className="p-2">
-                <Plot
-                    data={chartData.data}
-                    layout={{
-                        ...chartData.layout,
-                        autosize: true,
-                        margin: { t: 40, r: 20, b: 40, l: 50 },
-                    }}
-                    config={{ responsive: true, displayModeBar: false }}
-                    style={{ width: '100%', height: chartData.layout?.height || 350 }}
-                />
-            </div>
-        </div>
-    );
+function formatNumber(num: number): string {
+    return num.toLocaleString();
 }
 
-function MermaidDiagram({ content, onPin }: { content: string; onPin?: () => void }) {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [svg, setSvg] = useState<string>('');
-    const [error, setError] = useState<string | null>(null);
-    const [copied, setCopied] = useState(false);
+// ==================== Project Selector ====================
 
-    useEffect(() => {
-        const renderDiagram = async () => {
-            try {
-                const id = `mermaid-${Math.random().toString(36).substr(2, 9)}`;
-                const { svg } = await mermaid.render(id, content);
-                setSvg(svg);
-                setError(null);
-            } catch (e: any) {
-                setError(e.message || 'Failed to render diagram');
-            }
-        };
-        renderDiagram();
-    }, [content]);
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(content);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    if (error) {
-        return (
-            <div className="bg-red-900/20 border border-red-700 rounded-lg p-3 text-red-400 text-sm">
-                Mermaid Error: {error}
-                <pre className="mt-2 text-xs overflow-auto max-h-32 text-gray-400">{content}</pre>
-            </div>
-        );
-    }
-
-    return (
-        <div className="bg-gray-800/50 rounded-lg border border-gray-700 overflow-hidden">
-            <div className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700">
-                <span className="text-xs text-purple-400 font-medium flex items-center gap-2">
-                    <Code className="w-4 h-4" />
-                    Mermaid Diagram
-                </span>
-                <div className="flex gap-2">
-                    <button
-                        onClick={handleCopy}
-                        className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
-                    >
-                        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                        {copied ? 'Copied' : 'Copy'}
-                    </button>
-                    {onPin && (
-                        <button
-                            onClick={onPin}
-                            className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
-                        >
-                            <Pin className="w-3 h-3" /> Add to Dashboard
-                        </button>
-                    )}
-                </div>
-            </div>
-            <div
-                ref={containerRef}
-                className="p-4 flex justify-center bg-gray-900/50"
-                dangerouslySetInnerHTML={{ __html: svg }}
-            />
-        </div>
-    );
-}
-
-function InlineCodeBlock({ content, language, onPin }: { content: string; language: string; onPin?: () => void }) {
-    const [copied, setCopied] = useState(false);
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(content);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    return (
-        <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-700">
-            <div className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700">
-                <span className="text-xs text-gray-400 font-mono">{language}</span>
-                <div className="flex gap-2">
-                    <button
-                        onClick={handleCopy}
-                        className="text-xs text-gray-400 hover:text-white flex items-center gap-1"
-                    >
-                        {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                        {copied ? 'Copied' : 'Copy'}
-                    </button>
-                    {onPin && (
-                        <button
-                            onClick={onPin}
-                            className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
-                        >
-                            <Pin className="w-3 h-3" /> Pin
-                        </button>
-                    )}
-                </div>
-            </div>
-            <pre className="p-3 text-sm overflow-auto max-h-64">
-                <code className="text-gray-300">{content}</code>
-            </pre>
-        </div>
-    );
-}
-
-function RenderedContent({
-    content,
-    onPinChart,
-    onPinCode
+function ProjectSelector({
+    onSelect,
+    onCreateNew
 }: {
-    content: string;
-    onPinChart?: (chartData: any, type: 'plotly' | 'mermaid') => void;
-    onPinCode?: (code: string, language: string) => void;
+    onSelect: (project: DataStudioProject) => void;
+    onCreateNew: () => void;
 }) {
-    const blocks = useMemo(() => parseMarkdownContent(content), [content]);
-
-    return (
-        <div className="space-y-3">
-            {blocks.map((block, idx) => {
-                if (block.type === 'plotly') {
-                    return (
-                        <PlotlyChart
-                            key={idx}
-                            content={block.content}
-                            onPin={onPinChart ? (data) => onPinChart(data, 'plotly') : undefined}
-                        />
-                    );
-                }
-                if (block.type === 'mermaid') {
-                    return (
-                        <MermaidDiagram
-                            key={idx}
-                            content={block.content}
-                            onPin={onPinChart ? () => onPinChart({ mermaid: block.content }, 'mermaid') : undefined}
-                        />
-                    );
-                }
-                if (block.type === 'code') {
-                    return (
-                        <InlineCodeBlock
-                            key={idx}
-                            content={block.content}
-                            language={block.language || 'text'}
-                            onPin={onPinCode ? () => onPinCode(block.content, block.language || 'text') : undefined}
-                        />
-                    );
-                }
-                // Text block - render with basic markdown-like formatting
-                return (
-                    <div key={idx} className="text-gray-200 whitespace-pre-wrap">
-                        {block.content.split('\n').map((line, lineIdx) => {
-                            // Simple markdown table detection
-                            if (line.includes('|') && line.trim().startsWith('|')) {
-                                return <span key={lineIdx} className="font-mono text-sm">{line}<br/></span>;
-                            }
-                            // Headers
-                            if (line.startsWith('### ')) {
-                                return <h3 key={lineIdx} className="text-lg font-semibold text-white mt-3 mb-1">{line.slice(4)}</h3>;
-                            }
-                            if (line.startsWith('## ')) {
-                                return <h2 key={lineIdx} className="text-xl font-bold text-white mt-4 mb-2">{line.slice(3)}</h2>;
-                            }
-                            if (line.startsWith('# ')) {
-                                return <h1 key={lineIdx} className="text-2xl font-bold text-white mt-4 mb-2">{line.slice(2)}</h1>;
-                            }
-                            // Bold text
-                            if (line.includes('**')) {
-                                const parts = line.split(/(\*\*[^*]+\*\*)/g);
-                                return (
-                                    <span key={lineIdx}>
-                                        {parts.map((part, partIdx) => {
-                                            if (part.startsWith('**') && part.endsWith('**')) {
-                                                return <strong key={partIdx} className="text-white">{part.slice(2, -2)}</strong>;
-                                            }
-                                            return part;
-                                        })}
-                                        <br/>
-                                    </span>
-                                );
-                            }
-                            return <span key={lineIdx}>{line}<br/></span>;
-                        })}
-                    </div>
-                );
-            })}
-        </div>
-    );
-}
-
-// ==================== Components ====================
-
-function ProjectSelector({ onSelect }: { onSelect: (projectName: string) => void }) {
-    const [projects, setProjects] = useState<Array<{ name: string; createdAt: string }>>([]);
+    const [projects, setProjects] = useState<DataStudioProject[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        workspaceApi.listProjects()
-            .then((data) => setProjects(data.map(p => ({ name: p.name, createdAt: p.createdAt }))))
-            .catch(e => setError(e.message))
-            .finally(() => setLoading(false));
+        loadProjects();
     }, []);
+
+    const loadProjects = async () => {
+        try {
+            setLoading(true);
+            const data = await dataStudioV2Api.listProjects();
+            setProjects(data);
+        } catch (e: any) {
+            setError(e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -362,50 +87,75 @@ function ProjectSelector({ onSelect }: { onSelect: (projectName: string) => void
         );
     }
 
-    if (error) {
-        return (
-            <div className="text-center p-8">
-                <p className="text-red-400 mb-4">{error}</p>
+    return (
+        <div className="max-w-4xl mx-auto p-8">
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h2 className="text-2xl font-bold text-white">Data Studio Projects</h2>
+                    <p className="text-gray-400 mt-1">Select a project or create a new one to start analyzing</p>
+                </div>
                 <button
-                    onClick={() => window.location.reload()}
-                    className="text-cyan-400 hover:text-cyan-300"
+                    onClick={onCreateNew}
+                    className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition-colors"
                 >
-                    Retry
+                    <Plus className="w-5 h-5" />
+                    New Project
                 </button>
             </div>
-        );
-    }
 
-    return (
-        <div className="max-w-2xl mx-auto p-8">
-            <h2 className="text-2xl font-bold text-white mb-2">Select a Project</h2>
-            <p className="text-gray-400 mb-6">Choose a project to analyze its data files</p>
+            {error && (
+                <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 mb-6 text-red-300">
+                    {error}
+                </div>
+            )}
 
             {projects.length === 0 ? (
-                <div className="text-center p-8 border border-gray-700 rounded-lg">
-                    <Database className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                    <p className="text-gray-400 mb-4">No projects found</p>
-                    <Link
-                        href="/workspace"
-                        className="text-cyan-400 hover:text-cyan-300"
+                <div className="text-center p-12 border border-gray-700 rounded-lg bg-gray-800/50">
+                    <Database className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+                    <h3 className="text-xl font-medium text-white mb-2">No projects yet</h3>
+                    <p className="text-gray-400 mb-6">Create your first Data Studio project to start analyzing data</p>
+                    <button
+                        onClick={onCreateNew}
+                        className="inline-flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded-lg transition-colors"
                     >
-                        Create a project in Workspace first
-                    </Link>
+                        <Plus className="w-5 h-5" />
+                        Create Project
+                    </button>
                 </div>
             ) : (
-                <div className="grid gap-3">
+                <div className="grid gap-4 md:grid-cols-2">
                     {projects.map(project => (
                         <button
                             key={project.name}
-                            onClick={() => onSelect(project.name)}
-                            className="flex items-center gap-4 p-4 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 rounded-lg transition-all text-left"
+                            onClick={() => onSelect(project)}
+                            className="flex items-start gap-4 p-4 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 rounded-lg transition-all text-left group"
                         >
-                            <Database className="w-8 h-8 text-cyan-500" />
-                            <div>
-                                <h3 className="font-medium text-white">{project.name}</h3>
-                                <p className="text-sm text-gray-400">
-                                    Created {new Date(project.createdAt).toLocaleDateString()}
-                                </p>
+                            <div className="w-12 h-12 rounded-lg bg-cyan-900/50 flex items-center justify-center flex-shrink-0">
+                                <BarChart3 className="w-6 h-6 text-cyan-400" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h3 className="font-medium text-white group-hover:text-cyan-400 transition-colors">{project.name}</h3>
+                                {project.description && (
+                                    <p className="text-sm text-gray-400 truncate">{project.description}</p>
+                                )}
+                                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                                    <span className="flex items-center gap-1">
+                                        <FileText className="w-3 h-3" />
+                                        {project.file_count} files
+                                    </span>
+                                    {project.has_analysis && (
+                                        <span className="flex items-center gap-1 text-green-400">
+                                            <CheckCircle className="w-3 h-3" />
+                                            Analyzed
+                                        </span>
+                                    )}
+                                    {project.has_dashboard && (
+                                        <span className="flex items-center gap-1 text-purple-400">
+                                            <LayoutDashboard className="w-3 h-3" />
+                                            Dashboard
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </button>
                     ))}
@@ -415,256 +165,706 @@ function ProjectSelector({ onSelect }: { onSelect: (projectName: string) => void
     );
 }
 
-function ToolCallCard({ event }: { event: DataStudioEvent }) {
-    const [expanded, setExpanded] = useState(false);
+// ==================== Create Project Modal ====================
 
-    return (
-        <div className="bg-gray-800/50 rounded-lg p-3 text-sm border border-gray-700">
-            <div
-                className="flex items-center gap-2 cursor-pointer"
-                onClick={() => setExpanded(!expanded)}
-            >
-                <span className="text-blue-400">
-                    {event.status === 'running' ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                        '🔧'
-                    )}
-                </span>
-                <span className="font-mono text-blue-300">{event.tool}</span>
-                <span className="text-gray-500 text-xs ml-auto">
-                    {expanded ? '▼' : '▶'}
-                </span>
-            </div>
-            {expanded && event.input && (
-                <pre className="mt-2 text-xs text-gray-400 overflow-auto max-h-32 bg-gray-900 p-2 rounded">
-                    {JSON.stringify(event.input, null, 2)}
-                </pre>
-            )}
-        </div>
-    );
-}
-
-function CodeBlock({ event, onPin, onRun }: { event: DataStudioEvent; onPin?: () => void; onRun?: () => void }) {
-    return (
-        <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-700">
-            <div className="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700">
-                <span className="text-xs text-gray-400 font-mono">{event.language || 'python'}</span>
-                <div className="flex gap-2">
-                    {onRun && (
-                        <button
-                            onClick={onRun}
-                            className="text-xs text-green-400 hover:text-green-300 flex items-center gap-1"
-                        >
-                            <Play className="w-3 h-3" /> Run
-                        </button>
-                    )}
-                    {onPin && (
-                        <button
-                            onClick={onPin}
-                            className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
-                        >
-                            <Pin className="w-3 h-3" /> Pin
-                        </button>
-                    )}
-                </div>
-            </div>
-            <pre className="p-3 text-sm overflow-auto max-h-64">
-                <code className="text-gray-300">{event.content}</code>
-            </pre>
-        </div>
-    );
-}
-
-function MessageBubble({
-    message,
-    onPinCode,
-    onPinChart,
-    onRunCode
+function CreateProjectModal({
+    onClose,
+    onCreate
 }: {
-    message: ChatMessage;
-    onPinCode?: (code: string, language: string) => void;
-    onPinChart?: (chartData: any, type: 'plotly' | 'mermaid') => void;
-    onRunCode?: (code: string) => void;
+    onClose: () => void;
+    onCreate: (name: string, description?: string) => Promise<void>;
 }) {
-    const isUser = message.role === 'user';
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [creating, setCreating] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    return (
-        <div className={`mb-4 ${isUser ? 'ml-8' : 'mr-8'}`}>
-            <div className={`rounded-lg p-3 ${isUser ? 'bg-cyan-900/30 border border-cyan-700' : 'bg-gray-800 border border-gray-700'}`}>
-                {/* Text content - now with chart rendering */}
-                {message.content && (
-                    isUser ? (
-                        <p className="text-gray-200 whitespace-pre-wrap">{message.content}</p>
-                    ) : (
-                        <RenderedContent
-                            content={message.content}
-                            onPinChart={onPinChart}
-                            onPinCode={onPinCode}
-                        />
-                    )
-                )}
-
-                {/* Events (tool calls, code blocks, etc.) */}
-                {message.events.length > 0 && (
-                    <div className="mt-3 space-y-2">
-                        {message.events.map((event, idx) => {
-                            if (event.type === 'tool_call') {
-                                return <ToolCallCard key={idx} event={event} />;
-                            }
-                            if (event.type === 'code') {
-                                return (
-                                    <CodeBlock
-                                        key={idx}
-                                        event={event}
-                                        onPin={onPinCode ? () => onPinCode(event.content || '', event.language || 'python') : undefined}
-                                        onRun={onRunCode ? () => onRunCode(event.content || '') : undefined}
-                                    />
-                                );
-                            }
-                            if (event.type === 'tool_result') {
-                                return (
-                                    <div key={idx} className="bg-gray-900/50 rounded p-2 text-xs text-gray-400 max-h-32 overflow-auto">
-                                        <span className="text-green-400">Result:</span>
-                                        <pre className="mt-1">{event.content?.slice(0, 500)}{event.truncated ? '...' : ''}</pre>
-                                    </div>
-                                );
-                            }
-                            if (event.type === 'thinking') {
-                                return (
-                                    <div key={idx} className="text-gray-500 italic text-sm flex items-center gap-2">
-                                        <span className="animate-pulse">💭</span>
-                                        {event.content}
-                                    </div>
-                                );
-                            }
-                            if (event.type === 'error') {
-                                return (
-                                    <div key={idx} className="text-red-400 text-sm bg-red-900/20 p-2 rounded">
-                                        Error: {event.message}
-                                    </div>
-                                );
-                            }
-                            return null;
-                        })}
-                    </div>
-                )}
-            </div>
-            <div className={`text-xs text-gray-500 mt-1 ${isUser ? 'text-right' : ''}`}>
-                {message.timestamp.toLocaleTimeString()}
-            </div>
-        </div>
-    );
-}
-
-function ChatPanel({
-    messages,
-    isConnected,
-    onSendMessage,
-    onPinCode,
-    onPinChart,
-    onRunCode
-}: {
-    messages: ChatMessage[];
-    isConnected: boolean;
-    onSendMessage: (content: string) => void;
-    onPinCode: (code: string, language: string) => void;
-    onPinChart: (chartData: any, type: 'plotly' | 'mermaid') => void;
-    onRunCode: (code: string) => void;
-}) {
-    const [input, setInput] = useState('');
-
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (input.trim() && isConnected) {
-            onSendMessage(input.trim());
-            setInput('');
+        if (!name.trim()) return;
+
+        setCreating(true);
+        setError(null);
+        try {
+            await onCreate(name.trim(), description.trim() || undefined);
+            onClose();
+        } catch (e: any) {
+            setError(e.message);
+        } finally {
+            setCreating(false);
         }
     };
 
-    const quickActions = [
-        { label: "List all files", prompt: "What data files do I have? List them with their sizes and types." },
-        { label: "Data overview", prompt: "Give me a quick overview of all the data files - structure, row counts, and key columns." },
-        { label: "Find patterns", prompt: "Analyze the data and identify any interesting patterns, trends, or anomalies." },
-        { label: "Create chart", prompt: "Create a visualization that best represents the main insights from this data." },
-    ];
-
     return (
-        <div className="flex flex-col h-full">
-            {/* Messages */}
-            <div className="flex-1 overflow-auto p-4">
-                {messages.length === 0 ? (
-                    <div className="text-center text-gray-500 mt-4">
-                        <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                        <p className="font-medium text-gray-300">Ask Claude to analyze your data</p>
-                        <p className="text-sm mt-2 mb-6">Click a file on the left or try a quick action below</p>
-
-                        {/* Quick actions */}
-                        <div className="grid grid-cols-2 gap-2 max-w-sm mx-auto">
-                            {quickActions.map((action, idx) => (
-                                <button
-                                    key={idx}
-                                    onClick={() => isConnected && onSendMessage(action.prompt)}
-                                    disabled={!isConnected}
-                                    className="text-xs text-left p-2 bg-gray-800 hover:bg-gray-700 disabled:bg-gray-800/50 disabled:text-gray-600 border border-gray-700 hover:border-cyan-600 rounded transition-colors"
-                                >
-                                    {action.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        <p className="text-xs text-gray-600 mt-6">
-                            ← Select files from the sidebar to analyze
-                        </p>
-                    </div>
-                ) : (
-                    messages.map(message => (
-                        <MessageBubble
-                            key={message.id}
-                            message={message}
-                            onPinCode={onPinCode}
-                            onPinChart={onPinChart}
-                            onRunCode={onRunCode}
-                        />
-                    ))
-                )}
-            </div>
-
-            {/* Input */}
-            <form onSubmit={handleSubmit} className="p-4 border-t border-gray-700">
-                <div className="flex gap-2">
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={e => setInput(e.target.value)}
-                        placeholder={isConnected ? "Ask about your data..." : "Connecting..."}
-                        disabled={!isConnected}
-                        className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
-                    />
-                    <button
-                        type="submit"
-                        disabled={!isConnected || !input.trim()}
-                        className="bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
-                    >
-                        <Send className="w-5 h-5" />
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-800 rounded-lg w-full max-w-md border border-gray-700">
+                <div className="flex items-center justify-between p-4 border-b border-gray-700">
+                    <h3 className="text-lg font-medium text-white">Create New Project</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <X className="w-5 h-5" />
                     </button>
                 </div>
-            </form>
+                <form onSubmit={handleSubmit} className="p-4 space-y-4">
+                    {error && (
+                        <div className="bg-red-900/30 border border-red-700 rounded p-3 text-red-300 text-sm">
+                            {error}
+                        </div>
+                    )}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Project Name *</label>
+                        <input
+                            type="text"
+                            value={name}
+                            onChange={e => setName(e.target.value)}
+                            placeholder="my-analysis-project"
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                            autoFocus
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Description (optional)</label>
+                        <textarea
+                            value={description}
+                            onChange={e => setDescription(e.target.value)}
+                            placeholder="What will you be analyzing?"
+                            rows={3}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 resize-none"
+                        />
+                    </div>
+                    <div className="flex justify-end gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={!name.trim() || creating}
+                            className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
+                        >
+                            {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                            Create
+                        </button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 }
 
-function DashboardWidget({ widget, onRemove }: { widget: { id: string; type: string; data: any }; onRemove: () => void }) {
-    const containerRef = useRef<HTMLDivElement>(null);
-    const [mermaidSvg, setMermaidSvg] = useState<string>('');
+// ==================== Data Importer ====================
 
-    // Render Mermaid diagram if type is mermaid
+function DataImporter({
+    project,
+    onComplete,
+    onBack
+}: {
+    project: DataStudioProject;
+    onComplete: () => void;
+    onBack: () => void;
+}) {
+    const [files, setFiles] = useState<DataFile[]>([]);
+    const [workspaceProjects, setWorkspaceProjects] = useState<{ name: string }[]>([]);
+    const [selectedWorkspaceProject, setSelectedWorkspaceProject] = useState<string>('');
+    const [uploading, setUploading] = useState(false);
+    const [importing, setImporting] = useState(false);
+    const [tab, setTab] = useState<'upload' | 'import'>('upload');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
     useEffect(() => {
-        if (widget.type === 'mermaid' && widget.data?.mermaid) {
+        loadFiles();
+        loadWorkspaceProjects();
+    }, [project.name]);
+
+    const loadFiles = async () => {
+        try {
+            const data = await dataStudioV2Api.listFiles(project.name);
+            setFiles(data.files);
+        } catch (e) {
+            console.error('Failed to load files:', e);
+        }
+    };
+
+    const loadWorkspaceProjects = async () => {
+        try {
+            const projects = await workspaceApi.listProjects();
+            setWorkspaceProjects(projects.map(p => ({ name: p.name })));
+        } catch (e) {
+            console.error('Failed to load workspace projects:', e);
+        }
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFiles = e.target.files;
+        if (!selectedFiles || selectedFiles.length === 0) return;
+
+        setUploading(true);
+        try {
+            await dataStudioV2Api.uploadFiles(project.name, selectedFiles);
+            await loadFiles();
+        } catch (e: any) {
+            alert(e.message);
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const handleImportFromWorkspace = async () => {
+        if (!selectedWorkspaceProject) return;
+
+        setImporting(true);
+        try {
+            await dataStudioV2Api.importFromWorkspace(project.name, selectedWorkspaceProject);
+            await loadFiles();
+        } catch (e: any) {
+            alert(e.message);
+        } finally {
+            setImporting(false);
+        }
+    };
+
+    const handleDeleteFile = async (path: string) => {
+        if (!confirm('Delete this file?')) return;
+        try {
+            await dataStudioV2Api.deleteFile(project.name, path);
+            await loadFiles();
+        } catch (e: any) {
+            alert(e.message);
+        }
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto p-8">
+            <button
+                onClick={onBack}
+                className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
+            >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Projects
+            </button>
+
+            <div className="flex items-center justify-between mb-6">
+                <div>
+                    <h2 className="text-2xl font-bold text-white">{project.name}</h2>
+                    <p className="text-gray-400 mt-1">Add data files to your project</p>
+                </div>
+                <button
+                    onClick={onComplete}
+                    disabled={files.length === 0}
+                    className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
+                >
+                    <Sparkles className="w-5 h-5" />
+                    Analyze Data
+                </button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 mb-6 bg-gray-800 p-1 rounded-lg inline-flex">
+                <button
+                    onClick={() => setTab('upload')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        tab === 'upload' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
+                    }`}
+                >
+                    <Upload className="w-4 h-4 inline-block mr-2" />
+                    Upload Files
+                </button>
+                <button
+                    onClick={() => setTab('import')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        tab === 'import' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'
+                    }`}
+                >
+                    <Import className="w-4 h-4 inline-block mr-2" />
+                    Import from Workspace
+                </button>
+            </div>
+
+            {/* Upload Tab */}
+            {tab === 'upload' && (
+                <div className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center mb-8 hover:border-cyan-500 transition-colors">
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        multiple
+                        accept=".csv,.tsv,.json,.jsonl,.xlsx,.xls,.parquet,.md,.txt"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                    />
+                    <Upload className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+                    <p className="text-gray-300 mb-2">
+                        {uploading ? 'Uploading...' : 'Drop files here or click to upload'}
+                    </p>
+                    <p className="text-sm text-gray-500 mb-4">
+                        Supports CSV, JSON, Excel, Parquet, Markdown
+                    </p>
+                    <button
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                        className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg transition-colors"
+                    >
+                        {uploading ? <Loader2 className="w-4 h-4 animate-spin inline-block mr-2" /> : null}
+                        Select Files
+                    </button>
+                </div>
+            )}
+
+            {/* Import Tab */}
+            {tab === 'import' && (
+                <div className="bg-gray-800 rounded-lg p-6 mb-8 border border-gray-700">
+                    <p className="text-gray-300 mb-4">Import data files from an existing Workspace project:</p>
+                    <div className="flex gap-4">
+                        <select
+                            value={selectedWorkspaceProject}
+                            onChange={e => setSelectedWorkspaceProject(e.target.value)}
+                            className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                        >
+                            <option value="">Select a project...</option>
+                            {workspaceProjects.map(p => (
+                                <option key={p.name} value={p.name}>{p.name}</option>
+                            ))}
+                        </select>
+                        <button
+                            onClick={handleImportFromWorkspace}
+                            disabled={!selectedWorkspaceProject || importing}
+                            className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
+                        >
+                            {importing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Import className="w-4 h-4" />}
+                            Import
+                        </button>
+                    </div>
+                </div>
+            )}
+
+            {/* File List */}
+            <div className="bg-gray-800 rounded-lg border border-gray-700">
+                <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+                    <h3 className="font-medium text-white">Project Files ({files.length})</h3>
+                    <button onClick={loadFiles} className="text-gray-400 hover:text-white">
+                        <RefreshCw className="w-4 h-4" />
+                    </button>
+                </div>
+                {files.length === 0 ? (
+                    <div className="p-8 text-center text-gray-500">
+                        <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                        <p>No files yet. Upload or import data files to get started.</p>
+                    </div>
+                ) : (
+                    <div className="divide-y divide-gray-700">
+                        {files.map(file => (
+                            <div key={file.path} className="flex items-center justify-between p-3 hover:bg-gray-700/50">
+                                <div className="flex items-center gap-3">
+                                    <FileTypeIcon type={file.type} />
+                                    <div>
+                                        <span className="text-gray-200">{file.name}</span>
+                                        {file.folder !== 'root' && (
+                                            <span className="text-gray-500 text-sm ml-2">in {file.folder}/</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <span className="text-gray-500 text-sm">{formatBytes(file.size)}</span>
+                                    <button
+                                        onClick={() => handleDeleteFile(file.path)}
+                                        className="text-gray-500 hover:text-red-400 transition-colors"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function FileTypeIcon({ type }: { type: string }) {
+    const iconClass = "w-5 h-5";
+    switch (type) {
+        case 'csv':
+        case 'tsv':
+            return <Table className={`${iconClass} text-green-500`} />;
+        case 'xlsx':
+        case 'xls':
+            return <FileSpreadsheet className={`${iconClass} text-emerald-500`} />;
+        case 'json':
+        case 'jsonl':
+            return <Code className={`${iconClass} text-yellow-500`} />;
+        case 'parquet':
+            return <Database className={`${iconClass} text-purple-500`} />;
+        default:
+            return <FileText className={`${iconClass} text-gray-500`} />;
+    }
+}
+
+// ==================== Analysis Progress ====================
+
+function AnalysisProgressView({
+    project,
+    onComplete,
+    onBack
+}: {
+    project: DataStudioProject;
+    onComplete: (metadata: ProjectMetadata, dashboard: Dashboard) => void;
+    onBack: () => void;
+}) {
+    const [progress, setProgress] = useState<AnalysisProgress>({
+        stage: 'scanning',
+        message: 'Scanning data files...',
+        progress: 0
+    });
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        runAnalysis();
+    }, [project.name]);
+
+    const runAnalysis = async () => {
+        try {
+            // Stage 1: Scanning
+            setProgress({ stage: 'scanning', message: 'Scanning data files...', progress: 10 });
+            await new Promise(r => setTimeout(r, 500));
+
+            // Stage 2: Analyzing
+            setProgress({ stage: 'analyzing', message: 'Analyzing data structure and patterns...', progress: 30 });
+            const analysisResult = await dataStudioV2Api.analyzeProject(project.name);
+            setProgress({ stage: 'analyzing', message: 'Analysis complete!', progress: 60 });
+
+            // Stage 3: Generating dashboard
+            setProgress({ stage: 'generating', message: 'Generating dashboard visualizations...', progress: 80 });
+            const dashboard = await dataStudioV2Api.generateDashboard(project.name);
+
+            // Complete
+            setProgress({ stage: 'complete', message: 'Ready!', progress: 100 });
+            await new Promise(r => setTimeout(r, 500));
+
+            onComplete(analysisResult.metadata, dashboard);
+        } catch (e: any) {
+            setError(e.message);
+        }
+    };
+
+    if (error) {
+        return (
+            <div className="max-w-2xl mx-auto p-8 text-center">
+                <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                <h2 className="text-xl font-bold text-white mb-2">Analysis Failed</h2>
+                <p className="text-gray-400 mb-6">{error}</p>
+                <button
+                    onClick={onBack}
+                    className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
+                >
+                    Go Back
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="max-w-2xl mx-auto p-8 text-center">
+            <div className="mb-8">
+                <Sparkles className="w-16 h-16 text-cyan-500 mx-auto mb-4 animate-pulse" />
+                <h2 className="text-2xl font-bold text-white mb-2">Analyzing {project.name}</h2>
+                <p className="text-gray-400">{progress.message}</p>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full bg-gray-800 rounded-full h-3 mb-4 overflow-hidden">
+                <div
+                    className="bg-gradient-to-r from-cyan-500 to-purple-500 h-full rounded-full transition-all duration-500"
+                    style={{ width: `${progress.progress}%` }}
+                />
+            </div>
+
+            {/* Stage indicators */}
+            <div className="flex justify-between text-sm text-gray-500">
+                <span className={progress.stage === 'scanning' ? 'text-cyan-400' : progress.progress > 10 ? 'text-green-400' : ''}>
+                    Scan Files
+                </span>
+                <span className={progress.stage === 'analyzing' ? 'text-cyan-400' : progress.progress > 60 ? 'text-green-400' : ''}>
+                    Analyze Data
+                </span>
+                <span className={progress.stage === 'generating' ? 'text-cyan-400' : progress.progress > 80 ? 'text-green-400' : ''}>
+                    Generate Dashboard
+                </span>
+                <span className={progress.stage === 'complete' ? 'text-green-400' : ''}>
+                    Complete
+                </span>
+            </div>
+        </div>
+    );
+}
+
+// ==================== Dashboard View ====================
+
+function DashboardView({
+    project,
+    metadata,
+    dashboard,
+    onBack,
+    onRefresh
+}: {
+    project: DataStudioProject;
+    metadata: ProjectMetadata;
+    dashboard: Dashboard;
+    onBack: () => void;
+    onRefresh: () => void;
+}) {
+    const [widgets, setWidgets] = useState<DashboardWidget[]>(dashboard.widgets || []);
+    const [editingWidget, setEditingWidget] = useState<string | null>(null);
+    const [nlpInput, setNlpInput] = useState('');
+    const [processing, setProcessing] = useState(false);
+    const [showChat, setShowChat] = useState(false);
+
+    const handleNlpEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!nlpInput.trim() || processing) return;
+
+        setProcessing(true);
+        try {
+            const result = await dataStudioV2Api.nlpEdit(
+                project.name,
+                nlpInput.trim(),
+                'default',
+                editingWidget || undefined
+            );
+            setWidgets(result.widgets || []);
+            setNlpInput('');
+            setEditingWidget(null);
+        } catch (e: any) {
+            alert(e.message);
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleRemoveWidget = (widgetId: string) => {
+        setWidgets(prev => prev.filter(w => w.id !== widgetId));
+    };
+
+    return (
+        <div className="h-screen flex flex-col bg-gray-900">
+            {/* Header */}
+            <header className="border-b border-gray-800 bg-gray-950 flex-shrink-0">
+                <div className="px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={onBack}
+                            className="text-gray-400 hover:text-white transition-colors"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                        </button>
+                        <div className="h-5 w-px bg-gray-700" />
+                        <h1 className="text-lg font-semibold text-cyan-500 flex items-center gap-2">
+                            <BarChart3 className="w-5 h-5" />
+                            C3 Data Studio
+                        </h1>
+                        <span className="text-gray-500">|</span>
+                        <span className="text-gray-300">{project.name}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setShowChat(!showChat)}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors ${
+                                showChat ? 'bg-cyan-600 text-white' : 'bg-gray-800 text-gray-400 hover:text-white'
+                            }`}
+                        >
+                            <MessageSquare className="w-4 h-4" />
+                            Chat
+                        </button>
+                        <button
+                            onClick={onRefresh}
+                            className="text-gray-400 hover:text-white transition-colors"
+                        >
+                            <RefreshCw className="w-5 h-5" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* NLP Edit Bar */}
+                <div className="px-4 py-2 border-t border-gray-800 bg-gray-900/50">
+                    <form onSubmit={handleNlpEdit} className="flex gap-2">
+                        <div className="flex-1 flex items-center gap-2 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2">
+                            <Wand2 className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                            <input
+                                type="text"
+                                value={nlpInput}
+                                onChange={e => setNlpInput(e.target.value)}
+                                placeholder={editingWidget
+                                    ? "Describe how to edit this widget..."
+                                    : "Describe changes to the dashboard (e.g., 'Add a pie chart for categories')"
+                                }
+                                className="flex-1 bg-transparent text-white placeholder-gray-500 focus:outline-none text-sm"
+                            />
+                            {editingWidget && (
+                                <button
+                                    type="button"
+                                    onClick={() => setEditingWidget(null)}
+                                    className="text-gray-400 hover:text-white"
+                                >
+                                    <X className="w-4 h-4" />
+                                </button>
+                            )}
+                        </div>
+                        <button
+                            type="submit"
+                            disabled={!nlpInput.trim() || processing}
+                            className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-2"
+                        >
+                            {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                            Apply
+                        </button>
+                    </form>
+                </div>
+            </header>
+
+            {/* Main Content */}
+            <div className="flex-1 flex overflow-hidden">
+                {/* Sidebar - Metadata Summary */}
+                <aside className="w-72 border-r border-gray-800 bg-gray-950 flex-shrink-0 overflow-auto">
+                    <div className="p-4">
+                        <h3 className="text-sm font-medium text-gray-400 mb-3">Data Summary</h3>
+
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-2 gap-2 mb-4">
+                            <StatCard label="Files" value={metadata.summary.total_files} icon={FileText} />
+                            <StatCard label="Rows" value={formatNumber(metadata.summary.total_rows)} icon={Table} />
+                            <StatCard label="Columns" value={metadata.summary.total_columns} icon={Hash} />
+                            <StatCard label="Type" value={metadata.summary.primary_data_type.split('_')[0]} icon={Database} />
+                        </div>
+
+                        {/* Themes */}
+                        {metadata.summary.themes.length > 0 && (
+                            <div className="mb-4">
+                                <h4 className="text-xs font-medium text-gray-500 mb-2">Detected Themes</h4>
+                                <div className="flex flex-wrap gap-1">
+                                    {metadata.summary.themes.map(theme => (
+                                        <span
+                                            key={theme}
+                                            className="text-xs bg-gray-800 text-gray-300 px-2 py-1 rounded"
+                                        >
+                                            {theme}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Domain */}
+                        {metadata.summary.domain_detected && (
+                            <div className="mb-4 p-3 bg-cyan-900/30 border border-cyan-800 rounded-lg">
+                                <p className="text-xs text-cyan-400 font-medium">Domain Detected</p>
+                                <p className="text-sm text-white capitalize">{metadata.summary.domain_detected}</p>
+                            </div>
+                        )}
+
+                        {/* Files List */}
+                        <h4 className="text-xs font-medium text-gray-500 mb-2">Analyzed Files</h4>
+                        <div className="space-y-2">
+                            {Object.entries(metadata.files).map(([filename, analysis]) => (
+                                <div key={filename} className="bg-gray-800 rounded p-2 text-sm">
+                                    <p className="text-gray-200 truncate font-medium">{filename}</p>
+                                    <p className="text-xs text-gray-500">
+                                        {formatNumber(analysis.row_count)} rows, {analysis.column_count} cols
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </aside>
+
+                {/* Dashboard Canvas */}
+                <main className="flex-1 overflow-auto p-6 bg-gray-900">
+                    {widgets.length === 0 ? (
+                        <div className="flex items-center justify-center h-full text-gray-500">
+                            <div className="text-center">
+                                <LayoutDashboard className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                                <p className="text-lg font-medium">No widgets yet</p>
+                                <p className="text-sm mt-2">Use the NLP bar above to add visualizations</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-12 gap-4 auto-rows-min">
+                            {widgets.map(widget => (
+                                <WidgetCard
+                                    key={widget.id}
+                                    widget={widget}
+                                    metadata={metadata}
+                                    isEditing={editingWidget === widget.id}
+                                    onEdit={() => setEditingWidget(widget.id)}
+                                    onRemove={() => handleRemoveWidget(widget.id)}
+                                />
+                            ))}
+                        </div>
+                    )}
+                </main>
+
+                {/* Chat Panel */}
+                {showChat && (
+                    <aside className="w-80 border-l border-gray-800 bg-gray-950 flex-shrink-0 flex flex-col">
+                        <div className="p-3 border-b border-gray-800">
+                            <h3 className="font-medium text-white">Chat with your data</h3>
+                        </div>
+                        <div className="flex-1 p-4 text-center text-gray-500">
+                            <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                            <p className="text-sm">Chat feature coming soon</p>
+                            <p className="text-xs mt-1">Use NLP bar for now</p>
+                        </div>
+                    </aside>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function StatCard({
+    label,
+    value,
+    icon: Icon
+}: {
+    label: string;
+    value: string | number;
+    icon: React.ElementType;
+}) {
+    return (
+        <div className="bg-gray-800 rounded-lg p-3">
+            <Icon className="w-4 h-4 text-cyan-400 mb-1" />
+            <p className="text-lg font-semibold text-white">{value}</p>
+            <p className="text-xs text-gray-500">{label}</p>
+        </div>
+    );
+}
+
+function WidgetCard({
+    widget,
+    metadata,
+    isEditing,
+    onEdit,
+    onRemove
+}: {
+    widget: DashboardWidget;
+    metadata: ProjectMetadata;
+    isEditing: boolean;
+    onEdit: () => void;
+    onRemove: () => void;
+}) {
+    const [mermaidSvg, setMermaidSvg] = useState<string>('');
+    const layout = widget.layout || { x: 0, y: 0, w: 4, h: 3 };
+    const colSpan = Math.max(3, Math.min(12, layout.w));
+    const rowSpan = Math.max(2, layout.h);
+
+    // Render Mermaid
+    useEffect(() => {
+        if (widget.type === 'mermaid' && widget.mermaid_code) {
             const renderMermaid = async () => {
                 try {
-                    const id = `dashboard-mermaid-${widget.id}`;
-                    const { svg } = await mermaid.render(id, widget.data.mermaid);
+                    const id = `mermaid-${widget.id}`;
+                    const { svg } = await mermaid.render(id, widget.mermaid_code!);
                     setMermaidSvg(svg);
                 } catch (e) {
                     console.error('Mermaid render error:', e);
@@ -672,57 +872,63 @@ function DashboardWidget({ widget, onRemove }: { widget: { id: string; type: str
             };
             renderMermaid();
         }
-    }, [widget.id, widget.type, widget.data]);
+    }, [widget.id, widget.type, widget.mermaid_code]);
 
     return (
-        <div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+        <div
+            className={`bg-gray-800 rounded-lg border overflow-hidden ${
+                isEditing ? 'border-purple-500 ring-2 ring-purple-500/20' : 'border-gray-700'
+            }`}
+            style={{
+                gridColumn: `span ${colSpan}`,
+                minHeight: `${rowSpan * 100}px`
+            }}
+        >
+            {/* Header */}
             <div className="flex items-center justify-between px-3 py-2 bg-gray-900 border-b border-gray-700">
-                <span className="text-sm text-gray-400 flex items-center gap-2">
-                    {widget.type === 'chart' && <BarChart3 className="w-4 h-4 text-cyan-400" />}
-                    {widget.type === 'mermaid' && <Code className="w-4 h-4 text-purple-400" />}
-                    {widget.type === 'table' && <Table className="w-4 h-4" />}
-                    {widget.type === 'code' && <Code className="w-4 h-4" />}
-                    {widget.type === 'chart' ? 'Plotly Chart' : widget.type === 'mermaid' ? 'Diagram' : widget.type}
+                <span className="text-sm text-gray-300 font-medium truncate">
+                    {widget.title || widget.type}
                 </span>
-                <button
-                    onClick={onRemove}
-                    className="text-gray-500 hover:text-red-400"
-                >
-                    <Trash2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={onEdit}
+                        className="p-1 text-gray-500 hover:text-purple-400 transition-colors"
+                        title="Edit with NLP"
+                    >
+                        <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                        onClick={onRemove}
+                        className="p-1 text-gray-500 hover:text-red-400 transition-colors"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
+                </div>
             </div>
-            <div className="p-2">
-                {widget.type === 'code' && (
-                    <pre className="text-xs text-gray-300 font-mono max-h-64 overflow-auto p-2">
-                        {widget.data?.content || JSON.stringify(widget.data, null, 2)}
-                    </pre>
+
+            {/* Content */}
+            <div className="p-3">
+                {widget.type === 'stat_card' && (
+                    <div className="text-center py-4">
+                        <p className="text-3xl font-bold text-white">{widget.stat_value}</p>
+                        <p className="text-sm text-gray-400 mt-1">{widget.stat_label}</p>
+                    </div>
                 )}
-                {widget.type === 'chart' && widget.data?.data && (
-                    <Plot
-                        data={widget.data.data}
-                        layout={{
-                            ...widget.data.layout,
-                            autosize: true,
-                            margin: { t: 40, r: 20, b: 40, l: 50 },
-                            template: 'plotly_dark',
-                            paper_bgcolor: 'rgba(0,0,0,0)',
-                            plot_bgcolor: 'rgba(31,41,55,0.5)',
-                            font: { color: '#9ca3af' },
-                        }}
-                        config={{ responsive: true, displayModeBar: false }}
-                        style={{ width: '100%', height: widget.data.layout?.height || 300 }}
-                    />
-                )}
+
                 {widget.type === 'mermaid' && mermaidSvg && (
                     <div
-                        ref={containerRef}
-                        className="flex justify-center bg-gray-900/50 p-4 rounded"
+                        className="flex justify-center bg-gray-900/50 rounded p-4 overflow-auto"
                         dangerouslySetInnerHTML={{ __html: mermaidSvg }}
                     />
                 )}
+
+                {widget.plotly_spec && widget.type !== 'stat_card' && widget.type !== 'mermaid' && (
+                    <PlotlyWidget spec={widget.plotly_spec} metadata={metadata} />
+                )}
+
                 {widget.type === 'table' && (
-                    <div className="text-gray-400 text-sm p-4">
-                        Table view coming soon
+                    <div className="text-gray-400 text-sm text-center py-8">
+                        Table widget - data loading...
                     </div>
                 )}
             </div>
@@ -730,287 +936,113 @@ function DashboardWidget({ widget, onRemove }: { widget: { id: string; type: str
     );
 }
 
-function DashboardCanvas({
-    widgets,
-    onRemoveWidget
+function PlotlyWidget({
+    spec,
+    metadata
 }: {
-    widgets: Array<{ id: string; type: string; data: any }>;
-    onRemoveWidget: (id: string) => void;
+    spec: any;
+    metadata: ProjectMetadata;
 }) {
-    if (widgets.length === 0) {
-        return (
-            <div className="flex items-center justify-center h-full text-gray-500">
-                <div className="text-center">
-                    <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                    <p className="font-medium">Dashboard</p>
-                    <p className="text-sm mt-2">Charts will appear here</p>
-                    <p className="text-xs mt-4 text-gray-600">
-                        Click "Add to Dashboard" on charts to pin them
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {widgets.map(widget => (
-                <DashboardWidget
-                    key={widget.id}
-                    widget={widget}
-                    onRemove={() => onRemoveWidget(widget.id)}
-                />
-            ))}
-        </div>
-    );
-}
-
-function DataFilesList({
-    files,
-    selectedFiles,
-    onToggleSelect,
-    onAnalyzeSelected,
-    isConnected
-}: {
-    files: DataFile[];
-    selectedFiles: Set<string>;
-    onToggleSelect: (path: string) => void;
-    onAnalyzeSelected: () => void;
-    isConnected: boolean;
-}) {
-    const [search, setSearch] = useState('');
-    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['data', 'notes', 'root']));
-
-    // Filter files by search
-    const filteredFiles = files.filter(f =>
-        f.name.toLowerCase().includes(search.toLowerCase()) ||
-        f.path.toLowerCase().includes(search.toLowerCase())
-    );
-
-    // Group files by folder
-    const groupedFiles = filteredFiles.reduce((acc, file) => {
-        const folder = file.folder || 'root';
-        if (!acc[folder]) acc[folder] = [];
-        acc[folder].push(file);
-        return acc;
-    }, {} as Record<string, DataFile[]>);
-
-    const toggleFolder = (folder: string) => {
-        setExpandedFolders(prev => {
-            const next = new Set(prev);
-            if (next.has(folder)) next.delete(folder);
-            else next.add(folder);
-            return next;
-        });
-    };
-
-    const formatSize = (bytes: number) => {
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    };
-
-    const getFileIcon = (type: string) => {
-        switch (type) {
-            case 'csv':
-            case 'tsv':
-                return <Table className="w-4 h-4 text-green-500" />;
-            case 'xlsx':
-            case 'xls':
-                return <FileSpreadsheet className="w-4 h-4 text-emerald-500" />;
-            case 'json':
-            case 'jsonl':
-                return <Code className="w-4 h-4 text-yellow-500" />;
-            case 'md':
-                return <FileSpreadsheet className="w-4 h-4 text-blue-400" />;
-            default:
-                return <FileSpreadsheet className="w-4 h-4 text-cyan-500" />;
+    // In a full implementation, we'd load actual data here based on spec._file, _column, etc.
+    // For now, show the spec structure
+    const chartData = useMemo(() => {
+        if (spec.data && spec.layout) {
+            // Apply dark theme
+            const layout = {
+                ...spec.layout,
+                template: 'plotly_dark',
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(31,41,55,0.5)',
+                font: { color: '#9ca3af' },
+                margin: { t: 40, r: 20, b: 40, l: 50 },
+            };
+            return { data: spec.data, layout };
         }
-    };
+        return null;
+    }, [spec]);
 
-    if (files.length === 0) {
+    if (!chartData) {
         return (
-            <div className="text-gray-500 text-sm p-4 text-center">
-                <Database className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>No data files found</p>
-                <p className="text-xs mt-1">Add CSV, JSON, MD, or Excel files to your project</p>
+            <div className="text-gray-500 text-sm text-center py-8">
+                Chart configuration needed
             </div>
         );
     }
 
     return (
-        <div className="flex flex-col h-full">
-            {/* Search */}
-            <div className="p-2 border-b border-gray-800">
-                <input
-                    type="text"
-                    placeholder="Search files..."
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
-                />
-            </div>
-
-            {/* Selected count & analyze button */}
-            {selectedFiles.size > 0 && (
-                <div className="p-2 bg-cyan-900/30 border-b border-cyan-700 flex items-center justify-between">
-                    <span className="text-xs text-cyan-300">{selectedFiles.size} selected</span>
-                    <button
-                        onClick={onAnalyzeSelected}
-                        disabled={!isConnected}
-                        className="text-xs bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 text-white px-2 py-1 rounded flex items-center gap-1"
-                    >
-                        <BarChart3 className="w-3 h-3" />
-                        Analyze
-                    </button>
-                </div>
-            )}
-
-            {/* File list grouped by folder */}
-            <div className="flex-1 overflow-auto">
-                {Object.entries(groupedFiles).map(([folder, folderFiles]) => (
-                    <div key={folder}>
-                        {/* Folder header */}
-                        <button
-                            onClick={() => toggleFolder(folder)}
-                            className="w-full flex items-center gap-2 px-2 py-1.5 bg-gray-900 hover:bg-gray-800 text-xs text-gray-400 sticky top-0"
-                        >
-                            <span>{expandedFolders.has(folder) ? '▼' : '▶'}</span>
-                            <span className="font-medium">{folder}/</span>
-                            <span className="text-gray-600">({folderFiles.length})</span>
-                        </button>
-
-                        {/* Files in folder */}
-                        {expandedFolders.has(folder) && (
-                            <div className="space-y-0.5 p-1">
-                                {folderFiles.map(file => {
-                                    const isSelected = selectedFiles.has(file.path);
-                                    return (
-                                        <div
-                                            key={file.path}
-                                            onClick={() => onToggleSelect(file.path)}
-                                            className={`flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer transition-colors ${
-                                                isSelected
-                                                    ? 'bg-cyan-900/40 border border-cyan-600'
-                                                    : 'hover:bg-gray-800 border border-transparent'
-                                            }`}
-                                        >
-                                            {/* Checkbox */}
-                                            <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${
-                                                isSelected ? 'bg-cyan-500 border-cyan-500' : 'border-gray-600'
-                                            }`}>
-                                                {isSelected && <span className="text-white text-[10px]">✓</span>}
-                                            </div>
-                                            {/* Icon */}
-                                            {getFileIcon(file.type)}
-                                            {/* Name & size */}
-                                            <div className="flex-1 min-w-0">
-                                                <span className="text-gray-300 truncate block">{file.name}</span>
-                                            </div>
-                                            <span className="text-gray-600 text-[10px]">{formatSize(file.size)}</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
-
-            {/* Quick actions */}
-            <div className="p-2 border-t border-gray-800 space-y-1">
-                <button
-                    onClick={() => {
-                        // Select all visible files
-                        filteredFiles.forEach(f => {
-                            if (!selectedFiles.has(f.path)) onToggleSelect(f.path);
-                        });
-                    }}
-                    className="w-full text-xs text-gray-400 hover:text-cyan-400 p-1 hover:bg-gray-800 rounded text-left"
-                >
-                    Select All ({filteredFiles.length})
-                </button>
-                {selectedFiles.size > 0 && (
-                    <button
-                        onClick={() => {
-                            selectedFiles.forEach(path => onToggleSelect(path));
-                        }}
-                        className="w-full text-xs text-gray-400 hover:text-red-400 p-1 hover:bg-gray-800 rounded text-left"
-                    >
-                        Clear Selection
-                    </button>
-                )}
-            </div>
-        </div>
+        <Plot
+            data={chartData.data}
+            layout={chartData.layout}
+            config={{ responsive: true, displayModeBar: false }}
+            style={{ width: '100%', height: 300 }}
+        />
     );
 }
 
 // ==================== Main Page ====================
 
 function DataStudioContent() {
-    const [projectName, setProjectName] = useState<string | null>(null);
-    const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+    const [viewMode, setViewMode] = useState<ViewMode>('projects');
+    const [selectedProject, setSelectedProject] = useState<DataStudioProject | null>(null);
+    const [metadata, setMetadata] = useState<ProjectMetadata | null>(null);
+    const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+    const [showCreateModal, setShowCreateModal] = useState(false);
 
-    const {
-        sessionId,
-        isConnected,
-        isLoading,
-        error,
-        messages,
-        widgets,
-        dataFiles,
-        connect,
-        disconnect,
-        sendMessage,
-        runCode,
-        pinWidget,
-        removeWidget,
-    } = useDataStudioSession();
-
-    const handleSelectProject = async (name: string) => {
-        setProjectName(name);
-        setSelectedFiles(new Set());
-        await connect(name);
-    };
-
-    const handlePinCode = (code: string, language: string) => {
-        pinWidget({
-            type: 'code',
-            data: { content: code, language },
-        });
-    };
-
-    const handlePinChart = (chartData: any, type: 'plotly' | 'mermaid') => {
-        pinWidget({
-            type: type === 'plotly' ? 'chart' : 'mermaid',
-            data: chartData,
-        });
-    };
-
-    const handleToggleFileSelect = (path: string) => {
-        setSelectedFiles(prev => {
-            const next = new Set(prev);
-            if (next.has(path)) next.delete(path);
-            else next.add(path);
-            return next;
-        });
-    };
-
-    const handleAnalyzeSelected = () => {
-        if (!isConnected || selectedFiles.size === 0) return;
-
-        const files = Array.from(selectedFiles);
-        if (files.length === 1) {
-            sendMessage(`Analyze the file "${files[0]}" - show me the structure, data types, basic statistics, and any interesting patterns or insights.`);
+    const handleSelectProject = (project: DataStudioProject) => {
+        setSelectedProject(project);
+        if (project.has_dashboard) {
+            // Load existing dashboard
+            loadExistingData(project);
+        } else if (project.file_count > 0) {
+            // Has files but no dashboard - go to analysis
+            setViewMode('analyzing');
         } else {
-            const fileList = files.map(f => `- ${f}`).join('\n');
-            sendMessage(`Analyze these ${files.length} files and provide insights:\n${fileList}\n\nFor each file, show structure and key statistics. Then identify any relationships or patterns across the files.`);
+            // No files - go to import
+            setViewMode('import');
         }
-        // Clear selection after analyzing
-        setSelectedFiles(new Set());
     };
 
-    if (!projectName) {
+    const loadExistingData = async (project: DataStudioProject) => {
+        try {
+            const [metadataResult, dashboardResult] = await Promise.all([
+                dataStudioV2Api.getMetadata(project.name),
+                dataStudioV2Api.getDashboard(project.name, 'default')
+            ]);
+            setMetadata(metadataResult);
+            setDashboard(dashboardResult);
+            setViewMode('dashboard');
+        } catch (e) {
+            // If loading fails, go to import
+            setViewMode('import');
+        }
+    };
+
+    const handleCreateProject = async (name: string, description?: string) => {
+        const project = await dataStudioV2Api.createProject(name, description);
+        setSelectedProject(project);
+        setViewMode('import');
+    };
+
+    const handleAnalysisComplete = (newMetadata: ProjectMetadata, newDashboard: Dashboard) => {
+        setMetadata(newMetadata);
+        setDashboard(newDashboard);
+        setViewMode('dashboard');
+    };
+
+    const handleRefresh = async () => {
+        if (!selectedProject) return;
+        await loadExistingData(selectedProject);
+    };
+
+    const handleBackToProjects = () => {
+        setSelectedProject(null);
+        setMetadata(null);
+        setDashboard(null);
+        setViewMode('projects');
+    };
+
+    // Project selector view
+    if (viewMode === 'projects') {
         return (
             <div className="min-h-screen bg-gray-900">
                 <header className="border-b border-gray-800 bg-gray-950">
@@ -1020,7 +1052,7 @@ function DataStudioContent() {
                             className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
                         >
                             <ArrowLeft className="w-4 h-4" />
-                            <span className="text-sm">Back</span>
+                            <span className="text-sm">Home</span>
                         </Link>
                         <div className="h-4 w-px bg-gray-700" />
                         <h1 className="text-lg font-semibold text-cyan-500 flex items-center gap-2">
@@ -1029,95 +1061,78 @@ function DataStudioContent() {
                         </h1>
                     </div>
                 </header>
-                <ProjectSelector onSelect={handleSelectProject} />
+                <ProjectSelector
+                    onSelect={handleSelectProject}
+                    onCreateNew={() => setShowCreateModal(true)}
+                />
+                {showCreateModal && (
+                    <CreateProjectModal
+                        onClose={() => setShowCreateModal(false)}
+                        onCreate={handleCreateProject}
+                    />
+                )}
             </div>
         );
     }
 
-    return (
-        <div className="h-screen flex flex-col bg-gray-900">
-            {/* Header */}
-            <header className="border-b border-gray-800 bg-gray-950 flex-shrink-0">
-                <div className="px-4 py-2 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
+    // Import data view
+    if (viewMode === 'import' && selectedProject) {
+        return (
+            <div className="min-h-screen bg-gray-900">
+                <header className="border-b border-gray-800 bg-gray-950">
+                    <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-4">
                         <Link
                             href="/"
                             className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
                         >
                             <ArrowLeft className="w-4 h-4" />
                         </Link>
+                        <div className="h-4 w-px bg-gray-700" />
                         <h1 className="text-lg font-semibold text-cyan-500 flex items-center gap-2">
                             <BarChart3 className="w-5 h-5" />
-                            Data Studio
+                            C3 Data Studio
                         </h1>
-                        <span className="text-gray-500">|</span>
-                        <span className="text-gray-300">{projectName}</span>
                     </div>
-                    <div className="flex items-center gap-4">
-                        {/* Connection status */}
-                        <div className={`flex items-center gap-2 text-sm ${isConnected ? 'text-green-400' : 'text-gray-500'}`}>
-                            {isConnected ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
-                            {isConnected ? 'Connected' : isLoading ? 'Connecting...' : 'Disconnected'}
-                        </div>
-                        <button
-                            onClick={() => {
-                                disconnect();
-                                setProjectName(null);
-                            }}
-                            className="text-gray-400 hover:text-white text-sm"
-                        >
-                            Change Project
-                        </button>
-                    </div>
-                </div>
-            </header>
-
-            {/* Error banner */}
-            {error && (
-                <div className="bg-red-900/50 border-b border-red-700 px-4 py-2 text-red-300 text-sm">
-                    {error}
-                </div>
-            )}
-
-            {/* Main content */}
-            <div className="flex-1 flex overflow-hidden">
-                {/* Left sidebar - Data files */}
-                <div className="w-64 border-r border-gray-800 bg-gray-950 flex-shrink-0 flex flex-col">
-                    <div className="p-3 border-b border-gray-800">
-                        <h3 className="text-sm font-medium text-gray-400">Project Files</h3>
-                        <p className="text-xs text-gray-500 mt-1">{dataFiles.length} files · Select to analyze</p>
-                    </div>
-                    <DataFilesList
-                        files={dataFiles as DataFile[]}
-                        selectedFiles={selectedFiles}
-                        onToggleSelect={handleToggleFileSelect}
-                        onAnalyzeSelected={handleAnalyzeSelected}
-                        isConnected={isConnected}
-                    />
-                </div>
-
-                {/* Chat panel */}
-                <div className="w-[400px] border-r border-gray-800 flex flex-col flex-shrink-0">
-                    <ChatPanel
-                        messages={messages}
-                        isConnected={isConnected}
-                        onSendMessage={sendMessage}
-                        onPinCode={handlePinCode}
-                        onPinChart={handlePinChart}
-                        onRunCode={runCode}
-                    />
-                </div>
-
-                {/* Dashboard canvas */}
-                <div className="flex-1 overflow-auto bg-gray-900">
-                    <DashboardCanvas
-                        widgets={widgets}
-                        onRemoveWidget={removeWidget}
-                    />
-                </div>
+                </header>
+                <DataImporter
+                    project={selectedProject}
+                    onComplete={() => setViewMode('analyzing')}
+                    onBack={handleBackToProjects}
+                />
             </div>
-        </div>
-    );
+        );
+    }
+
+    // Analysis progress view
+    if (viewMode === 'analyzing' && selectedProject) {
+        return (
+            <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+                <AnalysisProgressView
+                    project={selectedProject}
+                    onComplete={handleAnalysisComplete}
+                    onBack={() => setViewMode('import')}
+                />
+            </div>
+        );
+    }
+
+    // Dashboard view
+    if (viewMode === 'dashboard' && selectedProject && metadata && dashboard) {
+        return (
+            <ProtectedRoute>
+                <DashboardView
+                    project={selectedProject}
+                    metadata={metadata}
+                    dashboard={dashboard}
+                    onBack={handleBackToProjects}
+                    onRefresh={handleRefresh}
+                />
+            </ProtectedRoute>
+        );
+    }
+
+    // Fallback
+    return null;
 }
 
 export default function DataStudioPage() {

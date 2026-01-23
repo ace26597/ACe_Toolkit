@@ -32,7 +32,8 @@ apps/api/
 │   │   ├── auth.py                # Authentication
 │   │   ├── ccresearch.py          # CCResearch Terminal + Unified Projects
 │   │   ├── workspace.py           # Workspace API
-│   │   ├── data_studio.py         # C3 Data Studio (NEW)
+│   │   ├── data_studio.py         # C3 Data Studio (Legacy)
+│   │   ├── data_studio_v2.py      # C3 Data Studio V2 (REDESIGNED)
 │   │   ├── video_factory.py       # Video Factory
 │   │   └── public_api.py          # Public endpoints
 │   └── core/
@@ -40,7 +41,9 @@ apps/api/
 │       ├── database.py            # SQLAlchemy async setup
 │       ├── security.py            # JWT, passwords
 │       ├── ccresearch_manager.py  # CCResearch PTY manager
-│       ├── data_studio_manager.py # Headless Claude manager (NEW)
+│       ├── data_studio_manager.py # Headless Claude manager (Legacy)
+│       ├── data_analyzer.py       # Smart metadata extraction (V2)
+│       ├── dashboard_generator.py # Auto-dashboard generation (V2)
 │       ├── project_manager.py     # Unified project manager
 │       ├── workspace_manager.py   # Workspace file manager
 │       ├── session_manager.py     # Session management
@@ -123,42 +126,91 @@ Cross-app project management for authenticated users.
 | POST | `/unified-projects` | Create project |
 | DELETE | `/unified-projects/{name}` | Delete project |
 
-### Data Studio (`/data-studio`) - NEW
+### Data Studio (`/data-studio`) - Legacy
 
-AI-powered data analysis using headless Claude Code.
+Legacy Data Studio API using headless Claude Code. See V2 for new implementation.
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/sessions` | Create session for project |
 | GET | `/sessions` | List active sessions |
-| GET | `/sessions/{id}` | Get session details |
 | DELETE | `/sessions/{id}` | Close session |
 | WS | `/ws/{session_id}` | Bidirectional Claude streaming |
-| GET | `/dashboards/{project}` | List saved dashboards |
-| GET | `/dashboards/{project}/{id}` | Get dashboard layout |
-| POST | `/dashboards/{project}` | Save dashboard |
-| DELETE | `/dashboards/{project}/{id}` | Delete dashboard |
-| GET | `/projects/{project}/files` | List data files |
 
-**WebSocket Protocol:**
+### Data Studio V2 (`/data-studio/v2`) - REDESIGNED
 
-Client sends:
-```json
-{"type": "message", "content": "Analyze sales.csv"}
-{"type": "run_code", "code": "import pandas as pd..."}
-{"type": "ping"}
+**All-rounder AI data analyst framework** with standalone project system, smart metadata extraction, auto-generated dashboards, and NLP-based editing.
+
+**Project Management:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/projects` | List Data Studio projects |
+| POST | `/projects` | Create new project |
+| DELETE | `/projects/{name}` | Delete project |
+
+**File Management:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/projects/{name}/files` | List data files |
+| POST | `/projects/{name}/files` | Upload files |
+| POST | `/projects/{name}/import` | Import from Workspace |
+| DELETE | `/projects/{name}/files` | Delete file |
+
+**Analysis:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/projects/{name}/analyze` | Run data analysis |
+| GET | `/projects/{name}/metadata` | Get analysis metadata |
+
+**Dashboards:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/projects/{name}/dashboards` | List dashboards |
+| GET | `/projects/{name}/dashboards/{id}` | Get dashboard |
+| POST | `/projects/{name}/dashboards/generate` | Auto-generate dashboard |
+| POST | `/projects/{name}/dashboards` | Save dashboard |
+| DELETE | `/projects/{name}/dashboards/{id}` | Delete dashboard |
+
+**NLP Editing:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/projects/{name}/edit` | NLP edit dashboard/widget |
+| WS | `/projects/{name}/chat` | Chat with data |
+
+**Project Structure:**
+```
+/data/users/{user-id}/data-studio-projects/{project}/
+├── .project.json          # Project metadata
+├── data/                  # Imported/uploaded files
+├── .analysis/             # Generated analysis
+│   ├── metadata.json      # Master metadata
+│   └── file_analyses/     # Per-file analysis
+├── .data-studio/          # Session state
+│   └── dashboards/        # Saved dashboards
+└── .claude/               # Claude config
 ```
 
-Server sends:
+**Analysis Metadata Schema:**
 ```json
-{"type": "thinking", "content": "..."}
-{"type": "tool_call", "tool": "Read", "input": {...}}
-{"type": "tool_result", "content": "..."}
-{"type": "text", "content": "..."}
-{"type": "code", "language": "python", "content": "..."}
-{"type": "error", "message": "..."}
-{"type": "done"}
-{"type": "pong"}
+{
+  "project_name": "example",
+  "analyzed_at": "2026-01-23T10:30:00Z",
+  "summary": {
+    "total_files": 3,
+    "total_rows": 15420,
+    "primary_data_type": "tabular_mixed",
+    "themes": ["healthcare", "temporal"],
+    "domain_detected": "healthcare/clinical"
+  },
+  "files": {"patients.csv": {...}},
+  "cross_file_insights": [...],
+  "recommended_charts": ["histogram", "bar", "line"]
+}
 ```
 
 ---

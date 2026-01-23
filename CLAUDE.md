@@ -49,23 +49,26 @@ lsof -i :3000 -i :8000  # Check our ports
 - Welcome page shows all capabilities when no project selected
 - `/ccresearch` redirects to `/workspace?tab=terminal`
 
-**C3 Data Studio Features (NEW):**
-- Headless Claude Code (`-p --output-format stream-json --verbose`)
-- Real-time streaming of thinking, tool calls, and outputs
-- Chat interface for data analysis requests
-- Dashboard canvas with draggable widgets (Plotly.js)
-- Scans entire project for files (csv, json, md, xlsx)
-- File search, multi-select, folder grouping
-- Deterministic session ID (user+project hash) for continuity
-- Session isolation (`.data-studio/` separate from `.claude/`)
-- Minimal MCP config (only filesystem) to reduce memory usage
-- Process tracking with automatic cleanup (prevents accumulation)
+**C3 Data Studio Features (V2 REDESIGNED):**
+- **Standalone Projects**: Separate from Workspace at `/data/users/{user-id}/data-studio-projects/`
+- **Smart Analysis**: Python-based metadata extraction (pandas, scipy)
+- **Auto Dashboards**: 5-10 widgets generated based on data characteristics
+- **NLP Editing**: Natural language control of individual widgets or entire dashboards
+- **Plotly Visualization**: Charts, histograms, bar, line, pie, scatter, mermaid diagrams
+- **Import Options**: File upload or import from Workspace projects
+
+**Data Studio Workflow:**
+1. Create/select Data Studio project
+2. Upload files or import from Workspace
+3. Automatic data analysis (types, patterns, themes)
+4. Auto-generated dashboard with editable widgets
+5. NLP-based customization ("Add a pie chart for categories")
 
 **Unified Project Architecture:**
-- Projects live at `/data/users/{user-id}/projects/{project-name}/`
-- Terminal uses same project directory for `--continue` support
-- Files, notes, and terminal all share the same project context
-- Data Studio uses `.data-studio/` subdirectory for session isolation
+- Workspace projects: `/data/users/{user-id}/projects/{project-name}/`
+- Data Studio projects: `/data/users/{user-id}/data-studio-projects/{project-name}/`
+- Terminal uses Workspace project directory for `--continue` support
+- Files, notes, and terminal share the same Workspace project context
 
 **For detailed app documentation, see:**
 - `apps/web/CLAUDE.md` - Frontend details
@@ -222,6 +225,9 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
+| 2026-01-23 | **MAJOR: Data Studio V2 Redesign** - Standalone projects, smart analysis, auto dashboards, NLP editing |
+| 2026-01-23 | **Backend:** data_analyzer.py, dashboard_generator.py, data_studio_v2.py router |
+| 2026-01-23 | **Frontend:** Complete rewrite with project selector, importer, analysis progress, dashboard view |
 | 2026-01-22 | **Data Studio Fix:** Minimal MCP config, process tracking, memory optimization |
 | 2026-01-22 | **C3 Data Studio** - File search, multi-select, folder grouping, --verbose fix |
 | 2026-01-22 | **Code Cleanup:** Removed unused core modules (ai_provider, file_processor, langgraph_workflows, report_generator) |

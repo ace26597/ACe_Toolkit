@@ -508,7 +508,7 @@ export interface SessionFile {
     modified_at: string;
 }
 
-// ============ Data Studio API ============
+// ============ Data Studio API (Legacy) ============
 
 export interface DataFile {
     name: string;
@@ -541,13 +541,21 @@ export interface DashboardLayout {
 
 export interface DashboardWidget {
     id: string;
-    type: 'chart' | 'table' | 'code' | 'mermaid';
+    type: 'chart' | 'table' | 'code' | 'mermaid' | 'stat_card' | 'bar_chart' | 'line_chart' | 'histogram' | 'scatter' | 'pie_chart' | 'heatmap';
     data: any;
     layout: { x: number; y: number; w: number; h: number };
+    title?: string;
+    description?: string;
+    source_file?: string;
+    plotly_spec?: any;
+    vega_lite_spec?: any;
+    stat_value?: string;
+    stat_label?: string;
+    mermaid_code?: string;
 }
 
+// Legacy API (kept for backwards compatibility)
 export const dataStudioApi = {
-    // Session management
     createSession: async (projectName: string): Promise<DataStudioSession> => {
         const res = await fetch(`${getApiUrl()}/data-studio/sessions`, {
             method: 'POST',
@@ -563,17 +571,13 @@ export const dataStudioApi = {
     },
 
     listSessions: async (): Promise<DataStudioSession[]> => {
-        const res = await fetch(`${getApiUrl()}/data-studio/sessions`, {
-            credentials: 'include',
-        });
+        const res = await fetch(`${getApiUrl()}/data-studio/sessions`, { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to list sessions');
         return res.json();
     },
 
     getSession: async (sessionId: string): Promise<any> => {
-        const res = await fetch(`${getApiUrl()}/data-studio/sessions/${sessionId}`, {
-            credentials: 'include',
-        });
+        const res = await fetch(`${getApiUrl()}/data-studio/sessions/${sessionId}`, { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to get session');
         return res.json();
     },
@@ -586,19 +590,14 @@ export const dataStudioApi = {
         if (!res.ok) throw new Error('Failed to close session');
     },
 
-    // Dashboard management
     listDashboards: async (projectName: string): Promise<DashboardInfo[]> => {
-        const res = await fetch(`${getApiUrl()}/data-studio/dashboards/${projectName}`, {
-            credentials: 'include',
-        });
+        const res = await fetch(`${getApiUrl()}/data-studio/dashboards/${projectName}`, { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to list dashboards');
         return res.json();
     },
 
     getDashboard: async (projectName: string, dashboardId: string): Promise<DashboardLayout> => {
-        const res = await fetch(`${getApiUrl()}/data-studio/dashboards/${projectName}/${dashboardId}`, {
-            credentials: 'include',
-        });
+        const res = await fetch(`${getApiUrl()}/data-studio/dashboards/${projectName}/${dashboardId}`, { credentials: 'include' });
         if (!res.ok) throw new Error('Failed to get dashboard');
         return res.json();
     },
@@ -622,20 +621,282 @@ export const dataStudioApi = {
         if (!res.ok) throw new Error('Failed to delete dashboard');
     },
 
-    // Data files
     listProjectFiles: async (projectName: string): Promise<{ files: DataFile[] }> => {
-        const res = await fetch(`${getApiUrl()}/data-studio/projects/${projectName}/files`, {
+        const res = await fetch(`${getApiUrl()}/data-studio/projects/${projectName}/files`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to list files');
+        return res.json();
+    },
+
+    getWebSocketUrl: (sessionId: string): string => {
+        const apiUrl = getApiUrl();
+        const wsUrl = apiUrl.replace(/^http/, 'ws');
+        return `${wsUrl}/data-studio/ws/${sessionId}`;
+    },
+};
+
+// ============ Data Studio V2 API (Redesigned) ============
+
+export interface DataStudioProject {
+    name: string;
+    description?: string;
+    created_at: string;
+    file_count: number;
+    has_analysis: boolean;
+    has_dashboard: boolean;
+}
+
+export interface ColumnInfo {
+    name: string;
+    dtype: string;
+    original_dtype: string;
+    unique_count: number;
+    null_count: number;
+    null_percentage: number;
+    sample_values: any[];
+    min_value?: number;
+    max_value?: number;
+    mean_value?: number;
+    median_value?: number;
+    std_value?: number;
+    distribution?: string;
+    categories?: string[];
+    category_counts?: Record<string, number>;
+    suggested_viz?: string[];
+    suggested_role?: string;
+}
+
+export interface FileAnalysis {
+    filename: string;
+    file_path: string;
+    file_type: string;
+    file_size: number;
+    analyzed_at: string;
+    row_count: number;
+    column_count: number;
+    columns: ColumnInfo[];
+    total_null_cells: number;
+    null_percentage: number;
+    duplicate_rows: number;
+    sample_data: Record<string, any>[];
+    insights: string[];
+    data_themes: string[];
+    suggested_charts: Array<{
+        type: string;
+        x?: string;
+        y?: string;
+        agg?: string;
+        title?: string;
+        priority?: string;
+    }>;
+}
+
+export interface ProjectMetadata {
+    project_name: string;
+    analyzed_at: string;
+    summary: {
+        total_files: number;
+        total_rows: number;
+        total_columns: number;
+        primary_data_type: string;
+        themes: string[];
+        domain_detected?: string;
+    };
+    files: Record<string, FileAnalysis>;
+    cross_file_insights: Array<{
+        type: string;
+        files?: string[];
+        columns?: string[];
+        description?: string;
+    }>;
+    common_columns: string[];
+    recommended_charts: string[];
+}
+
+export interface Dashboard {
+    id: string;
+    name: string;
+    description: string;
+    created_at: string;
+    updated_at?: string;
+    widgets: DashboardWidget[];
+    layout_cols?: number;
+    theme?: string;
+}
+
+export const dataStudioV2Api = {
+    // Project management
+    listProjects: async (): Promise<DataStudioProject[]> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects`, { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to list projects');
+        return res.json();
+    },
+
+    createProject: async (name: string, description?: string): Promise<DataStudioProject> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ name, description }),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Failed to create project' }));
+            throw new Error(error.detail || 'Failed to create project');
+        }
+        return res.json();
+    },
+
+    deleteProject: async (name: string): Promise<void> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(name)}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to delete project');
+    },
+
+    // File management
+    listFiles: async (projectName: string): Promise<{ files: DataFile[] }> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/files`, {
             credentials: 'include',
         });
         if (!res.ok) throw new Error('Failed to list files');
         return res.json();
     },
 
-    // WebSocket URL helper
-    getWebSocketUrl: (sessionId: string): string => {
+    uploadFiles: async (projectName: string, files: FileList | File[], folder: string = ''): Promise<{ uploaded: DataFile[]; count: number }> => {
+        const formData = new FormData();
+        const fileArray = Array.from(files);
+        fileArray.forEach(file => formData.append('files', file));
+        if (folder) formData.append('folder', folder);
+
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/files`, {
+            method: 'POST',
+            credentials: 'include',
+            body: formData,
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Failed to upload files' }));
+            throw new Error(error.detail || 'Failed to upload files');
+        }
+        return res.json();
+    },
+
+    importFromWorkspace: async (projectName: string, workspaceProject: string, files?: string[]): Promise<{ imported: string[]; count: number }> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ workspace_project: workspaceProject, files }),
+        });
+        if (!res.ok) throw new Error('Failed to import files');
+        return res.json();
+    },
+
+    deleteFile: async (projectName: string, path: string): Promise<void> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/files?path=${encodeURIComponent(path)}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to delete file');
+    },
+
+    // Analysis
+    analyzeProject: async (projectName: string, force: boolean = false): Promise<{ status: string; metadata: ProjectMetadata }> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/analyze`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ force }),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Analysis failed' }));
+            throw new Error(error.detail || 'Analysis failed');
+        }
+        return res.json();
+    },
+
+    getMetadata: async (projectName: string): Promise<ProjectMetadata> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/metadata`, {
+            credentials: 'include',
+        });
+        if (!res.ok) {
+            if (res.status === 404) throw new Error('No analysis found');
+            throw new Error('Failed to get metadata');
+        }
+        return res.json();
+    },
+
+    // Dashboard management
+    listDashboards: async (projectName: string): Promise<DashboardInfo[]> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/dashboards`, {
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to list dashboards');
+        return res.json();
+    },
+
+    getDashboard: async (projectName: string, dashboardId: string): Promise<Dashboard> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/dashboards/${encodeURIComponent(dashboardId)}`, {
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to get dashboard');
+        return res.json();
+    },
+
+    generateDashboard: async (projectName: string, name: string = 'default'): Promise<Dashboard> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/dashboards/generate?name=${encodeURIComponent(name)}`, {
+            method: 'POST',
+            credentials: 'include',
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Failed to generate dashboard' }));
+            throw new Error(error.detail || 'Failed to generate dashboard');
+        }
+        return res.json();
+    },
+
+    saveDashboard: async (projectName: string, name: string, widgets: DashboardWidget[]): Promise<{ id: string }> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/dashboards`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ name, widgets }),
+        });
+        if (!res.ok) throw new Error('Failed to save dashboard');
+        return res.json();
+    },
+
+    deleteDashboard: async (projectName: string, dashboardId: string): Promise<void> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/dashboards/${encodeURIComponent(dashboardId)}`, {
+            method: 'DELETE',
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to delete dashboard');
+    },
+
+    // NLP Editing
+    nlpEdit: async (projectName: string, request: string, dashboardId: string = 'default', targetWidgetId?: string): Promise<Dashboard> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/edit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+                request,
+                dashboard_id: dashboardId,
+                target_widget_id: targetWidgetId,
+            }),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Edit failed' }));
+            throw new Error(error.detail || 'Edit failed');
+        }
+        return res.json();
+    },
+
+    // Chat WebSocket
+    getChatWebSocketUrl: (projectName: string): string => {
         const apiUrl = getApiUrl();
         const wsUrl = apiUrl.replace(/^http/, 'ws');
-        return `${wsUrl}/data-studio/ws/${sessionId}`;
+        return `${wsUrl}/data-studio/v2/projects/${encodeURIComponent(projectName)}/chat`;
     },
 };
 
