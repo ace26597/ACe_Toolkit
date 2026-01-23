@@ -574,12 +574,18 @@ function AnalysisProgressView({
 
             // Stage 3: Generating dashboard
             setProgress({ stage: 'generating', message: 'Generating dashboard visualizations...', progress: 80 });
-            const dashboard = await dataStudioV2Api.generateDashboard(project.name);
+            await dataStudioV2Api.generateDashboard(project.name);
+
+            // Fetch the generated dashboard
+            const dashboard = await dataStudioV2Api.getDashboard(project.name, 'default');
 
             // Complete
             setProgress({ stage: 'complete', message: 'Ready!', progress: 100 });
             await new Promise(r => setTimeout(r, 500));
 
+            if (!analysisResult.metadata) {
+                throw new Error('Analysis did not produce metadata');
+            }
             onComplete(analysisResult.metadata, dashboard);
         } catch (e: any) {
             setError(e.message);
@@ -667,10 +673,12 @@ function DashboardView({
             const result = await dataStudioV2Api.nlpEdit(
                 project.name,
                 nlpInput.trim(),
-                'default',
-                editingWidget || undefined
+                { dashboardId: 'default', targetWidgetId: editingWidget || undefined }
             );
-            setWidgets(result.widgets || []);
+            // Check if result is a proper Dashboard (has widgets)
+            if ('widgets' in result && result.widgets) {
+                setWidgets(result.widgets);
+            }
             setNlpInput('');
             setEditingWidget(null);
         } catch (e: any) {
