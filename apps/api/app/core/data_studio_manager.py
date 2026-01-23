@@ -26,11 +26,10 @@ class DataStudioSession:
     user_id: str
     project_name: str
     project_dir: str
-    claude_session_id: str  # Deterministic UUID for Claude --session-id
+    claude_session_id: str  # Deterministic UUID for Claude --resume
     created_at: datetime = field(default_factory=datetime.utcnow)
     last_activity: datetime = field(default_factory=datetime.utcnow)
     is_active: bool = True
-    is_first_message: bool = True
 
 
 class DataStudioManager:
@@ -234,18 +233,14 @@ Always explain what the data shows in plain language.
 
         # Build command
         # Note: --output-format stream-json requires --verbose when using -p
-        cmd = ["claude", "-p", message, "--output-format", "stream-json", "--verbose"]
-
-        if session.is_first_message:
-            # First message: use --session-id to create new session
-            cmd.extend(["--session-id", session.claude_session_id])
-            session.is_first_message = False
-        else:
-            # Subsequent messages: use --resume to continue session
-            cmd.extend(["--resume", session.claude_session_id])
-
-        # Add permission mode
-        cmd.extend(["--permission-mode", "bypassPermissions"])
+        # Always use --resume - it resumes existing session or creates new one
+        cmd = [
+            "claude", "-p", message,
+            "--output-format", "stream-json",
+            "--verbose",
+            "--resume", session.claude_session_id,
+            "--permission-mode", "bypassPermissions"
+        ]
 
         logger.info(f"Executing: {' '.join(cmd[:6])}...")  # Log truncated command
         logger.info(f"Working directory: {session.project_dir}")
