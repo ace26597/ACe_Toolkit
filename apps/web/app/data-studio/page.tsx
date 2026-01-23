@@ -556,68 +556,134 @@ function AnalysisProgressView({
         progress: 0
     });
     const [error, setError] = useState<string | null>(null);
+    const [logs, setLogs] = useState<string[]>([]);
+    const logsEndRef = useRef<HTMLDivElement>(null);
+
+    // Auto-scroll logs
+    useEffect(() => {
+        logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [logs]);
 
     useEffect(() => {
         runAnalysis();
     }, [project.name]);
 
+    const addLog = (message: string) => {
+        setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
+    };
+
+    const handleEvent = (event: { type: string; content: any }) => {
+        if (event.type === 'status') {
+            addLog(`⚡ ${event.content}`);
+        } else if (event.type === 'text') {
+            // Claude's text output - show last 200 chars
+            const text = String(event.content);
+            if (text.length > 200) {
+                addLog(`📝 ${text.slice(0, 200)}...`);
+            } else {
+                addLog(`📝 ${text}`);
+            }
+        } else if (event.type === 'tool') {
+            addLog(`🔧 ${event.content}`);
+        } else if (event.type === 'result') {
+            addLog(`✅ Result received`);
+        } else if (event.type === 'error') {
+            addLog(`❌ Error: ${event.content}`);
+        } else if (event.type === 'complete') {
+            addLog(`🎉 ${event.content}`);
+        }
+    };
+
     const runAnalysis = async () => {
         try {
             // Stage 1: Scanning
             setProgress({ stage: 'scanning', message: 'Scanning data files...', progress: 10 });
-            await new Promise(r => setTimeout(r, 500));
+            addLog('Starting analysis...');
+            await new Promise(r => setTimeout(r, 300));
 
-            // Stage 2: Analyzing
-            setProgress({ stage: 'analyzing', message: 'Analyzing data structure and patterns...', progress: 30 });
-            const analysisResult = await dataStudioV2Api.analyzeProject(project.name);
+            // Stage 2: Analyzing with Claude
+            setProgress({ stage: 'analyzing', message: 'Claude is analyzing data...', progress: 20 });
+            addLog('Invoking Claude Code for data analysis...');
+
+            await dataStudioV2Api.analyzeProject(
+                project.name,
+                { mode: 'terminal' },
+                handleEvent
+            );
+
             setProgress({ stage: 'analyzing', message: 'Analysis complete!', progress: 60 });
+            addLog('Data analysis completed');
 
             // Stage 3: Generating dashboard
-            setProgress({ stage: 'generating', message: 'Generating dashboard visualizations...', progress: 80 });
-            await dataStudioV2Api.generateDashboard(project.name);
+            setProgress({ stage: 'generating', message: 'Claude is generating dashboard...', progress: 70 });
+            addLog('Invoking Claude Code for dashboard generation...');
 
-            // Fetch the generated dashboard
-            const dashboard = await dataStudioV2Api.getDashboard(project.name, 'default');
+            await dataStudioV2Api.generateDashboard(
+                project.name,
+                { mode: 'terminal' },
+                handleEvent
+            );
+
+            setProgress({ stage: 'generating', message: 'Dashboard generated!', progress: 90 });
+            addLog('Dashboard generation completed');
+
+            // Fetch results
+            addLog('Fetching results...');
+            const [metadata, dashboard] = await Promise.all([
+                dataStudioV2Api.getMetadata(project.name),
+                dataStudioV2Api.getDashboard(project.name, 'default')
+            ]);
 
             // Complete
             setProgress({ stage: 'complete', message: 'Ready!', progress: 100 });
+            addLog('All done! Loading dashboard...');
             await new Promise(r => setTimeout(r, 500));
 
-            if (!analysisResult.metadata) {
-                throw new Error('Analysis did not produce metadata');
-            }
-            onComplete(analysisResult.metadata, dashboard);
+            onComplete(metadata, dashboard);
         } catch (e: any) {
+            addLog(`Error: ${e.message}`);
             setError(e.message);
         }
     };
 
     if (error) {
         return (
-            <div className="max-w-2xl mx-auto p-8 text-center">
-                <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-                <h2 className="text-xl font-bold text-white mb-2">Analysis Failed</h2>
-                <p className="text-gray-400 mb-6">{error}</p>
-                <button
-                    onClick={onBack}
-                    className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
-                >
-                    Go Back
-                </button>
+            <div className="max-w-4xl mx-auto p-8">
+                <div className="text-center mb-6">
+                    <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                    <h2 className="text-xl font-bold text-white mb-2">Analysis Failed</h2>
+                    <p className="text-gray-400 mb-4">{error}</p>
+                </div>
+
+                {/* Show logs on error for debugging */}
+                <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 mb-6 max-h-64 overflow-y-auto font-mono text-sm">
+                    {logs.map((log, i) => (
+                        <div key={i} className="text-gray-300 whitespace-pre-wrap">{log}</div>
+                    ))}
+                </div>
+
+                <div className="text-center">
+                    <button
+                        onClick={onBack}
+                        className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg"
+                    >
+                        Go Back
+                    </button>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="max-w-2xl mx-auto p-8 text-center">
-            <div className="mb-8">
-                <Sparkles className="w-16 h-16 text-cyan-500 mx-auto mb-4 animate-pulse" />
-                <h2 className="text-2xl font-bold text-white mb-2">Analyzing {project.name}</h2>
-                <p className="text-gray-400">{progress.message}</p>
+        <div className="max-w-4xl mx-auto p-8">
+            <div className="text-center mb-6">
+                <Sparkles className="w-12 h-12 text-cyan-500 mx-auto mb-3 animate-pulse" />
+                <h2 className="text-xl font-bold text-white mb-1">Analyzing {project.name}</h2>
+                <p className="text-gray-400 text-sm">{progress.message}</p>
             </div>
 
             {/* Progress bar */}
-            <div className="w-full bg-gray-800 rounded-full h-3 mb-4 overflow-hidden">
+            <div className="w-full bg-gray-800 rounded-full h-2 mb-4 overflow-hidden">
                 <div
                     className="bg-gradient-to-r from-cyan-500 to-purple-500 h-full rounded-full transition-all duration-500"
                     style={{ width: `${progress.progress}%` }}
@@ -625,19 +691,39 @@ function AnalysisProgressView({
             </div>
 
             {/* Stage indicators */}
-            <div className="flex justify-between text-sm text-gray-500">
+            <div className="flex justify-between text-xs text-gray-500 mb-6">
                 <span className={progress.stage === 'scanning' ? 'text-cyan-400' : progress.progress > 10 ? 'text-green-400' : ''}>
-                    Scan Files
+                    Scan
                 </span>
                 <span className={progress.stage === 'analyzing' ? 'text-cyan-400' : progress.progress > 60 ? 'text-green-400' : ''}>
-                    Analyze Data
+                    Analyze
                 </span>
                 <span className={progress.stage === 'generating' ? 'text-cyan-400' : progress.progress > 80 ? 'text-green-400' : ''}>
-                    Generate Dashboard
+                    Generate
                 </span>
                 <span className={progress.stage === 'complete' ? 'text-green-400' : ''}>
-                    Complete
+                    Done
                 </span>
+            </div>
+
+            {/* Live Terminal Output */}
+            <div className="bg-gray-950 border border-gray-700 rounded-lg overflow-hidden">
+                <div className="bg-gray-800 px-4 py-2 flex items-center gap-2 border-b border-gray-700">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                    <span className="text-gray-400 text-sm ml-2">Claude Code Output</span>
+                </div>
+                <div className="p-4 h-64 overflow-y-auto font-mono text-sm">
+                    {logs.length === 0 ? (
+                        <div className="text-gray-500 animate-pulse">Initializing...</div>
+                    ) : (
+                        logs.map((log, i) => (
+                            <div key={i} className="text-gray-300 whitespace-pre-wrap mb-1">{log}</div>
+                        ))
+                    )}
+                    <div ref={logsEndRef} />
+                </div>
             </div>
         </div>
     );
