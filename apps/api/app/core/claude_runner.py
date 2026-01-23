@@ -121,7 +121,8 @@ Available: pandas, numpy, plotly, kaleido, openpyxl, xlrd, pyarrow
         user_id: str,
         project_name: str,
         project_dir: str,
-        mode: str = "headless"
+        mode: str = "headless",
+        analysis_mode: str = "combined"
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         Run data analysis on a project.
@@ -131,6 +132,7 @@ Available: pandas, numpy, plotly, kaleido, openpyxl, xlrd, pyarrow
             project_name: Project name
             project_dir: Full path to project directory
             mode: "headless" for clean output, "terminal" for full view
+            analysis_mode: "combined" for unified analysis, "separate" for per-file detailed analysis
 
         Yields:
             Dict with event type and data
@@ -150,7 +152,67 @@ Available: pandas, numpy, plotly, kaleido, openpyxl, xlrd, pyarrow
             with open(context_file, 'r') as f:
                 context = f"\n\nPREVIOUS ANALYSIS CONTEXT:\n{f.read()}\n\n"
 
-        prompt = f"""Analyze all data files in this project.{context}
+        # Build prompt based on analysis mode
+        if analysis_mode == "separate":
+            prompt = f"""Analyze all data files in this project with DETAILED PER-FILE ANALYSIS.{context}
+
+ANALYSIS MODE: Separate (detailed per-file insights)
+
+STEPS:
+1. Activate the Python venv: source ~/.local/share/data-studio-venv/bin/activate
+2. Write a Python script to analyze EACH file in data/ directory SEPARATELY
+3. For EACH file, the script must:
+   - Load the file (CSV, JSON, Excel, Parquet) using pandas
+   - Extract: row count, column count, column names, data types
+   - Calculate statistics for each column (min, max, mean, unique counts, nulls)
+   - Detect patterns and anomalies in each column
+   - Generate specific chart recommendations for this file
+   - Save detailed per-file analysis to .analysis/file_analyses/{{filename}}_analysis.json
+4. After all files, create a summary in .analysis/metadata.json
+5. Run the script
+6. Output a detailed summary for each file
+
+REQUIRED OUTPUT FORMAT for .analysis/metadata.json:
+{{
+  "project_name": "string",
+  "analyzed_at": "ISO timestamp",
+  "analysis_mode": "separate",
+  "summary": {{
+    "total_files": int,
+    "total_rows": int,
+    "files_analyzed": ["file1.csv", "file2.xlsx"]
+  }},
+  "files": {{
+    "filename.csv": {{
+      "rows": int,
+      "columns": int,
+      "column_details": [
+        {{"name": "col1", "type": "int64", "unique": 100, "nulls": 0, "min": 0, "max": 100}}
+      ],
+      "quality_score": 0.95,
+      "insights": ["Column X has outliers", "Strong correlation with Y"],
+      "recommended_charts": ["histogram", "scatter"]
+    }}
+  }}
+}}
+
+ALSO create per-file analysis files at .analysis/file_analyses/{{filename}}_analysis.json with:
+- Full column statistics
+- Sample data (first 5 rows)
+- Data quality metrics
+- Specific visualizations for this file
+
+ALSO save a context file at .analysis/context.md with:
+- Detailed summary of each file
+- Per-file insights and findings
+- File-specific chart recommendations
+
+IMPORTANT: You MUST create the .analysis/metadata.json file. The dashboard generation depends on it."""
+        else:
+            # Combined mode (default)
+            prompt = f"""Analyze all data files in this project with COMBINED ANALYSIS.{context}
+
+ANALYSIS MODE: Combined (unified cross-file analysis)
 
 STEPS:
 1. Activate the Python venv: source ~/.local/share/data-studio-venv/bin/activate
@@ -158,6 +220,8 @@ STEPS:
 3. The script must:
    - Load each file (CSV, JSON, Excel, Parquet) using pandas
    - Extract: row count, column count, column names, data types
+   - Look for common columns across files (potential joins)
+   - Identify relationships and patterns between files
    - Save results to .analysis/metadata.json
 4. Run the script
 5. Output a summary of what you found
@@ -166,14 +230,24 @@ REQUIRED OUTPUT FORMAT for .analysis/metadata.json:
 {{
   "project_name": "string",
   "analyzed_at": "ISO timestamp",
-  "summary": {{"total_files": int, "total_rows": int}},
-  "files": {{"filename.csv": {{"rows": int, "columns": int, "column_details": [...]}}}}
+  "analysis_mode": "combined",
+  "summary": {{
+    "total_files": int,
+    "total_rows": int,
+    "common_columns": ["col1", "col2"],
+    "potential_joins": [{{"files": ["a.csv", "b.csv"], "on": "id"}}]
+  }},
+  "files": {{"filename.csv": {{"rows": int, "columns": int, "column_details": [...]}}}},
+  "cross_file_insights": [
+    {{"type": "joinable", "files": ["a.csv", "b.csv"], "on": "patient_id"}},
+    {{"type": "correlation", "description": "Column X in file A correlates with Y in file B"}}
+  ]
 }}
 
 ALSO save a context file for future prompts at .analysis/context.md with:
 - Brief summary of each file analyzed
-- Key insights discovered
-- Recommended chart types for this data
+- Cross-file relationships discovered
+- Recommended unified dashboard structure
 - Any data quality issues found
 
 IMPORTANT: You MUST create the .analysis/metadata.json file. The dashboard generation depends on it."""

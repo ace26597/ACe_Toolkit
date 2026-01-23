@@ -65,6 +65,7 @@ class ImportFromWorkspaceRequest(BaseModel):
 class AnalyzeRequest(BaseModel):
     force: bool = False  # Force re-analysis even if cached
     mode: str = "headless"  # "headless" or "terminal"
+    analysis_mode: str = "combined"  # "combined" or "separate" for multi-file analysis
 
 
 class GenerateDashboardRequest(BaseModel):
@@ -397,7 +398,8 @@ async def analyze_project(
             user_id=user_id,
             project_name=project_name,
             project_dir=project_dir,
-            mode=request.mode
+            mode=request.mode,
+            analysis_mode=request.analysis_mode
         ):
             yield f"data: {json.dumps(event)}\n\n"
 

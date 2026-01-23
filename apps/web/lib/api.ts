@@ -802,15 +802,15 @@ export const dataStudioV2Api = {
     // Analysis - streaming with SSE
     analyzeProject: async (
         projectName: string,
-        options: { force?: boolean; mode?: 'headless' | 'terminal' } = {},
+        options: { force?: boolean; mode?: 'headless' | 'terminal'; analysisMode?: 'combined' | 'separate' } = {},
         onEvent?: (event: { type: string; content: any }) => void
     ): Promise<{ status: string; metadata?: ProjectMetadata }> => {
-        const { force = false, mode = 'headless' } = options;
+        const { force = false, mode = 'headless', analysisMode = 'combined' } = options;
         const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ force, mode }),
+            body: JSON.stringify({ force, mode, analysis_mode: analysisMode }),
         });
 
         if (!res.ok) {

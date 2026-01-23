@@ -419,19 +419,23 @@ Manages headless Claude Code execution for Data Studio analysis:
 
 **Key Methods:**
 ```python
-async def run_analysis(user_id, project_name, project_dir, mode) -> AsyncGenerator
+async def run_analysis(user_id, project_name, project_dir, mode, analysis_mode) -> AsyncGenerator
 async def generate_dashboard(user_id, project_name, project_dir, dashboard_name, mode) -> AsyncGenerator
 async def nlp_edit(user_id, project_name, project_dir, request, dashboard_id, widget_id, mode) -> AsyncGenerator
 async def chat(user_id, project_name, project_dir, message, mode) -> AsyncGenerator
 ```
 
+**Analysis Modes:**
+- `combined`: Unified cross-file analysis, looks for relationships and common columns
+- `separate`: Detailed per-file insights, saves to `.analysis/file_analyses/`
+
 **Prompt Design:**
-- Simplified instructional prompts (not embedded scripts)
+- Mode-specific prompts for combined vs separate analysis
 - Clear STEPS and REQUIRED OUTPUT FORMAT sections
 - Claude writes and executes Python scripts autonomously
 - Must save to `.analysis/metadata.json` and `.dashboards/{name}.json`
 
-**Modes:**
+**Output Modes:**
 - `headless`: Clean output - status, text, tool calls, results
 - `terminal`: Full Claude output including raw JSON events
 

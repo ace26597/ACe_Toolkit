@@ -227,6 +227,10 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
+| 2026-01-23 | **Data Studio:** Multi-file analysis mode selector (combined vs separate) |
+| 2026-01-23 | **Data Studio:** NLP edit progress modal with live Claude output |
+| 2026-01-23 | **Data Studio:** Retry logic for metadata/dashboard fetch with filesystem sync |
+| 2026-01-23 | **Data Studio:** Fixed state transition issue (needed refresh to see dashboard) |
 | 2026-01-23 | **Fix:** Claude runner prompts simplified, removed --resume flag (requires UUID) |
 | 2026-01-23 | **Backend:** claude_runner.py replaces data_analyzer.py + dashboard_generator.py |
 | 2026-01-23 | **Frontend:** Live terminal output during analysis with SSE streaming |

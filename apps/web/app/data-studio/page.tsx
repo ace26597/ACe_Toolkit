@@ -293,13 +293,15 @@ function CreateProjectModal({
 
 // ==================== Data Importer ====================
 
+type AnalysisMode = 'combined' | 'separate';
+
 function DataImporter({
     project,
     onComplete,
     onBack
 }: {
     project: DataStudioProject;
-    onComplete: () => void;
+    onComplete: (mode: AnalysisMode, fileCount: number, fileNames: string[]) => void;
     onBack: () => void;
 }) {
     const [files, setFiles] = useState<DataFile[]>([]);
@@ -308,7 +310,19 @@ function DataImporter({
     const [uploading, setUploading] = useState(false);
     const [importing, setImporting] = useState(false);
     const [tab, setTab] = useState<'upload' | 'import'>('upload');
+    const [showModeSelector, setShowModeSelector] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleStartAnalysis = () => {
+        const fileNames = files.map(f => f.name);
+        // If only 1 file, go straight to analysis with combined mode
+        if (files.length <= 1) {
+            onComplete('combined', files.length, fileNames);
+        } else {
+            // Show mode selector for multiple files
+            setShowModeSelector(true);
+        }
+    };
 
     useEffect(() => {
         loadFiles();
@@ -389,7 +403,7 @@ function DataImporter({
                     <p className="text-gray-400 mt-1">Add data files to your project</p>
                 </div>
                 <button
-                    onClick={onComplete}
+                    onClick={handleStartAnalysis}
                     disabled={files.length === 0}
                     className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-4 py-2 rounded-lg transition-colors"
                 >
@@ -516,6 +530,71 @@ function DataImporter({
                     </div>
                 )}
             </div>
+
+            {/* Analysis Mode Selector Modal */}
+            {showModeSelector && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                    <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-lg w-full mx-4">
+                        <h3 className="text-xl font-bold text-white mb-2">How should we analyze your files?</h3>
+                        <p className="text-gray-400 mb-6">
+                            You have {files.length} files. Choose how to analyze them:
+                        </p>
+
+                        <div className="space-y-4">
+                            {/* Combined Analysis Option */}
+                            <button
+                                onClick={() => {
+                                    setShowModeSelector(false);
+                                    onComplete('combined', files.length, files.map(f => f.name));
+                                }}
+                                className="w-full text-left p-4 rounded-lg border border-gray-700 hover:border-cyan-500 hover:bg-gray-800/50 transition-all group"
+                            >
+                                <div className="flex items-start gap-4">
+                                    <div className="w-10 h-10 rounded-lg bg-cyan-600/20 flex items-center justify-center flex-shrink-0 group-hover:bg-cyan-600/30">
+                                        <Database className="w-5 h-5 text-cyan-400" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-medium text-white mb-1">Combined Analysis</h4>
+                                        <p className="text-sm text-gray-400">
+                                            Analyze all files together. Best for related datasets that share columns or can be merged.
+                                            Creates a unified dashboard with cross-file insights.
+                                        </p>
+                                    </div>
+                                </div>
+                            </button>
+
+                            {/* Separate Analysis Option */}
+                            <button
+                                onClick={() => {
+                                    setShowModeSelector(false);
+                                    onComplete('separate', files.length, files.map(f => f.name));
+                                }}
+                                className="w-full text-left p-4 rounded-lg border border-gray-700 hover:border-purple-500 hover:bg-gray-800/50 transition-all group"
+                            >
+                                <div className="flex items-start gap-4">
+                                    <div className="w-10 h-10 rounded-lg bg-purple-600/20 flex items-center justify-center flex-shrink-0 group-hover:bg-purple-600/30">
+                                        <FileText className="w-5 h-5 text-purple-400" />
+                                    </div>
+                                    <div>
+                                        <h4 className="font-medium text-white mb-1">Separate Analysis</h4>
+                                        <p className="text-sm text-gray-400">
+                                            Analyze each file independently with detailed per-file insights.
+                                            Best for unrelated files or when you need deep analysis of each.
+                                        </p>
+                                    </div>
+                                </div>
+                            </button>
+                        </div>
+
+                        <button
+                            onClick={() => setShowModeSelector(false)}
+                            className="mt-6 w-full text-center text-gray-400 hover:text-white text-sm"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -543,10 +622,16 @@ function FileTypeIcon({ type }: { type: string }) {
 
 function AnalysisProgressView({
     project,
+    analysisMode = 'combined',
+    fileCount = 0,
+    fileNames = [],
     onComplete,
     onBack
 }: {
     project: DataStudioProject;
+    analysisMode?: AnalysisMode;
+    fileCount?: number;
+    fileNames?: string[];
     onComplete: (metadata: ProjectMetadata, dashboard: Dashboard) => void;
     onBack: () => void;
 }) {
@@ -576,17 +661,33 @@ function AnalysisProgressView({
         if (event.type === 'status') {
             addLog(`⚡ ${event.content}`);
         } else if (event.type === 'text') {
-            // Claude's text output - show last 200 chars
-            const text = String(event.content);
-            if (text.length > 200) {
-                addLog(`📝 ${text.slice(0, 200)}...`);
-            } else {
-                addLog(`📝 ${text}`);
+            // Claude's text output - show up to 500 chars for better visibility
+            const text = String(event.content).trim();
+            if (!text) return;
+            // Split long text into multiple lines for readability
+            const lines = text.split('\n');
+            for (const line of lines.slice(0, 10)) { // Show first 10 lines
+                if (line.trim()) {
+                    if (line.length > 120) {
+                        addLog(`📝 ${line.slice(0, 120)}...`);
+                    } else {
+                        addLog(`📝 ${line}`);
+                    }
+                }
+            }
+            if (lines.length > 10) {
+                addLog(`   ... (${lines.length - 10} more lines)`);
             }
         } else if (event.type === 'tool') {
-            addLog(`🔧 ${event.content}`);
+            addLog(`🔧 Tool: ${event.content}`);
         } else if (event.type === 'result') {
-            addLog(`✅ Result received`);
+            // Show a sample of the result
+            const result = String(event.content);
+            if (result.length > 300) {
+                addLog(`✅ Result: ${result.slice(0, 300)}...`);
+            } else {
+                addLog(`✅ Result: ${result}`);
+            }
         } else if (event.type === 'error') {
             addLog(`❌ Error: ${event.content}`);
         } else if (event.type === 'complete') {
@@ -594,29 +695,89 @@ function AnalysisProgressView({
         }
     };
 
+    // Retry helper for fetching results (files may need time to flush)
+    const fetchWithRetry = async <T,>(
+        fn: () => Promise<T>,
+        label: string,
+        maxRetries: number = 5,
+        delayMs: number = 1500
+    ): Promise<T> => {
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                addLog(`📂 ${label} (attempt ${attempt}/${maxRetries})...`);
+                const result = await fn();
+                addLog(`✅ ${label} successful`);
+                return result;
+            } catch (e: any) {
+                if (attempt === maxRetries) {
+                    addLog(`❌ ${label} failed after ${maxRetries} attempts: ${e.message}`);
+                    throw e;
+                }
+                addLog(`⏳ ${label} not ready, waiting ${delayMs}ms...`);
+                await new Promise(r => setTimeout(r, delayMs));
+            }
+        }
+        throw new Error(`${label} failed`);
+    };
+
     const runAnalysis = async () => {
+        const actualFileCount = fileCount || project.file_count || 0;
+        const actualFileNames = fileNames.length > 0 ? fileNames : [];
+
         try {
             // Stage 1: Scanning
-            setProgress({ stage: 'scanning', message: 'Scanning data files...', progress: 10 });
-            addLog('Starting analysis...');
+            setProgress({ stage: 'scanning', message: 'Scanning data files...', progress: 5 });
+            addLog('🚀 Starting Data Studio analysis pipeline...');
+            addLog(`📁 Project: ${project.name}`);
+            addLog(`📊 Files to analyze: ${actualFileCount}`);
+            if (actualFileNames.length > 0) {
+                addLog(`📄 Files: ${actualFileNames.join(', ')}`);
+            }
+            addLog(`🔧 Analysis Mode: ${analysisMode === 'combined' ? 'Combined (unified analysis)' : 'Separate (per-file analysis)'}`);
             await new Promise(r => setTimeout(r, 300));
 
             // Stage 2: Analyzing with Claude
-            setProgress({ stage: 'analyzing', message: 'Claude is analyzing data...', progress: 20 });
-            addLog('Invoking Claude Code for data analysis...');
+            setProgress({ stage: 'analyzing', message: 'Claude is analyzing data...', progress: 10 });
+            addLog('');
+            addLog('═══════════════════════════════════════');
+            addLog('📊 PHASE 1: DATA ANALYSIS');
+            addLog('═══════════════════════════════════════');
+            addLog('🤖 Invoking Claude Code for data analysis...');
+            addLog('   - Activating Python environment');
+            addLog('   - Loading data files with pandas');
+            addLog('   - Extracting column types and statistics');
+            if (analysisMode === 'separate') {
+                addLog('   - Creating per-file detailed insights');
+            } else {
+                addLog('   - Analyzing cross-file relationships');
+            }
+            addLog('');
 
             await dataStudioV2Api.analyzeProject(
                 project.name,
-                { mode: 'terminal' },
+                { mode: 'terminal', analysisMode },
                 handleEvent
             );
 
-            setProgress({ stage: 'analyzing', message: 'Analysis complete!', progress: 60 });
-            addLog('Data analysis completed');
+            setProgress({ stage: 'analyzing', message: 'Analysis complete, verifying...', progress: 50 });
+            addLog('');
+            addLog('✅ Data analysis phase completed');
+
+            // Give filesystem time to flush
+            addLog('⏳ Waiting for files to sync...');
+            await new Promise(r => setTimeout(r, 2000));
 
             // Stage 3: Generating dashboard
-            setProgress({ stage: 'generating', message: 'Claude is generating dashboard...', progress: 70 });
-            addLog('Invoking Claude Code for dashboard generation...');
+            setProgress({ stage: 'generating', message: 'Claude is generating dashboard...', progress: 55 });
+            addLog('');
+            addLog('═══════════════════════════════════════');
+            addLog('📈 PHASE 2: DASHBOARD GENERATION');
+            addLog('═══════════════════════════════════════');
+            addLog('🤖 Invoking Claude Code for dashboard generation...');
+            addLog('   - Reading analysis metadata');
+            addLog('   - Selecting optimal chart types');
+            addLog('   - Creating Plotly specifications');
+            addLog('');
 
             await dataStudioV2Api.generateDashboard(
                 project.name,
@@ -624,24 +785,56 @@ function AnalysisProgressView({
                 handleEvent
             );
 
-            setProgress({ stage: 'generating', message: 'Dashboard generated!', progress: 90 });
-            addLog('Dashboard generation completed');
+            setProgress({ stage: 'generating', message: 'Dashboard generated, loading...', progress: 85 });
+            addLog('');
+            addLog('✅ Dashboard generation phase completed');
 
-            // Fetch results
-            addLog('Fetching results...');
-            const [metadata, dashboard] = await Promise.all([
-                dataStudioV2Api.getMetadata(project.name),
-                dataStudioV2Api.getDashboard(project.name, 'default')
-            ]);
+            // Give filesystem time to flush
+            addLog('⏳ Waiting for files to sync...');
+            await new Promise(r => setTimeout(r, 2000));
+
+            // Fetch results with retry logic
+            addLog('');
+            addLog('═══════════════════════════════════════');
+            addLog('📥 PHASE 3: LOADING RESULTS');
+            addLog('═══════════════════════════════════════');
+
+            setProgress({ stage: 'generating', message: 'Loading metadata...', progress: 90 });
+            const metadata = await fetchWithRetry(
+                () => dataStudioV2Api.getMetadata(project.name),
+                'Fetching analysis metadata'
+            );
+
+            setProgress({ stage: 'generating', message: 'Loading dashboard...', progress: 95 });
+            const dashboard = await fetchWithRetry(
+                () => dataStudioV2Api.getDashboard(project.name, 'default'),
+                'Fetching dashboard'
+            );
 
             // Complete
             setProgress({ stage: 'complete', message: 'Ready!', progress: 100 });
-            addLog('All done! Loading dashboard...');
-            await new Promise(r => setTimeout(r, 500));
+            addLog('');
+            addLog('═══════════════════════════════════════');
+            addLog('🎉 ALL PHASES COMPLETE');
+            addLog('═══════════════════════════════════════');
+            addLog(`📊 Analyzed ${Object.keys(metadata.files || {}).length} files`);
+            addLog(`📈 Generated ${dashboard.widgets?.length || 0} widgets`);
+            addLog('');
+            addLog('🚀 Loading dashboard view...');
+            await new Promise(r => setTimeout(r, 800));
 
             onComplete(metadata, dashboard);
         } catch (e: any) {
+            addLog('');
+            addLog('═══════════════════════════════════════');
+            addLog('❌ ANALYSIS FAILED');
+            addLog('═══════════════════════════════════════');
             addLog(`Error: ${e.message}`);
+            addLog('');
+            addLog('💡 Troubleshooting tips:');
+            addLog('   - Check that data files are valid CSV/JSON/Excel');
+            addLog('   - Try refreshing and running analysis again');
+            addLog('   - Check backend logs for more details');
             setError(e.message);
         }
     };
@@ -709,7 +902,7 @@ function AnalysisProgressView({
             {/* Info Cards */}
             <div className="grid grid-cols-3 gap-3 mb-4">
                 <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-cyan-400">{project.file_count || '?'}</p>
+                    <p className="text-2xl font-bold text-cyan-400">{fileCount || project.file_count || '?'}</p>
                     <p className="text-xs text-gray-500">Files to Analyze</p>
                 </div>
                 <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-center">
@@ -771,26 +964,97 @@ function DashboardView({
     const [nlpInput, setNlpInput] = useState('');
     const [processing, setProcessing] = useState(false);
     const [showChat, setShowChat] = useState(false);
+    const [nlpLogs, setNlpLogs] = useState<string[]>([]);
+    const [showNlpProgress, setShowNlpProgress] = useState(false);
+    const nlpLogsEndRef = useRef<HTMLDivElement>(null);
+
+    // Auto-scroll NLP logs
+    useEffect(() => {
+        nlpLogsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [nlpLogs]);
+
+    const addNlpLog = (message: string) => {
+        setNlpLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] ${message}`]);
+    };
+
+    const handleNlpEvent = (event: { type: string; content: any }) => {
+        if (event.type === 'status') {
+            addNlpLog(`⚡ ${event.content}`);
+        } else if (event.type === 'text') {
+            const text = String(event.content);
+            if (text.length > 150) {
+                addNlpLog(`📝 ${text.slice(0, 150)}...`);
+            } else {
+                addNlpLog(`📝 ${text}`);
+            }
+        } else if (event.type === 'tool') {
+            addNlpLog(`🔧 ${event.content}`);
+        } else if (event.type === 'result') {
+            addNlpLog(`✅ Edit applied`);
+        } else if (event.type === 'error') {
+            addNlpLog(`❌ Error: ${event.content}`);
+        } else if (event.type === 'complete') {
+            addNlpLog(`🎉 ${event.content}`);
+        }
+    };
 
     const handleNlpEdit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!nlpInput.trim() || processing) return;
 
+        const request = nlpInput.trim();
         setProcessing(true);
+        setShowNlpProgress(true);
+        setNlpLogs([]);
+
+        addNlpLog('═══════════════════════════════════════');
+        addNlpLog('🎨 NLP DASHBOARD EDIT');
+        addNlpLog('═══════════════════════════════════════');
+        addNlpLog(`📝 Request: "${request}"`);
+        addNlpLog(`🎯 Target: ${editingWidget ? `Widget ${editingWidget}` : 'Entire dashboard'}`);
+        addNlpLog('');
+        addNlpLog('🤖 Invoking Claude Code...');
+
         try {
             const result = await dataStudioV2Api.nlpEdit(
                 project.name,
-                nlpInput.trim(),
-                { dashboardId: 'default', targetWidgetId: editingWidget || undefined }
+                request,
+                { dashboardId: 'default', targetWidgetId: editingWidget || undefined, mode: 'terminal' },
+                handleNlpEvent
             );
-            // Check if result is a proper Dashboard (has widgets)
-            if ('widgets' in result && result.widgets) {
+
+            addNlpLog('');
+            addNlpLog('📥 Fetching updated dashboard...');
+
+            // Fetch the updated dashboard to get new widgets
+            await new Promise(r => setTimeout(r, 1000)); // Wait for file to sync
+            const updatedDashboard = await dataStudioV2Api.getDashboard(project.name, 'default');
+
+            if (updatedDashboard.widgets) {
+                setWidgets(updatedDashboard.widgets);
+                addNlpLog(`✅ Dashboard updated with ${updatedDashboard.widgets.length} widgets`);
+            } else if ('widgets' in result && result.widgets) {
                 setWidgets(result.widgets);
+                addNlpLog(`✅ Dashboard updated`);
             }
+
+            addNlpLog('');
+            addNlpLog('🎉 Edit complete!');
             setNlpInput('');
             setEditingWidget(null);
+
+            // Auto-close after success
+            setTimeout(() => setShowNlpProgress(false), 1500);
         } catch (e: any) {
-            alert(e.message);
+            addNlpLog('');
+            addNlpLog('═══════════════════════════════════════');
+            addNlpLog('❌ EDIT FAILED');
+            addNlpLog('═══════════════════════════════════════');
+            addNlpLog(`Error: ${e.message}`);
+            addNlpLog('');
+            addNlpLog('💡 Tips:');
+            addNlpLog('   - Try rephrasing your request');
+            addNlpLog('   - Be specific about chart type or colors');
         } finally {
             setProcessing(false);
         }
@@ -802,6 +1066,41 @@ function DashboardView({
 
     return (
         <div className="h-screen flex flex-col bg-gray-900">
+            {/* NLP Edit Progress Modal */}
+            {showNlpProgress && (
+                <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+                    <div className="bg-gray-900 border border-gray-700 rounded-lg w-full max-w-2xl mx-4 overflow-hidden">
+                        <div className="bg-gray-800 px-4 py-3 flex items-center justify-between border-b border-gray-700">
+                            <div className="flex items-center gap-3">
+                                <Wand2 className={`w-5 h-5 text-purple-400 ${processing ? 'animate-pulse' : ''}`} />
+                                <span className="font-medium text-white">AI Dashboard Edit</span>
+                                {processing && (
+                                    <span className="text-xs text-gray-400 animate-pulse">Processing...</span>
+                                )}
+                            </div>
+                            {!processing && (
+                                <button
+                                    onClick={() => setShowNlpProgress(false)}
+                                    className="text-gray-400 hover:text-white"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            )}
+                        </div>
+                        <div className="p-4 h-80 overflow-y-auto font-mono text-sm bg-gray-950">
+                            {nlpLogs.length === 0 ? (
+                                <div className="text-gray-500 animate-pulse">Initializing...</div>
+                            ) : (
+                                nlpLogs.map((log, i) => (
+                                    <div key={i} className="text-gray-300 whitespace-pre-wrap mb-1">{log}</div>
+                                ))
+                            )}
+                            <div ref={nlpLogsEndRef} />
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <header className="border-b border-gray-800 bg-gray-950 flex-shrink-0">
                 <div className="px-4 py-3 flex items-center justify-between">
@@ -1144,6 +1443,9 @@ function DataStudioContent() {
     const [metadata, setMetadata] = useState<ProjectMetadata | null>(null);
     const [dashboard, setDashboard] = useState<Dashboard | null>(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
+    const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('combined');
+    const [analysisFileCount, setAnalysisFileCount] = useState(0);
+    const [analysisFileNames, setAnalysisFileNames] = useState<string[]>([]);
 
     const handleSelectProject = (project: DataStudioProject) => {
         setSelectedProject(project);
@@ -1151,7 +1453,8 @@ function DataStudioContent() {
             // Load existing dashboard
             loadExistingData(project);
         } else if (project.file_count > 0) {
-            // Has files but no dashboard - go to analysis
+            // Has files but no dashboard - go to analysis with default combined mode
+            setAnalysisMode('combined');
             setViewMode('analyzing');
         } else {
             // No files - go to import
@@ -1253,7 +1556,12 @@ function DataStudioContent() {
                 </header>
                 <DataImporter
                     project={selectedProject}
-                    onComplete={() => setViewMode('analyzing')}
+                    onComplete={(mode, fileCount, fileNames) => {
+                        setAnalysisMode(mode);
+                        setAnalysisFileCount(fileCount);
+                        setAnalysisFileNames(fileNames);
+                        setViewMode('analyzing');
+                    }}
                     onBack={handleBackToProjects}
                 />
             </div>
@@ -1266,6 +1574,9 @@ function DataStudioContent() {
             <div className="min-h-screen bg-gray-900 flex items-center justify-center">
                 <AnalysisProgressView
                     project={selectedProject}
+                    analysisMode={analysisMode}
+                    fileCount={analysisFileCount}
+                    fileNames={analysisFileNames}
                     onComplete={handleAnalysisComplete}
                     onBack={() => setViewMode('import')}
                 />

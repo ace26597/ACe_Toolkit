@@ -144,18 +144,34 @@ When no project is selected, displays comprehensive capabilities overview:
 **User Flow:**
 1. **Project Selection**: Create new or select existing Data Studio project
 2. **Data Import**: Upload files or import from Workspace projects
-3. **Analysis**: Automatic scanning and metadata extraction
-4. **Dashboard**: Auto-generated visualizations with NLP editing
+3. **Analysis Mode Selection**: Combined (unified) or Separate (per-file) for multiple files
+4. **Analysis**: Automatic scanning with live terminal output
+5. **Dashboard**: Auto-generated visualizations with NLP editing
+
+**Analysis Modes (Multi-File):**
+| Mode | Description |
+|------|-------------|
+| `combined` | Unified cross-file analysis, finds relationships and common columns |
+| `separate` | Detailed per-file insights, saves to `.analysis/file_analyses/` |
+
+When uploading multiple files, a modal asks user to choose the analysis mode.
 
 **Components:**
 - `ProjectSelector` - Create/select Data Studio projects
 - `CreateProjectModal` - New project creation dialog
-- `DataImporter` - File upload and Workspace import
-- `AnalysisProgressView` - Animated analysis progress
+- `DataImporter` - File upload, Workspace import, analysis mode selector
+- `AnalysisProgressView` - Live terminal output with phase indicators
 - `DashboardView` - Main dashboard with sidebar, canvas, and NLP bar
 - `WidgetCard` - Individual widget with edit/remove controls
 - `PlotlyWidget` - Renders Plotly specifications
 - `StatCard` - Metric display cards
+
+**Analysis Progress Features:**
+- Live terminal output showing Claude's work
+- Phase indicators (Scan → Analyze → Generate → Done)
+- Shows actual file names and counts
+- Retry logic with filesystem sync delays
+- Detailed error messages with troubleshooting tips
 
 **Widget Types:**
 | Type | Description |
@@ -172,15 +188,16 @@ When no project is selected, displays comprehensive capabilities overview:
 **NLP Edit Bar:**
 - Dashboard-wide edits: "Add a pie chart for categories"
 - Single widget edits: Click edit icon, then describe changes
-- Real-time processing with loading state
+- Progress modal with live Claude output
+- Auto-closes on success
 
 **API Integration:**
 Uses `dataStudioV2Api` from `lib/api.ts`:
 - `listProjects()`, `createProject()`, `deleteProject()`
 - `listFiles()`, `uploadFiles()`, `importFromWorkspace()`
-- `analyzeProject()`, `getMetadata()`
+- `analyzeProject(name, { mode, analysisMode })`, `getMetadata()`
 - `listDashboards()`, `getDashboard()`, `generateDashboard()`
-- `nlpEdit()`, `saveDashboard()`
+- `nlpEdit(name, request, { mode: 'terminal' })`, `saveDashboard()`
 
 **Storage:**
 ```
@@ -412,6 +429,11 @@ npm run start
 
 | Date | Change |
 |------|--------|
+| 2026-01-23 | **Data Studio:** Multi-file analysis mode selector (combined vs separate) |
+| 2026-01-23 | **Data Studio:** NLP edit progress modal with live Claude output |
+| 2026-01-23 | **Data Studio:** Fixed file count display (passes actual count from DataImporter) |
+| 2026-01-23 | **Data Studio:** Improved Claude output display (multi-line, result samples) |
+| 2026-01-23 | **Data Studio:** Retry logic for metadata/dashboard fetch with filesystem sync |
 | 2026-01-23 | **Data Studio V2:** Live terminal output during analysis with SSE streaming |
 | 2026-01-23 | **Data Studio V2:** AnalysisProgressView shows Claude Code events in real-time |
 | 2026-01-23 | **Fix:** TypeScript errors in analysis flow (metadata null check, nlpEdit options) |
