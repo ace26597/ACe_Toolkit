@@ -49,13 +49,15 @@ lsof -i :3000 -i :8000  # Check our ports
 - Welcome page shows all capabilities when no project selected
 - `/ccresearch` redirects to `/workspace?tab=terminal`
 
-**C3 Data Studio Features (V2 REDESIGNED):**
+**C3 Data Studio Features (V2 - Claude Code First):**
+- **Claude Code Powered**: Uses `data-studio-analyst` skill for analysis
 - **Standalone Projects**: Separate from Workspace at `/data/users/{user-id}/data-studio-projects/`
-- **Smart Analysis**: Python-based metadata extraction (pandas, scipy)
-- **Auto Dashboards**: 5-10 widgets generated based on data characteristics
-- **NLP Editing**: Natural language control of individual widgets or entire dashboards
-- **Plotly Visualization**: Charts, histograms, bar, line, pie, scatter, mermaid diagrams
-- **Import Options**: File upload or import from Workspace projects
+- **SSE Streaming**: Real-time analysis progress (headless or terminal mode)
+- **Insight Caching**: Metadata and insights saved for faster re-analysis
+- **Auto Dashboards**: 5-10 Plotly widgets generated from data insights
+- **NLP Editing**: Natural language chart modifications via Claude
+- **Python Venv**: Dedicated environment at `~/.local/share/data-studio-venv/`
+- **File Support**: CSV, JSON, Excel (xlsx/xls), Parquet
 
 **Data Studio Workflow:**
 1. Create/select Data Studio project

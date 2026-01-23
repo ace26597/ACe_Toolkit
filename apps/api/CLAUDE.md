@@ -409,46 +409,38 @@ Unified project operations across apps:
 - Project metadata (.project.json)
 - Cross-app visibility (CCResearch + Workspace)
 
-### DataStudioManager (`core/data_studio_manager.py`) - NEW
+### ClaudeRunner (`core/claude_runner.py`) - Data Studio V2
 
-Manages headless Claude Code sessions for Data Studio:
-- Spawns Claude with `-p --output-format stream-json`
+Manages headless Claude Code execution for Data Studio analysis:
+- Spawns Claude with `-p --output-format stream-json --verbose`
 - Uses `--permission-mode bypassPermissions` for auto-approval
-- Parses JSON output stream into frontend events
-- Maintains session state in `.data-studio/sessions/`
-- Creates CLAUDE.md with data analysis guidelines
-- **Process tracking** - Kills existing process before spawning new one
-- **Minimal MCP config** - Only loads filesystem server (reduces memory 500MB → ~50MB)
-- **Timeout handling** - 5-minute max timeout kills hung processes
+- Streams SSE events to frontend (status, text, tool, result, error, complete)
+- Deterministic session IDs (user+project hash) for session continuity
+- Project-level CLAUDE.md auto-generated with data analyst context
 
 **Key Methods:**
 ```python
-async def create_session(user_id, project_name, session_id=None) -> DataStudioSession
-async def send_message(session_id, message) -> None
-async def stream_output(session_id) -> AsyncGenerator[Dict, None]
-async def close_session(session_id) -> bool  # Kills active process
-def list_data_files(project_dir) -> List[dict]
+async def run_analysis(user_id, project_name, project_dir, mode) -> AsyncGenerator
+async def generate_dashboard(user_id, project_name, project_dir, dashboard_name, mode) -> AsyncGenerator
+async def nlp_edit(user_id, project_name, project_dir, request, dashboard_id, widget_id, mode) -> AsyncGenerator
+async def chat(user_id, project_name, project_dir, message, mode) -> AsyncGenerator
 ```
 
-**Claude Execution:**
-```bash
-# All messages use --resume (works for new and existing sessions)
-claude -p "message" \
-  --output-format stream-json \
-  --verbose \
-  --resume {deterministic-uuid} \
-  --permission-mode bypassPermissions \
-  --strict-mcp-config \
-  --mcp-config '{"mcpServers":{"filesystem":{"command":"npx","args":["-y","@modelcontextprotocol/server-filesystem","/path/to/project"]}}}'
-```
+**Modes:**
+- `headless`: Clean output - status, text, tool calls, results
+- `terminal`: Full Claude output including thinking
 
-**Memory Optimization:**
-- Uses `--strict-mcp-config` to prevent loading default MCP servers (100+ processes)
-- Only loads filesystem MCP server for reading data files
-- Process tracked per session, killed on new message or session close
-- Chunk-based stdout reading to handle Claude's buffered output
+**Skill Integration:**
+Uses `~/.claude/skills/data-studio-analyst/` skill for:
+- File analysis with pandas (CSV, JSON, Excel, Parquet)
+- Pattern detection and insight generation
+- Plotly chart specification generation
+- Dashboard layout design
 
-**Note:** `--verbose` is required when using `-p` with `--output-format stream-json`.
+**Python Environment:**
+Central venv at `~/.local/share/data-studio-venv/` with:
+- pandas 3.0.0, numpy 2.4.1, plotly 6.5.2
+- kaleido, openpyxl, xlrd, pyarrow
 
 ---
 

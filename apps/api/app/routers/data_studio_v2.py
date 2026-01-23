@@ -1,27 +1,26 @@
 """
-Data Studio V2 Router - Redesigned AI Data Analyst Framework.
+Data Studio V2 Router - Claude Code Powered AI Data Analyst.
 
 Features:
 - Standalone project system (separate from Workspace)
-- Smart metadata extraction for any data type
-- Auto-generated dashboards
+- Claude Code for smart data analysis
+- Auto-generated dashboards with Plotly
 - NLP-based editing of charts and dashboards
+- Terminal or headless mode support
 """
 
-import asyncio
 import json
 import logging
 import os
 import shutil
-import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, WebSocket, WebSocketDisconnect
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.core.data_analyzer import DataAnalyzer
-from app.core.dashboard_generator import DashboardGenerator
+from app.core.claude_runner import claude_runner
 from app.core.user_access import require_valid_access
 from app.models.models import User
 
@@ -65,15 +64,22 @@ class ImportFromWorkspaceRequest(BaseModel):
 
 class AnalyzeRequest(BaseModel):
     force: bool = False  # Force re-analysis even if cached
+    mode: str = "headless"  # "headless" or "terminal"
+
+
+class GenerateDashboardRequest(BaseModel):
+    name: str = "default"
+    mode: str = "headless"
 
 
 class NLPEditRequest(BaseModel):
     request: str  # Natural language edit request
     target_widget_id: Optional[str] = None  # If editing a specific widget
     dashboard_id: str = "default"
+    mode: str = "headless"
 
 
-class DashboardCreateRequest(BaseModel):
+class DashboardSaveRequest(BaseModel):
     name: str
     widgets: List[dict] = []
 
@@ -81,6 +87,7 @@ class DashboardCreateRequest(BaseModel):
 class ChatMessage(BaseModel):
     content: str
     context_files: Optional[List[str]] = None
+    mode: str = "headless"
 
 
 # ==================== Project Management ====================
@@ -118,7 +125,7 @@ async def list_projects(user: User = Depends(require_valid_access)):
 
         # Check for analysis and dashboard
         analysis_exists = os.path.exists(os.path.join(project_path, ".analysis", "metadata.json"))
-        dashboard_exists = os.path.exists(os.path.join(project_path, ".data-studio", "dashboards", "default.json"))
+        dashboard_exists = os.path.exists(os.path.join(project_path, ".dashboards", "default.json"))
 
         projects.append(ProjectResponse(
             name=name,
@@ -153,8 +160,9 @@ async def create_project(
     os.makedirs(project_dir)
     os.makedirs(os.path.join(project_dir, "data"))
     os.makedirs(os.path.join(project_dir, ".analysis"))
-    os.makedirs(os.path.join(project_dir, ".data-studio", "dashboards"))
+    os.makedirs(os.path.join(project_dir, ".dashboards"))
     os.makedirs(os.path.join(project_dir, ".claude"))
+    os.makedirs(os.path.join(project_dir, "output", "charts"))
 
     # Create project metadata
     metadata = {
@@ -165,11 +173,6 @@ async def create_project(
     }
     with open(os.path.join(project_dir, ".project.json"), 'w') as f:
         json.dump(metadata, f, indent=2)
-
-    # Create CLAUDE.md for headless Claude sessions
-    claude_md_content = _create_claude_md(safe_name)
-    with open(os.path.join(project_dir, ".claude", "CLAUDE.md"), 'w') as f:
-        f.write(claude_md_content)
 
     return ProjectResponse(
         name=safe_name,
@@ -361,7 +364,7 @@ async def delete_file(
     return {"status": "deleted", "path": path}
 
 
-# ==================== Analysis ====================
+# ==================== Analysis (Claude Code) ====================
 
 @router.post("/projects/{project_name}/analyze")
 async def analyze_project(
@@ -369,29 +372,43 @@ async def analyze_project(
     request: AnalyzeRequest = AnalyzeRequest(),
     user: User = Depends(require_valid_access)
 ):
-    """Analyze all data files in the project."""
-    project_dir = get_project_dir(str(user.id), project_name)
+    """
+    Analyze all data files using Claude Code.
+
+    Returns a streaming response with analysis progress.
+    Mode: "headless" for clean output, "terminal" for full Claude view.
+    """
+    user_id = str(user.id)
+    project_dir = get_project_dir(user_id, project_name)
 
     if not os.path.exists(project_dir):
         raise HTTPException(status_code=404, detail="Project not found")
 
-    analyzer = DataAnalyzer(project_dir)
-
-    # Check for cached analysis
+    # Check for cached analysis if not forcing
     if not request.force:
-        cached = analyzer.get_cached_metadata()
-        if cached:
-            return {"status": "cached", "metadata": cached}
+        metadata_path = os.path.join(project_dir, ".analysis", "metadata.json")
+        if os.path.exists(metadata_path):
+            with open(metadata_path, 'r') as f:
+                return {"status": "cached", "metadata": json.load(f)}
 
-    # Run analysis
-    try:
-        metadata = await analyzer.analyze_project()
-        return {"status": "complete", "metadata": metadata.to_dict()}
-    except Exception as e:
-        logger.error(f"Analysis error: {e}")
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+    async def stream_analysis():
+        """Stream analysis events as SSE."""
+        async for event in claude_runner.run_analysis(
+            user_id=user_id,
+            project_name=project_name,
+            project_dir=project_dir,
+            mode=request.mode
+        ):
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(
+        stream_analysis(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
+    )
 
 
 @router.get("/projects/{project_name}/metadata")
@@ -399,19 +416,39 @@ async def get_metadata(
     project_name: str,
     user: User = Depends(require_valid_access)
 ):
-    """Get analysis metadata for a project."""
+    """Get cached analysis metadata for a project."""
     project_dir = get_project_dir(str(user.id), project_name)
 
     if not os.path.exists(project_dir):
         raise HTTPException(status_code=404, detail="Project not found")
 
-    analyzer = DataAnalyzer(project_dir)
-    cached = analyzer.get_cached_metadata()
+    metadata_path = os.path.join(project_dir, ".analysis", "metadata.json")
 
-    if not cached:
+    if not os.path.exists(metadata_path):
         raise HTTPException(status_code=404, detail="No analysis found. Run analyze first.")
 
-    return cached
+    with open(metadata_path, 'r') as f:
+        return json.load(f)
+
+
+@router.get("/projects/{project_name}/insights")
+async def get_insights(
+    project_name: str,
+    user: User = Depends(require_valid_access)
+):
+    """Get accumulated insights for a project."""
+    project_dir = get_project_dir(str(user.id), project_name)
+
+    if not os.path.exists(project_dir):
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    insights_path = os.path.join(project_dir, ".analysis", "insights.md")
+
+    if not os.path.exists(insights_path):
+        return {"insights": ""}
+
+    with open(insights_path, 'r') as f:
+        return {"insights": f.read()}
 
 
 # ==================== Dashboards ====================
@@ -427,8 +464,26 @@ async def list_dashboards(
     if not os.path.exists(project_dir):
         raise HTTPException(status_code=404, detail="Project not found")
 
-    generator = DashboardGenerator(project_dir)
-    return generator.list_dashboards()
+    dashboards_dir = os.path.join(project_dir, ".dashboards")
+    dashboards = []
+
+    if os.path.exists(dashboards_dir):
+        for filename in os.listdir(dashboards_dir):
+            if filename.endswith('.json'):
+                dashboard_id = filename[:-5]
+                try:
+                    with open(os.path.join(dashboards_dir, filename), 'r') as f:
+                        data = json.load(f)
+                        dashboards.append({
+                            "id": dashboard_id,
+                            "name": data.get("name", dashboard_id),
+                            "widget_count": len(data.get("widgets", [])),
+                            "updated_at": data.get("updated_at")
+                        })
+                except:
+                    pass
+
+    return {"dashboards": dashboards}
 
 
 @router.get("/projects/{project_name}/dashboards/{dashboard_id}")
@@ -443,58 +498,87 @@ async def get_dashboard(
     if not os.path.exists(project_dir):
         raise HTTPException(status_code=404, detail="Project not found")
 
-    generator = DashboardGenerator(project_dir)
-    dashboard = generator.get_dashboard(dashboard_id)
+    dashboard_path = os.path.join(project_dir, ".dashboards", f"{dashboard_id}.json")
 
-    if not dashboard:
+    if not os.path.exists(dashboard_path):
         raise HTTPException(status_code=404, detail="Dashboard not found")
 
-    return dashboard
+    with open(dashboard_path, 'r') as f:
+        return json.load(f)
 
 
 @router.post("/projects/{project_name}/dashboards/generate")
 async def generate_dashboard(
     project_name: str,
-    name: str = "default",
+    request: GenerateDashboardRequest = GenerateDashboardRequest(),
     user: User = Depends(require_valid_access)
 ):
-    """Generate an auto-dashboard from analysis metadata."""
-    project_dir = get_project_dir(str(user.id), project_name)
+    """
+    Generate a dashboard using Claude Code.
+
+    Returns a streaming response with generation progress.
+    """
+    user_id = str(user.id)
+    project_dir = get_project_dir(user_id, project_name)
 
     if not os.path.exists(project_dir):
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # Load metadata
-    analyzer = DataAnalyzer(project_dir)
-    metadata = analyzer.get_cached_metadata()
-
-    if not metadata:
+    # Check if analysis exists
+    metadata_path = os.path.join(project_dir, ".analysis", "metadata.json")
+    if not os.path.exists(metadata_path):
         raise HTTPException(status_code=400, detail="No analysis found. Run analyze first.")
 
-    # Generate dashboard
-    generator = DashboardGenerator(project_dir)
-    dashboard = await generator.generate_dashboard(metadata, name)
+    async def stream_generation():
+        """Stream dashboard generation events as SSE."""
+        async for event in claude_runner.generate_dashboard(
+            user_id=user_id,
+            project_name=project_name,
+            project_dir=project_dir,
+            dashboard_name=request.name,
+            mode=request.mode
+        ):
+            yield f"data: {json.dumps(event)}\n\n"
 
-    return dashboard.to_dict()
+    return StreamingResponse(
+        stream_generation(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
+    )
 
 
 @router.post("/projects/{project_name}/dashboards")
 async def save_dashboard(
     project_name: str,
-    request: DashboardCreateRequest,
+    request: DashboardSaveRequest,
     user: User = Depends(require_valid_access)
 ):
-    """Save or update a dashboard."""
+    """Save or update a dashboard manually."""
     project_dir = get_project_dir(str(user.id), project_name)
 
     if not os.path.exists(project_dir):
         raise HTTPException(status_code=404, detail="Project not found")
 
-    generator = DashboardGenerator(project_dir)
-    dashboard_id = generator.save_dashboard({
+    dashboards_dir = os.path.join(project_dir, ".dashboards")
+    os.makedirs(dashboards_dir, exist_ok=True)
+
+    # Sanitize dashboard name for ID
+    dashboard_id = request.name.strip().replace(' ', '-').lower()
+    dashboard_id = ''.join(c for c in dashboard_id if c.isalnum() or c in '-_') or "dashboard"
+
+    dashboard_data = {
+        "id": dashboard_id,
         "name": request.name,
-        "widgets": request.widgets
-    })
+        "widgets": request.widgets,
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat()
+    }
+
+    with open(os.path.join(dashboards_dir, f"{dashboard_id}.json"), 'w') as f:
+        json.dump(dashboard_data, f, indent=2)
 
     return {"id": dashboard_id, "status": "saved"}
 
@@ -511,14 +595,16 @@ async def delete_dashboard(
     if not os.path.exists(project_dir):
         raise HTTPException(status_code=404, detail="Project not found")
 
-    generator = DashboardGenerator(project_dir)
-    if generator.delete_dashboard(dashboard_id):
-        return {"status": "deleted", "id": dashboard_id}
-    else:
+    dashboard_path = os.path.join(project_dir, ".dashboards", f"{dashboard_id}.json")
+
+    if not os.path.exists(dashboard_path):
         raise HTTPException(status_code=404, detail="Dashboard not found")
 
+    os.remove(dashboard_path)
+    return {"status": "deleted", "id": dashboard_id}
 
-# ==================== NLP Editing ====================
+
+# ==================== NLP Editing (Claude Code) ====================
 
 @router.post("/projects/{project_name}/edit")
 async def nlp_edit(
@@ -526,41 +612,43 @@ async def nlp_edit(
     request: NLPEditRequest,
     user: User = Depends(require_valid_access)
 ):
-    """Edit a dashboard using natural language."""
-    project_dir = get_project_dir(str(user.id), project_name)
+    """
+    Edit a dashboard using natural language via Claude Code.
+
+    Returns a streaming response with edit progress.
+    """
+    user_id = str(user.id)
+    project_dir = get_project_dir(user_id, project_name)
 
     if not os.path.exists(project_dir):
         raise HTTPException(status_code=404, detail="Project not found")
 
-    generator = DashboardGenerator(project_dir)
-    dashboard = generator.get_dashboard(request.dashboard_id)
-
-    if not dashboard:
+    # Check dashboard exists
+    dashboard_path = os.path.join(project_dir, ".dashboards", f"{request.dashboard_id}.json")
+    if not os.path.exists(dashboard_path):
         raise HTTPException(status_code=404, detail="Dashboard not found")
 
-    # Build Claude prompt for editing
-    edit_prompt = _build_edit_prompt(
-        dashboard=dashboard,
-        user_request=request.request,
-        target_widget_id=request.target_widget_id
+    async def stream_edit():
+        """Stream NLP edit events as SSE."""
+        async for event in claude_runner.nlp_edit(
+            user_id=user_id,
+            project_name=project_name,
+            project_dir=project_dir,
+            request=request.request,
+            dashboard_id=request.dashboard_id,
+            widget_id=request.target_widget_id,
+            mode=request.mode
+        ):
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(
+        stream_edit(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
     )
-
-    # Execute via headless Claude
-    result = await _execute_claude_edit(
-        project_dir=project_dir,
-        prompt=edit_prompt,
-        current_dashboard=dashboard
-    )
-
-    if result.get('error'):
-        raise HTTPException(status_code=500, detail=result['error'])
-
-    # Save updated dashboard
-    if result.get('dashboard'):
-        generator.save_dashboard(result['dashboard'])
-        return result['dashboard']
-
-    return dashboard
 
 
 # ==================== Chat Interface ====================
@@ -574,22 +662,23 @@ async def chat_websocket(
     WebSocket endpoint for chat-based data analysis.
 
     Client sends:
-    - {"type": "message", "content": "...", "context_files": [...]}
+    - {"type": "auth", "token": "..."} - Authenticate first
+    - {"type": "message", "content": "...", "mode": "headless|terminal"}
     - {"type": "ping"}
 
     Server sends:
-    - {"type": "thinking", "content": "..."}
-    - {"type": "text_delta", "content": "..."}
+    - {"type": "status", "content": "..."}
+    - {"type": "text", "content": "..."}
+    - {"type": "tool", "content": "..."}
     - {"type": "result", "content": "..."}
-    - {"type": "chart", "data": {...}}
-    - {"type": "error", "message": "..."}
-    - {"type": "done"}
+    - {"type": "error", "content": "..."}
+    - {"type": "complete", "content": "..."}
+    - {"type": "pong"}
     """
     await websocket.accept()
 
-    # Get user from cookie (simplified - in production would verify JWT)
-    # For now, extract user_id from the project path
-    # This is a simplified version - real implementation would verify auth
+    user_id = None
+    project_dir = None
 
     try:
         while True:
@@ -600,141 +689,50 @@ async def chat_websocket(
                 await websocket.send_json({"type": "pong"})
                 continue
 
-            if msg_type == "message":
-                content = data.get("content", "")
-                context_files = data.get("context_files", [])
+            if msg_type == "auth":
+                # Simple auth - in production, verify JWT token
+                token = data.get("token", "")
+                # For now, extract user_id from token (simplified)
+                # In production, decode and verify JWT
+                user_id = data.get("user_id", "")
+                if user_id:
+                    project_dir = get_project_dir(user_id, project_name)
+                    if os.path.exists(project_dir):
+                        await websocket.send_json({"type": "status", "content": "Authenticated"})
+                    else:
+                        await websocket.send_json({"type": "error", "content": "Project not found"})
+                        user_id = None
+                else:
+                    await websocket.send_json({"type": "error", "content": "Invalid authentication"})
+                continue
 
-                if not content:
-                    await websocket.send_json({"type": "error", "message": "Empty message"})
+            if msg_type == "message":
+                if not user_id or not project_dir:
+                    await websocket.send_json({"type": "error", "content": "Not authenticated"})
                     continue
 
-                # Stream response via Claude
-                await _stream_claude_response(
-                    websocket=websocket,
+                content = data.get("content", "")
+                mode = data.get("mode", "headless")
+
+                if not content:
+                    await websocket.send_json({"type": "error", "content": "Empty message"})
+                    continue
+
+                # Stream Claude response
+                async for event in claude_runner.chat(
+                    user_id=user_id,
                     project_name=project_name,
+                    project_dir=project_dir,
                     message=content,
-                    context_files=context_files
-                )
+                    mode=mode
+                ):
+                    await websocket.send_json(event)
 
     except WebSocketDisconnect:
         logger.info(f"Chat WebSocket disconnected for project {project_name}")
     except Exception as e:
         logger.error(f"Chat WebSocket error: {e}")
         try:
-            await websocket.send_json({"type": "error", "message": str(e)})
+            await websocket.send_json({"type": "error", "content": str(e)})
         except:
             pass
-
-
-# ==================== Helper Functions ====================
-
-def _create_claude_md(project_name: str) -> str:
-    """Create CLAUDE.md content for Data Studio projects."""
-    return f'''# Data Studio Project: {project_name}
-
-You are a data analysis assistant for the C3 Data Studio.
-
-## Your Role
-- Analyze data files and provide insights
-- Create visualizations using Plotly (JSON format)
-- Answer questions about patterns, trends, and anomalies
-- Suggest data transformations and cleaning steps
-
-## Data Location
-Data files are in the `data/` directory. Use the Read tool to examine them.
-
-## Output Format
-When creating charts, output Plotly JSON specifications in code blocks:
-
-```plotly
-{{
-  "data": [...],
-  "layout": {{...}}
-}}
-```
-
-Always use `"template": "plotly_dark"` for dark theme compatibility.
-
-## Guidelines
-1. Read files before analyzing
-2. Show sample data before transformations
-3. Explain findings in plain language
-4. Handle errors gracefully
-5. Keep visualizations focused and clear
-'''
-
-
-def _build_edit_prompt(
-    dashboard: dict,
-    user_request: str,
-    target_widget_id: Optional[str] = None
-) -> str:
-    """Build a prompt for Claude to edit a dashboard."""
-    if target_widget_id:
-        # Find the specific widget
-        widgets = dashboard.get('widgets', [])
-        target_widget = next((w for w in widgets if w.get('id') == target_widget_id), None)
-
-        if target_widget:
-            return f'''You are editing a dashboard widget.
-
-Current widget:
-```json
-{json.dumps(target_widget, indent=2)}
-```
-
-User request: {user_request}
-
-Return ONLY the updated widget JSON, nothing else.'''
-
-    return f'''You are editing a data dashboard.
-
-Current dashboard:
-```json
-{json.dumps(dashboard, indent=2)}
-```
-
-User request: {user_request}
-
-Return ONLY the complete updated dashboard JSON, nothing else.'''
-
-
-async def _execute_claude_edit(
-    project_dir: str,
-    prompt: str,
-    current_dashboard: dict
-) -> dict:
-    """Execute a Claude edit request and parse the result."""
-    # For now, return the current dashboard
-    # In a full implementation, this would spawn Claude and parse the response
-    logger.info(f"NLP edit request: {prompt[:100]}...")
-
-    # TODO: Implement actual Claude execution
-    # This is a placeholder that returns the current dashboard unchanged
-    return {"dashboard": current_dashboard}
-
-
-async def _stream_claude_response(
-    websocket: WebSocket,
-    project_name: str,
-    message: str,
-    context_files: List[str]
-):
-    """Stream a Claude response over WebSocket."""
-    # This is a simplified placeholder
-    # Full implementation would spawn headless Claude and stream output
-
-    await websocket.send_json({"type": "thinking", "content": "Analyzing your request..."})
-
-    # Placeholder response
-    await websocket.send_json({
-        "type": "text_delta",
-        "content": f"I received your message about: {message[:50]}...\n\n"
-    })
-
-    await websocket.send_json({
-        "type": "text_delta",
-        "content": "This feature is being implemented. For now, use the analysis and dashboard generation endpoints."
-    })
-
-    await websocket.send_json({"type": "done"})

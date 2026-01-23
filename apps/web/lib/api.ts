@@ -799,19 +799,57 @@ export const dataStudioV2Api = {
         if (!res.ok) throw new Error('Failed to delete file');
     },
 
-    // Analysis
-    analyzeProject: async (projectName: string, force: boolean = false): Promise<{ status: string; metadata: ProjectMetadata }> => {
+    // Analysis - streaming with SSE
+    analyzeProject: async (
+        projectName: string,
+        options: { force?: boolean; mode?: 'headless' | 'terminal' } = {},
+        onEvent?: (event: { type: string; content: any }) => void
+    ): Promise<{ status: string; metadata?: ProjectMetadata }> => {
+        const { force = false, mode = 'headless' } = options;
         const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ force }),
+            body: JSON.stringify({ force, mode }),
         });
+
         if (!res.ok) {
             const error = await res.json().catch(() => ({ detail: 'Analysis failed' }));
             throw new Error(error.detail || 'Analysis failed');
         }
-        return res.json();
+
+        // Check if response is SSE stream or JSON
+        const contentType = res.headers.get('content-type');
+        if (contentType?.includes('text/event-stream')) {
+            // SSE streaming response
+            const reader = res.body?.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const event = JSON.parse(line.slice(6));
+                                onEvent?.(event);
+                            } catch {}
+                        }
+                    }
+                }
+            }
+            return { status: 'complete' };
+        } else {
+            // Regular JSON response (cached)
+            return res.json();
+        }
     },
 
     getMetadata: async (projectName: string): Promise<ProjectMetadata> => {
@@ -842,16 +880,54 @@ export const dataStudioV2Api = {
         return res.json();
     },
 
-    generateDashboard: async (projectName: string, name: string = 'default'): Promise<Dashboard> => {
-        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/dashboards/generate?name=${encodeURIComponent(name)}`, {
+    generateDashboard: async (
+        projectName: string,
+        options: { name?: string; mode?: 'headless' | 'terminal' } = {},
+        onEvent?: (event: { type: string; content: any }) => void
+    ): Promise<Dashboard | { status: string }> => {
+        const { name = 'default', mode = 'headless' } = options;
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/dashboards/generate`, {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
+            body: JSON.stringify({ name, mode }),
         });
+
         if (!res.ok) {
             const error = await res.json().catch(() => ({ detail: 'Failed to generate dashboard' }));
             throw new Error(error.detail || 'Failed to generate dashboard');
         }
-        return res.json();
+
+        // Check if response is SSE stream
+        const contentType = res.headers.get('content-type');
+        if (contentType?.includes('text/event-stream')) {
+            const reader = res.body?.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const event = JSON.parse(line.slice(6));
+                                onEvent?.(event);
+                            } catch {}
+                        }
+                    }
+                }
+            }
+            return { status: 'complete' };
+        } else {
+            return res.json();
+        }
     },
 
     saveDashboard: async (projectName: string, name: string, widgets: DashboardWidget[]): Promise<{ id: string }> => {
@@ -873,8 +949,14 @@ export const dataStudioV2Api = {
         if (!res.ok) throw new Error('Failed to delete dashboard');
     },
 
-    // NLP Editing
-    nlpEdit: async (projectName: string, request: string, dashboardId: string = 'default', targetWidgetId?: string): Promise<Dashboard> => {
+    // NLP Editing - streaming with SSE
+    nlpEdit: async (
+        projectName: string,
+        request: string,
+        options: { dashboardId?: string; targetWidgetId?: string; mode?: 'headless' | 'terminal' } = {},
+        onEvent?: (event: { type: string; content: any }) => void
+    ): Promise<Dashboard | { status: string }> => {
+        const { dashboardId = 'default', targetWidgetId, mode = 'headless' } = options;
         const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/edit`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -883,12 +965,53 @@ export const dataStudioV2Api = {
                 request,
                 dashboard_id: dashboardId,
                 target_widget_id: targetWidgetId,
+                mode,
             }),
         });
+
         if (!res.ok) {
             const error = await res.json().catch(() => ({ detail: 'Edit failed' }));
             throw new Error(error.detail || 'Edit failed');
         }
+
+        // Check if response is SSE stream
+        const contentType = res.headers.get('content-type');
+        if (contentType?.includes('text/event-stream')) {
+            const reader = res.body?.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const event = JSON.parse(line.slice(6));
+                                onEvent?.(event);
+                            } catch {}
+                        }
+                    }
+                }
+            }
+            return { status: 'complete' };
+        } else {
+            return res.json();
+        }
+    },
+
+    // Get insights
+    getInsights: async (projectName: string): Promise<{ insights: string }> => {
+        const res = await fetch(`${getApiUrl()}/data-studio/v2/projects/${encodeURIComponent(projectName)}/insights`, {
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to get insights');
         return res.json();
     },
 

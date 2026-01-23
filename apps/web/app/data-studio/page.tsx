@@ -62,6 +62,7 @@ function ProjectSelector({
     const [projects, setProjects] = useState<DataStudioProject[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [deleting, setDeleting] = useState<string | null>(null);
 
     useEffect(() => {
         loadProjects();
@@ -76,6 +77,21 @@ function ProjectSelector({
             setError(e.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDelete = async (e: React.MouseEvent, projectName: string) => {
+        e.stopPropagation();
+        if (!confirm(`Delete project "${projectName}"? This cannot be undone.`)) return;
+
+        try {
+            setDeleting(projectName);
+            await dataStudioV2Api.deleteProject(projectName);
+            setProjects(projects.filter(p => p.name !== projectName));
+        } catch (e: any) {
+            setError(e.message);
+        } finally {
+            setDeleting(null);
         }
     };
 
@@ -94,13 +110,22 @@ function ProjectSelector({
                     <h2 className="text-2xl font-bold text-white">Data Studio Projects</h2>
                     <p className="text-gray-400 mt-1">Select a project or create a new one to start analyzing</p>
                 </div>
-                <button
-                    onClick={onCreateNew}
-                    className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                    <Plus className="w-5 h-5" />
-                    New Project
-                </button>
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={loadProjects}
+                        className="flex items-center gap-2 bg-gray-700 hover:bg-gray-600 text-white px-3 py-2 rounded-lg transition-colors"
+                        title="Refresh projects"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                        onClick={onCreateNew}
+                        className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg transition-colors"
+                    >
+                        <Plus className="w-5 h-5" />
+                        New Project
+                    </button>
+                </div>
             </div>
 
             {error && (
@@ -125,10 +150,10 @@ function ProjectSelector({
             ) : (
                 <div className="grid gap-4 md:grid-cols-2">
                     {projects.map(project => (
-                        <button
+                        <div
                             key={project.name}
+                            className="relative flex items-start gap-4 p-4 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 rounded-lg transition-all group cursor-pointer"
                             onClick={() => onSelect(project)}
-                            className="flex items-start gap-4 p-4 bg-gray-800 hover:bg-gray-700 border border-gray-700 hover:border-cyan-500 rounded-lg transition-all text-left group"
                         >
                             <div className="w-12 h-12 rounded-lg bg-cyan-900/50 flex items-center justify-center flex-shrink-0">
                                 <BarChart3 className="w-6 h-6 text-cyan-400" />
@@ -157,7 +182,19 @@ function ProjectSelector({
                                     )}
                                 </div>
                             </div>
-                        </button>
+                            {/* Delete button */}
+                            <button
+                                onClick={(e) => handleDelete(e, project.name)}
+                                className="absolute top-3 right-3 p-1.5 rounded bg-gray-700/50 opacity-0 group-hover:opacity-100 hover:bg-red-900/50 text-gray-400 hover:text-red-400 transition-all"
+                                title="Delete project"
+                            >
+                                {deleting === project.name ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                    <Trash2 className="w-4 h-4" />
+                                )}
+                            </button>
+                        </div>
                     ))}
                 </div>
             )}
