@@ -143,109 +143,34 @@ Available: pandas, numpy, plotly, kaleido, openpyxl, xlrd, pyarrow
         # Kill any existing session
         await self.close_session(session_id)
 
-        prompt = """You are a data analyst. Analyze all data files in this project.
+        # Check for previous analysis context
+        context_file = os.path.join(project_dir, '.analysis', 'context.md')
+        context = ""
+        if os.path.exists(context_file):
+            with open(context_file, 'r') as f:
+                context = f"\n\nPREVIOUS ANALYSIS CONTEXT:\n{f.read()}\n\n"
 
-IMPORTANT: First activate the Python venv:
-source ~/.local/share/data-studio-venv/bin/activate
+        prompt = f"""Analyze all data files in this project.{context}
 
-Then write and run a Python script to analyze all files in data/:
+STEPS:
+1. Activate the Python venv: source ~/.local/share/data-studio-venv/bin/activate
+2. Write a Python script to analyze all files in data/ directory
+3. The script must:
+   - Load each file (CSV, JSON, Excel, Parquet) using pandas
+   - Extract: row count, column count, column names, data types
+   - Save results to .analysis/metadata.json
+4. Run the script
+5. Output a summary of what you found
 
-```python
-import pandas as pd
-import json
-import os
-from datetime import datetime
-import hashlib
+REQUIRED OUTPUT FORMAT for .analysis/metadata.json:
+{{
+  "project_name": "string",
+  "analyzed_at": "ISO timestamp",
+  "summary": {{"total_files": int, "total_rows": int}},
+  "files": {{"filename.csv": {{"rows": int, "columns": int, "column_details": [...]}}}}
+}}
 
-# Scan data directory
-data_dir = "data"
-analysis_dir = ".analysis"
-os.makedirs(analysis_dir, exist_ok=True)
-
-files = {}
-file_hashes = {}
-
-for filename in os.listdir(data_dir):
-    filepath = os.path.join(data_dir, filename)
-    if not os.path.isfile(filepath):
-        continue
-
-    # Calculate file hash
-    with open(filepath, 'rb') as f:
-        file_hash = hashlib.md5(f.read()).hexdigest()
-    file_hashes[filename] = file_hash
-
-    # Load and analyze based on extension
-    ext = filename.lower().split('.')[-1]
-    try:
-        if ext == 'csv':
-            df = pd.read_csv(filepath)
-        elif ext == 'json':
-            df = pd.read_json(filepath)
-        elif ext in ['xlsx', 'xls']:
-            df = pd.read_excel(filepath)
-        elif ext == 'parquet':
-            df = pd.read_parquet(filepath)
-        else:
-            continue
-
-        # Analyze columns
-        columns = []
-        for col in df.columns:
-            col_info = {
-                "name": col,
-                "dtype": str(df[col].dtype),
-                "null_count": int(df[col].isnull().sum()),
-                "unique_count": int(df[col].nunique())
-            }
-            if pd.api.types.is_numeric_dtype(df[col]):
-                col_info["type"] = "numerical"
-                col_info["min"] = float(df[col].min()) if not df[col].isnull().all() else None
-                col_info["max"] = float(df[col].max()) if not df[col].isnull().all() else None
-                col_info["mean"] = float(df[col].mean()) if not df[col].isnull().all() else None
-            elif pd.api.types.is_datetime64_any_dtype(df[col]):
-                col_info["type"] = "temporal"
-            else:
-                col_info["type"] = "categorical"
-                if df[col].nunique() < 20:
-                    col_info["categories"] = df[col].dropna().unique().tolist()[:10]
-            columns.append(col_info)
-
-        files[filename] = {
-            "rows": len(df),
-            "columns": len(df.columns),
-            "column_details": columns,
-            "sample": df.head(3).to_dict('records')
-        }
-    except Exception as e:
-        files[filename] = {"error": str(e)}
-
-# Build metadata
-metadata = {
-    "project_name": os.path.basename(os.getcwd()),
-    "analyzed_at": datetime.utcnow().isoformat() + "Z",
-    "summary": {
-        "total_files": len(files),
-        "total_rows": sum(f.get("rows", 0) for f in files.values()),
-    },
-    "files": files
-}
-
-# Save metadata
-with open(os.path.join(analysis_dir, "metadata.json"), "w") as f:
-    json.dump(metadata, f, indent=2, default=str)
-
-with open(os.path.join(analysis_dir, "file_hashes.json"), "w") as f:
-    json.dump(file_hashes, f, indent=2)
-
-print("Analysis complete!")
-print(f"Analyzed {len(files)} files with {metadata['summary']['total_rows']} total rows")
-for fname, info in files.items():
-    if "error" not in info:
-        print(f"  - {fname}: {info['rows']} rows, {info['columns']} columns")
-```
-
-After running the script, output a brief summary of what you found."""
+IMPORTANT: You MUST create the .analysis/metadata.json file. The dashboard generation depends on it."""
 
         async for event in self._run_claude(session_id, project_dir, prompt, mode):
             yield event
@@ -268,134 +193,38 @@ After running the script, output a brief summary of what you found."""
 
         prompt = f"""Generate a dashboard named '{dashboard_name}' for this project.
 
-IMPORTANT: First activate the Python venv:
-source ~/.local/share/data-studio-venv/bin/activate
+STEPS:
+1. Read .analysis/metadata.json to understand the data
+2. Activate venv: source ~/.local/share/data-studio-venv/bin/activate
+3. Write a Python script that:
+   - Loads the metadata from .analysis/metadata.json
+   - Creates 5-10 dashboard widgets based on the data:
+     * Stat cards for totals (rows, files)
+     * Bar/pie charts for categorical columns
+     * Histograms for numerical columns
+   - Saves to .dashboards/{dashboard_name}.json
+4. Run the script
 
-Then write and run a Python script to generate the dashboard:
-
-```python
-import json
-import os
-from datetime import datetime
-import uuid
-
-# Load analysis metadata
-with open(".analysis/metadata.json", "r") as f:
-    metadata = json.load(f)
-
-os.makedirs(".dashboards", exist_ok=True)
-
-# Generate widgets based on data
-widgets = []
-layout_y = 0
-
-# Widget 1: Summary stat card
-widgets.append({{
-    "id": str(uuid.uuid4())[:8],
-    "type": "stat_card",
-    "title": "Total Records",
-    "stat_value": str(metadata["summary"]["total_rows"]),
-    "layout": {{"x": 0, "y": 0, "w": 3, "h": 2}},
-    "data": {{"value": metadata["summary"]["total_rows"], "label": "Total Records"}}
-}})
-
-widgets.append({{
-    "id": str(uuid.uuid4())[:8],
-    "type": "stat_card",
-    "title": "Files Analyzed",
-    "stat_value": str(metadata["summary"]["total_files"]),
-    "layout": {{"x": 3, "y": 0, "w": 3, "h": 2}},
-    "data": {{"value": metadata["summary"]["total_files"], "label": "Files"}}
-}})
-
-layout_y = 2
-
-# Generate charts for each file's columns
-for filename, file_info in metadata.get("files", {{}}).items():
-    if "error" in file_info or "column_details" not in file_info:
-        continue
-
-    for col in file_info["column_details"][:3]:  # First 3 columns
-        col_name = col["name"]
-        col_type = col.get("type", "unknown")
-
-        if col_type == "numerical" and col.get("min") is not None:
-            # Histogram for numerical
-            widgets.append({{
-                "id": str(uuid.uuid4())[:8],
-                "type": "histogram",
-                "title": f"Distribution: {{col_name}}",
-                "source_file": filename,
-                "layout": {{"x": 0, "y": layout_y, "w": 6, "h": 4}},
-                "plotly_spec": {{
-                    "data": [{{
-                        "type": "histogram",
-                        "x": [],  # Will be filled by frontend
-                        "marker": {{"color": "#06b6d4"}},
-                        "name": col_name
-                    }}],
-                    "layout": {{
-                        "template": "plotly_dark",
-                        "paper_bgcolor": "rgba(0,0,0,0)",
-                        "plot_bgcolor": "rgba(0,0,0,0)",
-                        "title": f"Distribution of {{col_name}}",
-                        "xaxis": {{"title": col_name}},
-                        "yaxis": {{"title": "Count"}}
-                    }}
-                }}
-            }})
-            layout_y += 4
-
-        elif col_type == "categorical" and col.get("categories"):
-            # Bar chart for categorical
-            categories = col.get("categories", [])[:10]
-            widgets.append({{
-                "id": str(uuid.uuid4())[:8],
-                "type": "bar_chart",
-                "title": f"Categories: {{col_name}}",
-                "source_file": filename,
-                "layout": {{"x": 6, "y": layout_y - 4 if layout_y > 2 else 2, "w": 6, "h": 4}},
-                "plotly_spec": {{
-                    "data": [{{
-                        "type": "bar",
-                        "x": categories,
-                        "y": [1] * len(categories),  # Placeholder counts
-                        "marker": {{"color": "#8b5cf6"}}
-                    }}],
-                    "layout": {{
-                        "template": "plotly_dark",
-                        "paper_bgcolor": "rgba(0,0,0,0)",
-                        "plot_bgcolor": "rgba(0,0,0,0)",
-                        "title": f"{{col_name}} Categories",
-                        "xaxis": {{"title": col_name}},
-                        "yaxis": {{"title": "Count"}}
-                    }}
-                }}
-            }})
-
-# Limit to 10 widgets max
-widgets = widgets[:10]
-
-# Build dashboard
-dashboard = {{
-    "id": "{dashboard_name}",
-    "name": "{dashboard_name}",
-    "description": f"Auto-generated dashboard for {{metadata['project_name']}}",
-    "created_at": datetime.utcnow().isoformat() + "Z",
-    "widgets": widgets,
-    "layout_cols": 12,
-    "theme": "dark"
+REQUIRED OUTPUT FORMAT for .dashboards/{dashboard_name}.json:
+{{
+  "id": "{dashboard_name}",
+  "name": "{dashboard_name}",
+  "description": "string",
+  "created_at": "ISO timestamp",
+  "widgets": [
+    {{
+      "id": "unique-id",
+      "type": "stat_card|bar_chart|histogram|pie_chart",
+      "title": "Chart Title",
+      "layout": {{"x": 0, "y": 0, "w": 6, "h": 4}},
+      "plotly_spec": {{...}}  // Plotly JSON spec with template: "plotly_dark"
+    }}
+  ],
+  "layout_cols": 12,
+  "theme": "dark"
 }}
 
-# Save dashboard
-with open(f".dashboards/{dashboard_name}.json", "w") as f:
-    json.dump(dashboard, f, indent=2)
-
-print(f"Dashboard '{{dashboard_name}}' created with {{len(widgets)}} widgets")
-print(json.dumps(dashboard, indent=2))
-```
-
-Run the script and output the dashboard JSON."""
+IMPORTANT: You MUST create the .dashboards/{dashboard_name}.json file."""
 
         async for event in self._run_claude(session_id, project_dir, prompt, mode):
             yield event
@@ -490,13 +319,12 @@ If asked to create a visualization, output a Plotly JSON specification."""
         Yields:
             Dict with type and content
         """
-        # Build command
+        # Build command - don't use --resume with -p mode as it requires existing UUID session
         cmd = [
             "claude",
             "-p", prompt,
             "--output-format", "stream-json",
             "--verbose",
-            "--resume", session_id,
             "--permission-mode", "bypassPermissions"
         ]
 
