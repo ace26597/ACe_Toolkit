@@ -41,9 +41,7 @@ apps/api/
 │       ├── database.py            # SQLAlchemy async setup
 │       ├── security.py            # JWT, passwords
 │       ├── ccresearch_manager.py  # CCResearch PTY manager
-│       ├── data_studio_manager.py # Headless Claude manager (Legacy)
-│       ├── data_analyzer.py       # Smart metadata extraction (V2)
-│       ├── dashboard_generator.py # Auto-dashboard generation (V2)
+│       ├── claude_runner.py       # Headless Claude Code for Data Studio V2
 │       ├── project_manager.py     # Unified project manager
 │       ├── workspace_manager.py   # Workspace file manager
 │       ├── session_manager.py     # Session management
@@ -412,11 +410,12 @@ Unified project operations across apps:
 ### ClaudeRunner (`core/claude_runner.py`) - Data Studio V2
 
 Manages headless Claude Code execution for Data Studio analysis:
-- Spawns Claude with `-p --output-format stream-json --verbose`
-- Uses `--permission-mode bypassPermissions` for auto-approval
+- Spawns Claude with `-p --output-format stream-json --verbose --permission-mode bypassPermissions`
+- Does NOT use `--resume` (requires valid UUID session which doesn't exist for new analysis)
 - Streams SSE events to frontend (status, text, tool, result, error, complete)
-- Deterministic session IDs (user+project hash) for session continuity
+- Deterministic session IDs (user+project hash) for tracking
 - Project-level CLAUDE.md auto-generated with data analyst context
+- Context loading from `.analysis/context.md` for session continuity
 
 **Key Methods:**
 ```python
@@ -426,9 +425,15 @@ async def nlp_edit(user_id, project_name, project_dir, request, dashboard_id, wi
 async def chat(user_id, project_name, project_dir, message, mode) -> AsyncGenerator
 ```
 
+**Prompt Design:**
+- Simplified instructional prompts (not embedded scripts)
+- Clear STEPS and REQUIRED OUTPUT FORMAT sections
+- Claude writes and executes Python scripts autonomously
+- Must save to `.analysis/metadata.json` and `.dashboards/{name}.json`
+
 **Modes:**
 - `headless`: Clean output - status, text, tool calls, results
-- `terminal`: Full Claude output including thinking
+- `terminal`: Full Claude output including raw JSON events
 
 **Skill Integration:**
 Uses `~/.claude/skills/data-studio-analyst/` skill for:
@@ -462,21 +467,24 @@ open http://localhost:8000/docs
 
 ---
 
-## Removed Modules (2026-01-22)
+## Removed Modules
 
 The following modules were removed during cleanup:
 
-| Module | Reason |
-|--------|--------|
-| `core/ai_provider.py` | Was used by Research Assistant (removed) |
-| `core/file_processor.py` | Was used by Research Assistant (removed) |
-| `core/langgraph_workflows.py` | Was used by Research Assistant (removed) |
-| `core/report_generator.py` | Was used by Research Assistant (removed) |
-| `routers/analyst.py` | Data Analyst app removed |
-| `routers/research_chat.py` | Research Assistant app removed |
-| `routers/notes.py` | Standalone notes removed (now in workspace) |
-| `routers/logs.py` | Logs viewer app removed |
-| `routers/projects.py` | Legacy projects removed |
+| Module | Date | Reason |
+|--------|------|--------|
+| `core/data_analyzer.py` | 2026-01-23 | Replaced by claude_runner.py (Claude Code First) |
+| `core/dashboard_generator.py` | 2026-01-23 | Replaced by claude_runner.py (Claude Code First) |
+| `core/data_studio_manager.py` | 2026-01-23 | Replaced by claude_runner.py |
+| `core/ai_provider.py` | 2026-01-22 | Was used by Research Assistant (removed) |
+| `core/file_processor.py` | 2026-01-22 | Was used by Research Assistant (removed) |
+| `core/langgraph_workflows.py` | 2026-01-22 | Was used by Research Assistant (removed) |
+| `core/report_generator.py` | 2026-01-22 | Was used by Research Assistant (removed) |
+| `routers/analyst.py` | 2026-01-22 | Data Analyst app removed |
+| `routers/research_chat.py` | 2026-01-22 | Research Assistant app removed |
+| `routers/notes.py` | 2026-01-22 | Standalone notes removed (now in workspace) |
+| `routers/logs.py` | 2026-01-22 | Logs viewer app removed |
+| `routers/projects.py` | 2026-01-22 | Legacy projects removed |
 
 ---
 

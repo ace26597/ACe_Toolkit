@@ -412,6 +412,9 @@ npm run start
 
 | Date | Change |
 |------|--------|
+| 2026-01-23 | **Data Studio V2:** Live terminal output during analysis with SSE streaming |
+| 2026-01-23 | **Data Studio V2:** AnalysisProgressView shows Claude Code events in real-time |
+| 2026-01-23 | **Fix:** TypeScript errors in analysis flow (metadata null check, nlpEdit options) |
 | 2026-01-22 | **Data Studio Fix:** Added `result` event type, improved event handling |
 | 2026-01-22 | **C3 Data Studio** - AI-powered data analysis with headless Claude |
 | 2026-01-22 | Added react-grid-layout, Plotly.js for dashboard visualizations |

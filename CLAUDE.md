@@ -1,6 +1,6 @@
 # CLAUDE.md - ACe_Toolkit
 
-**Last Updated:** January 22, 2026 | **Status:** Active | **Deployment:** Raspberry Pi + Cloudflare Tunnel
+**Last Updated:** January 23, 2026 | **Status:** Active | **Deployment:** Raspberry Pi + Cloudflare Tunnel
 
 ---
 
@@ -227,8 +227,10 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
-| 2026-01-23 | **MAJOR: Data Studio V2 Redesign** - Standalone projects, smart analysis, auto dashboards, NLP editing |
-| 2026-01-23 | **Backend:** data_analyzer.py, dashboard_generator.py, data_studio_v2.py router |
+| 2026-01-23 | **Fix:** Claude runner prompts simplified, removed --resume flag (requires UUID) |
+| 2026-01-23 | **Backend:** claude_runner.py replaces data_analyzer.py + dashboard_generator.py |
+| 2026-01-23 | **Frontend:** Live terminal output during analysis with SSE streaming |
+| 2026-01-23 | **MAJOR: Data Studio V2 Claude Code First** - Claude writes and executes analysis scripts |
 | 2026-01-23 | **Frontend:** Complete rewrite with project selector, importer, analysis progress, dashboard view |
 | 2026-01-22 | **Data Studio Fix:** Minimal MCP config, process tracking, memory optimization |
 | 2026-01-22 | **C3 Data Studio** - File search, multi-select, folder grouping, --verbose fix |
