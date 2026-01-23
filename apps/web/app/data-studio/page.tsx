@@ -656,7 +656,7 @@ function AnalysisProgressView({
                 </div>
 
                 {/* Show logs on error for debugging */}
-                <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 mb-6 max-h-64 overflow-y-auto font-mono text-sm">
+                <div className="bg-gray-900 border border-gray-700 rounded-lg p-4 mb-6 max-h-80 overflow-y-auto font-mono text-sm">
                     {logs.map((log, i) => (
                         <div key={i} className="text-gray-300 whitespace-pre-wrap">{log}</div>
                     ))}
@@ -675,10 +675,10 @@ function AnalysisProgressView({
     }
 
     return (
-        <div className="max-w-4xl mx-auto p-8">
-            <div className="text-center mb-6">
-                <Sparkles className="w-12 h-12 text-cyan-500 mx-auto mb-3 animate-pulse" />
-                <h2 className="text-xl font-bold text-white mb-1">Analyzing {project.name}</h2>
+        <div className="max-w-5xl mx-auto p-6 h-full flex flex-col">
+            <div className="text-center mb-4">
+                <Sparkles className="w-10 h-10 text-cyan-500 mx-auto mb-2 animate-pulse" />
+                <h2 className="text-lg font-bold text-white mb-1">Analyzing {project.name}</h2>
                 <p className="text-gray-400 text-sm">{progress.message}</p>
             </div>
 
@@ -706,17 +706,34 @@ function AnalysisProgressView({
                 </span>
             </div>
 
+            {/* Info Cards */}
+            <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-cyan-400">{project.file_count || '?'}</p>
+                    <p className="text-xs text-gray-500">Files to Analyze</p>
+                </div>
+                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-purple-400">pandas</p>
+                    <p className="text-xs text-gray-500">Data Library</p>
+                </div>
+                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-3 text-center">
+                    <p className="text-2xl font-bold text-green-400">Plotly</p>
+                    <p className="text-xs text-gray-500">Charts</p>
+                </div>
+            </div>
+
             {/* Live Terminal Output */}
-            <div className="bg-gray-950 border border-gray-700 rounded-lg overflow-hidden">
+            <div className="bg-gray-950 border border-gray-700 rounded-lg overflow-hidden flex-1 flex flex-col">
                 <div className="bg-gray-800 px-4 py-2 flex items-center gap-2 border-b border-gray-700">
                     <div className="w-3 h-3 rounded-full bg-red-500"></div>
                     <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
                     <div className="w-3 h-3 rounded-full bg-green-500"></div>
                     <span className="text-gray-400 text-sm ml-2">Claude Code Output</span>
+                    <span className="text-gray-600 text-xs ml-auto">Project: {project.name}</span>
                 </div>
-                <div className="p-4 h-64 overflow-y-auto font-mono text-sm">
+                <div className="p-4 h-80 overflow-y-auto font-mono text-sm flex-1">
                     {logs.length === 0 ? (
-                        <div className="text-gray-500 animate-pulse">Initializing...</div>
+                        <div className="text-gray-500 animate-pulse">Initializing Claude Code session...</div>
                     ) : (
                         logs.map((log, i) => (
                             <div key={i} className="text-gray-300 whitespace-pre-wrap mb-1">{log}</div>
@@ -725,6 +742,11 @@ function AnalysisProgressView({
                     <div ref={logsEndRef} />
                 </div>
             </div>
+
+            {/* Tips */}
+            <p className="text-xs text-gray-600 text-center mt-3">
+                Claude is writing and executing Python scripts to analyze your data
+            </p>
         </div>
     );
 }

@@ -170,6 +170,12 @@ REQUIRED OUTPUT FORMAT for .analysis/metadata.json:
   "files": {{"filename.csv": {{"rows": int, "columns": int, "column_details": [...]}}}}
 }}
 
+ALSO save a context file for future prompts at .analysis/context.md with:
+- Brief summary of each file analyzed
+- Key insights discovered
+- Recommended chart types for this data
+- Any data quality issues found
+
 IMPORTANT: You MUST create the .analysis/metadata.json file. The dashboard generation depends on it."""
 
         async for event in self._run_claude(session_id, project_dir, prompt, mode):
