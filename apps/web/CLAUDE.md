@@ -429,6 +429,9 @@ npm run start
 
 | Date | Change |
 |------|--------|
+| 2026-01-23 | **Data Studio:** Fix empty stat cards - support alternate field names (value/stat_value) |
+| 2026-01-23 | **Data Studio:** Fix [Object] display - properly stringify result objects |
+| 2026-01-23 | **Data Studio:** Remove redundant "Starting Claude Code session" message |
 | 2026-01-23 | **Data Studio:** Multi-file analysis mode selector (combined vs separate) |
 | 2026-01-23 | **Data Studio:** NLP edit progress modal with live Claude output |
 | 2026-01-23 | **Data Studio:** Fixed file count display (passes actual count from DataImporter) |

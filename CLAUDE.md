@@ -227,6 +227,8 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
+| 2026-01-23 | **Data Studio:** Fix empty stat cards/charts - support alternate field names |
+| 2026-01-23 | **Data Studio:** Fix [Object] display - properly stringify result objects |
 | 2026-01-23 | **Data Studio:** Multi-file analysis mode selector (combined vs separate) |
 | 2026-01-23 | **Data Studio:** NLP edit progress modal with live Claude output |
 | 2026-01-23 | **Data Studio:** Retry logic for metadata/dashboard fetch with filesystem sync |
