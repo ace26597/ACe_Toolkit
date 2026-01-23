@@ -65,8 +65,8 @@ class DataStudioManager:
         for d in dirs:
             os.makedirs(d, exist_ok=True)
 
-        # Create CLAUDE.md for the project if it doesn't exist
-        claude_md_path = os.path.join(project_dir, "CLAUDE.md")
+        # Create CLAUDE.md in .data-studio/ (not project root to avoid conflicts)
+        claude_md_path = os.path.join(data_studio_dir, "CLAUDE.md")
         if not os.path.exists(claude_md_path):
             self._create_claude_md(claude_md_path, project_dir)
 
@@ -107,30 +107,54 @@ Always explain what the data shows in plain language.
         logger.info(f"Created CLAUDE.md at {path}")
 
     def list_data_files(self, project_dir: str) -> List[Dict]:
-        """List available data files in the project."""
-        data_dir = os.path.join(project_dir, "data")
+        """
+        List available data files in the entire project.
+
+        Scans all directories except hidden ones (.claude, .data-studio, etc.)
+        Returns only supported file types: csv, tsv, xlsx, xls, json, md
+        """
         files = []
 
-        if not os.path.exists(data_dir):
+        if not os.path.exists(project_dir):
             return files
 
-        data_extensions = {
-            '.csv', '.tsv', '.xlsx', '.xls', '.json', '.jsonl',
-            '.parquet', '.feather', '.pickle', '.pkl', '.h5', '.hdf5',
-            '.txt', '.md'
+        # Only these extensions for Data Studio
+        supported_extensions = {
+            '.csv', '.tsv', '.xlsx', '.xls', '.json', '.jsonl', '.md'
         }
 
-        for root, _, filenames in os.walk(data_dir):
+        # Directories to skip
+        skip_dirs = {'.claude', '.data-studio', '.git', '__pycache__', 'node_modules', '.venv'}
+
+        for root, dirs, filenames in os.walk(project_dir):
+            # Skip hidden and system directories
+            dirs[:] = [d for d in dirs if d not in skip_dirs and not d.startswith('.')]
+
+            # Get relative path from project root
+            rel_root = os.path.relpath(root, project_dir)
+            if rel_root == '.':
+                rel_root = ''
+
             for filename in filenames:
+                # Skip hidden files
+                if filename.startswith('.'):
+                    continue
+
                 ext = os.path.splitext(filename)[1].lower()
-                if ext in data_extensions:
+                if ext in supported_extensions:
                     full_path = os.path.join(root, filename)
-                    rel_path = os.path.relpath(full_path, project_dir)
+                    rel_path = os.path.join(rel_root, filename) if rel_root else filename
+
                     try:
                         stat = os.stat(full_path)
+
+                        # Determine folder for grouping
+                        folder = rel_root.split('/')[0] if rel_root else 'root'
+
                         files.append({
                             "name": filename,
                             "path": rel_path,
+                            "folder": folder,
                             "size": stat.st_size,
                             "modified": datetime.fromtimestamp(stat.st_mtime).isoformat(),
                             "type": ext[1:]  # Remove the dot
@@ -138,7 +162,8 @@ Always explain what the data shows in plain language.
                     except OSError:
                         continue
 
-        return sorted(files, key=lambda x: x['name'])
+        # Sort by folder then name
+        return sorted(files, key=lambda x: (x['folder'], x['name']))
 
     async def create_session(
         self,

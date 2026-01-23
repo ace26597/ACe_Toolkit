@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Database, FileSpreadsheet, Send, Pin, Trash2, Play, Loader2, Wifi, WifiOff, BarChart3, Table, Code } from 'lucide-react';
+import { ArrowLeft, Database, FileSpreadsheet, Send, Pin, Trash2, Play, Loader2, Wifi, WifiOff, BarChart3, Table, Code, Search, FolderOpen } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth';
-import { workspaceApi } from '@/lib/api';
+import { workspaceApi, DataFile } from '@/lib/api';
 import { useDataStudioSession, ChatMessage, DataStudioEvent } from './hooks/useDataStudioSession';
 
 // ==================== Components ====================
@@ -219,15 +219,13 @@ function ChatPanel({
     isConnected,
     onSendMessage,
     onPinCode,
-    onRunCode,
-    dataFiles
+    onRunCode
 }: {
     messages: ChatMessage[];
     isConnected: boolean;
     onSendMessage: (content: string) => void;
     onPinCode: (code: string, language: string) => void;
     onRunCode: (code: string) => void;
-    dataFiles?: Array<{ name: string; path: string; type: string }>;
 }) {
     const [input, setInput] = useState('');
 
@@ -270,25 +268,9 @@ function ChatPanel({
                             ))}
                         </div>
 
-                        {/* File suggestions if available */}
-                        {dataFiles && dataFiles.length > 0 && (
-                            <div className="mt-6 text-left max-w-sm mx-auto">
-                                <p className="text-xs text-gray-500 mb-2">Or analyze a specific file:</p>
-                                <div className="space-y-1">
-                                    {dataFiles.slice(0, 3).map((file, idx) => (
-                                        <button
-                                            key={idx}
-                                            onClick={() => isConnected && onSendMessage(`Analyze the file "${file.path}" - show me the structure, statistics, and key insights.`)}
-                                            disabled={!isConnected}
-                                            className="w-full text-xs text-left p-2 bg-gray-800/50 hover:bg-gray-700 disabled:text-gray-600 border border-gray-700 hover:border-cyan-600 rounded flex items-center gap-2 transition-colors"
-                                        >
-                                            <FileSpreadsheet className="w-3 h-3 text-cyan-500" />
-                                            <span className="truncate">{file.name}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        <p className="text-xs text-gray-600 mt-6">
+                            ← Select files from the sidebar to analyze
+                        </p>
                     </div>
                 ) : (
                     messages.map(message => (
@@ -391,20 +373,42 @@ function DashboardCanvas({
 
 function DataFilesList({
     files,
-    onAnalyze,
-    onPreview
+    selectedFiles,
+    onToggleSelect,
+    onAnalyzeSelected,
+    isConnected
 }: {
-    files: Array<{ name: string; path: string; size: number; type: string }>;
-    onAnalyze?: (file: { name: string; path: string; type: string }) => void;
-    onPreview?: (file: { name: string; path: string; type: string }) => void;
+    files: DataFile[];
+    selectedFiles: Set<string>;
+    onToggleSelect: (path: string) => void;
+    onAnalyzeSelected: () => void;
+    isConnected: boolean;
 }) {
-    if (files.length === 0) {
-        return (
-            <div className="text-gray-500 text-sm p-2">
-                No data files found. Upload files to the project's data folder.
-            </div>
-        );
-    }
+    const [search, setSearch] = useState('');
+    const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['data', 'notes', 'root']));
+
+    // Filter files by search
+    const filteredFiles = files.filter(f =>
+        f.name.toLowerCase().includes(search.toLowerCase()) ||
+        f.path.toLowerCase().includes(search.toLowerCase())
+    );
+
+    // Group files by folder
+    const groupedFiles = filteredFiles.reduce((acc, file) => {
+        const folder = file.folder || 'root';
+        if (!acc[folder]) acc[folder] = [];
+        acc[folder].push(file);
+        return acc;
+    }, {} as Record<string, DataFile[]>);
+
+    const toggleFolder = (folder: string) => {
+        setExpandedFolders(prev => {
+            const next = new Set(prev);
+            if (next.has(folder)) next.delete(folder);
+            else next.add(folder);
+            return next;
+        });
+    };
 
     const formatSize = (bytes: number) => {
         if (bytes < 1024) return `${bytes} B`;
@@ -423,40 +427,126 @@ function DataFilesList({
             case 'json':
             case 'jsonl':
                 return <Code className="w-4 h-4 text-yellow-500" />;
-            case 'parquet':
-            case 'feather':
-                return <Database className="w-4 h-4 text-purple-500" />;
+            case 'md':
+                return <FileSpreadsheet className="w-4 h-4 text-blue-400" />;
             default:
                 return <FileSpreadsheet className="w-4 h-4 text-cyan-500" />;
         }
     };
 
+    if (files.length === 0) {
+        return (
+            <div className="text-gray-500 text-sm p-4 text-center">
+                <Database className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <p>No data files found</p>
+                <p className="text-xs mt-1">Add CSV, JSON, MD, or Excel files to your project</p>
+            </div>
+        );
+    }
+
     return (
-        <div className="space-y-1 p-2">
-            {files.map(file => (
-                <div
-                    key={file.path}
-                    className="group flex items-center gap-2 p-2 hover:bg-gray-800 rounded text-sm cursor-pointer transition-colors"
-                    onClick={() => onAnalyze?.(file)}
-                    title={`Click to analyze ${file.name}`}
-                >
-                    {getFileIcon(file.type)}
-                    <div className="flex-1 min-w-0">
-                        <span className="text-gray-300 truncate block">{file.name}</span>
-                        <span className="text-gray-500 text-xs">{formatSize(file.size)}</span>
-                    </div>
+        <div className="flex flex-col h-full">
+            {/* Search */}
+            <div className="p-2 border-b border-gray-800">
+                <input
+                    type="text"
+                    placeholder="Search files..."
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+                />
+            </div>
+
+            {/* Selected count & analyze button */}
+            {selectedFiles.size > 0 && (
+                <div className="p-2 bg-cyan-900/30 border-b border-cyan-700 flex items-center justify-between">
+                    <span className="text-xs text-cyan-300">{selectedFiles.size} selected</span>
                     <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onAnalyze?.(file);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 text-cyan-400 hover:text-cyan-300 p-1"
-                        title="Analyze this file"
+                        onClick={onAnalyzeSelected}
+                        disabled={!isConnected}
+                        className="text-xs bg-cyan-600 hover:bg-cyan-700 disabled:bg-gray-600 text-white px-2 py-1 rounded flex items-center gap-1"
                     >
                         <BarChart3 className="w-3 h-3" />
+                        Analyze
                     </button>
                 </div>
-            ))}
+            )}
+
+            {/* File list grouped by folder */}
+            <div className="flex-1 overflow-auto">
+                {Object.entries(groupedFiles).map(([folder, folderFiles]) => (
+                    <div key={folder}>
+                        {/* Folder header */}
+                        <button
+                            onClick={() => toggleFolder(folder)}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 bg-gray-900 hover:bg-gray-800 text-xs text-gray-400 sticky top-0"
+                        >
+                            <span>{expandedFolders.has(folder) ? '▼' : '▶'}</span>
+                            <span className="font-medium">{folder}/</span>
+                            <span className="text-gray-600">({folderFiles.length})</span>
+                        </button>
+
+                        {/* Files in folder */}
+                        {expandedFolders.has(folder) && (
+                            <div className="space-y-0.5 p-1">
+                                {folderFiles.map(file => {
+                                    const isSelected = selectedFiles.has(file.path);
+                                    return (
+                                        <div
+                                            key={file.path}
+                                            onClick={() => onToggleSelect(file.path)}
+                                            className={`flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer transition-colors ${
+                                                isSelected
+                                                    ? 'bg-cyan-900/40 border border-cyan-600'
+                                                    : 'hover:bg-gray-800 border border-transparent'
+                                            }`}
+                                        >
+                                            {/* Checkbox */}
+                                            <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${
+                                                isSelected ? 'bg-cyan-500 border-cyan-500' : 'border-gray-600'
+                                            }`}>
+                                                {isSelected && <span className="text-white text-[10px]">✓</span>}
+                                            </div>
+                                            {/* Icon */}
+                                            {getFileIcon(file.type)}
+                                            {/* Name & size */}
+                                            <div className="flex-1 min-w-0">
+                                                <span className="text-gray-300 truncate block">{file.name}</span>
+                                            </div>
+                                            <span className="text-gray-600 text-[10px]">{formatSize(file.size)}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            {/* Quick actions */}
+            <div className="p-2 border-t border-gray-800 space-y-1">
+                <button
+                    onClick={() => {
+                        // Select all visible files
+                        filteredFiles.forEach(f => {
+                            if (!selectedFiles.has(f.path)) onToggleSelect(f.path);
+                        });
+                    }}
+                    className="w-full text-xs text-gray-400 hover:text-cyan-400 p-1 hover:bg-gray-800 rounded text-left"
+                >
+                    Select All ({filteredFiles.length})
+                </button>
+                {selectedFiles.size > 0 && (
+                    <button
+                        onClick={() => {
+                            selectedFiles.forEach(path => onToggleSelect(path));
+                        }}
+                        className="w-full text-xs text-gray-400 hover:text-red-400 p-1 hover:bg-gray-800 rounded text-left"
+                    >
+                        Clear Selection
+                    </button>
+                )}
+            </div>
         </div>
     );
 }
@@ -465,6 +555,7 @@ function DataFilesList({
 
 function DataStudioContent() {
     const [projectName, setProjectName] = useState<string | null>(null);
+    const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
 
     const {
         sessionId,
@@ -484,6 +575,7 @@ function DataStudioContent() {
 
     const handleSelectProject = async (name: string) => {
         setProjectName(name);
+        setSelectedFiles(new Set());
         await connect(name);
     };
 
@@ -492,6 +584,29 @@ function DataStudioContent() {
             type: 'code',
             data: { content: code, language },
         });
+    };
+
+    const handleToggleFileSelect = (path: string) => {
+        setSelectedFiles(prev => {
+            const next = new Set(prev);
+            if (next.has(path)) next.delete(path);
+            else next.add(path);
+            return next;
+        });
+    };
+
+    const handleAnalyzeSelected = () => {
+        if (!isConnected || selectedFiles.size === 0) return;
+
+        const files = Array.from(selectedFiles);
+        if (files.length === 1) {
+            sendMessage(`Analyze the file "${files[0]}" - show me the structure, data types, basic statistics, and any interesting patterns or insights.`);
+        } else {
+            const fileList = files.map(f => `- ${f}`).join('\n');
+            sendMessage(`Analyze these ${files.length} files and provide insights:\n${fileList}\n\nFor each file, show structure and key statistics. Then identify any relationships or patterns across the files.`);
+        }
+        // Clear selection after analyzing
+        setSelectedFiles(new Set());
     };
 
     if (!projectName) {
@@ -566,34 +681,18 @@ function DataStudioContent() {
             {/* Main content */}
             <div className="flex-1 flex overflow-hidden">
                 {/* Left sidebar - Data files */}
-                <div className="w-56 border-r border-gray-800 bg-gray-950 flex-shrink-0 overflow-auto">
+                <div className="w-64 border-r border-gray-800 bg-gray-950 flex-shrink-0 flex flex-col">
                     <div className="p-3 border-b border-gray-800">
-                        <h3 className="text-sm font-medium text-gray-400">Data Files</h3>
-                        <p className="text-xs text-gray-500 mt-1">Click to analyze</p>
+                        <h3 className="text-sm font-medium text-gray-400">Project Files</h3>
+                        <p className="text-xs text-gray-500 mt-1">{dataFiles.length} files · Select to analyze</p>
                     </div>
                     <DataFilesList
-                        files={dataFiles}
-                        onAnalyze={(file) => {
-                            if (isConnected) {
-                                sendMessage(`Analyze the file "${file.path}" - show me the structure, basic statistics, and any interesting patterns.`);
-                            }
-                        }}
+                        files={dataFiles as DataFile[]}
+                        selectedFiles={selectedFiles}
+                        onToggleSelect={handleToggleFileSelect}
+                        onAnalyzeSelected={handleAnalyzeSelected}
+                        isConnected={isConnected}
                     />
-                    {dataFiles.length > 0 && (
-                        <div className="p-2 border-t border-gray-800">
-                            <button
-                                onClick={() => {
-                                    if (isConnected) {
-                                        sendMessage("List all data files and give me a brief summary of each one.");
-                                    }
-                                }}
-                                disabled={!isConnected}
-                                className="w-full text-xs text-cyan-400 hover:text-cyan-300 disabled:text-gray-600 p-2 hover:bg-gray-800 rounded transition-colors"
-                            >
-                                Analyze All Files
-                            </button>
-                        </div>
-                    )}
                 </div>
 
                 {/* Chat panel */}
@@ -604,7 +703,6 @@ function DataStudioContent() {
                         onSendMessage={sendMessage}
                         onPinCode={handlePinCode}
                         onRunCode={runCode}
-                        dataFiles={dataFiles}
                     />
                 </div>
 

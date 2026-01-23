@@ -513,6 +513,7 @@ export interface SessionFile {
 export interface DataFile {
     name: string;
     path: string;
+    folder: string;
     size: number;
     modified: string;
     type: string;
