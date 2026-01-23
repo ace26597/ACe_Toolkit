@@ -681,8 +681,17 @@ function AnalysisProgressView({
         } else if (event.type === 'tool') {
             addLog(`🔧 Tool: ${event.content}`);
         } else if (event.type === 'result') {
-            // Show a sample of the result
-            const result = String(event.content);
+            // Show a sample of the result - properly stringify objects
+            let result: string;
+            if (typeof event.content === 'object' && event.content !== null) {
+                try {
+                    result = JSON.stringify(event.content, null, 2);
+                } catch {
+                    result = String(event.content);
+                }
+            } else {
+                result = String(event.content);
+            }
             if (result.length > 300) {
                 addLog(`✅ Result: ${result.slice(0, 300)}...`);
             } else {
@@ -1366,8 +1375,12 @@ function WidgetCard({
             <div className="p-3">
                 {widget.type === 'stat_card' && (
                     <div className="text-center py-4">
-                        <p className="text-3xl font-bold text-white">{widget.stat_value}</p>
-                        <p className="text-sm text-gray-400 mt-1">{widget.stat_label}</p>
+                        <p className="text-3xl font-bold text-white">
+                            {widget.stat_value || widget.value || '-'}
+                        </p>
+                        <p className="text-sm text-gray-400 mt-1">
+                            {widget.stat_label || widget.subtitle || widget.title || ''}
+                        </p>
                     </div>
                 )}
 
@@ -1378,8 +1391,8 @@ function WidgetCard({
                     />
                 )}
 
-                {widget.plotly_spec && widget.type !== 'stat_card' && widget.type !== 'mermaid' && (
-                    <PlotlyWidget spec={widget.plotly_spec} metadata={metadata} />
+                {(widget.plotly_spec || widget.plotly) && widget.type !== 'stat_card' && widget.type !== 'mermaid' && (
+                    <PlotlyWidget spec={widget.plotly_spec || widget.plotly} metadata={metadata} />
                 )}
 
                 {widget.type === 'table' && (

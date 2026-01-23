@@ -548,9 +548,12 @@ export interface DashboardWidget {
     description?: string;
     source_file?: string;
     plotly_spec?: any;
+    plotly?: any;  // Alternate field name from Claude
     vega_lite_spec?: any;
     stat_value?: string;
     stat_label?: string;
+    value?: string;     // Alternate field name from Claude
+    subtitle?: string;  // Alternate field name from Claude
     mermaid_code?: string;
 }
 

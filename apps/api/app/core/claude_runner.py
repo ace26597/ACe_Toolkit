@@ -277,11 +277,11 @@ STEPS:
 1. Read .analysis/metadata.json to understand the data
 2. Activate venv: source ~/.local/share/data-studio-venv/bin/activate
 3. Write a Python script that:
-   - Loads the metadata from .analysis/metadata.json
+   - Loads the metadata AND the actual data files from data/
    - Creates 5-10 dashboard widgets based on the data:
-     * Stat cards for totals (rows, files)
-     * Bar/pie charts for categorical columns
-     * Histograms for numerical columns
+     * Stat cards for totals (rows, files, key metrics)
+     * Bar/pie charts for categorical columns (with actual data)
+     * Histograms for numerical columns (with actual data)
    - Saves to .dashboards/{dashboard_name}.json
 4. Run the script
 
@@ -293,18 +293,31 @@ REQUIRED OUTPUT FORMAT for .dashboards/{dashboard_name}.json:
   "created_at": "ISO timestamp",
   "widgets": [
     {{
-      "id": "unique-id",
-      "type": "stat_card|bar_chart|histogram|pie_chart",
-      "title": "Chart Title",
-      "layout": {{"x": 0, "y": 0, "w": 6, "h": 4}},
-      "plotly_spec": {{...}}  // Plotly JSON spec with template: "plotly_dark"
+      "id": "w1",
+      "type": "stat_card",
+      "title": "Total Rows",
+      "value": "1,234",
+      "subtitle": "Across all files"
+    }},
+    {{
+      "id": "w2",
+      "type": "histogram",
+      "title": "Age Distribution",
+      "plotly": {{
+        "data": [{{"type": "histogram", "x": [actual, data, values, here]}}],
+        "layout": {{"template": "plotly_dark", "paper_bgcolor": "rgba(0,0,0,0)", "plot_bgcolor": "rgba(0,0,0,0)"}}
+      }}
     }}
   ],
   "layout_cols": 12,
   "theme": "dark"
 }}
 
-IMPORTANT: You MUST create the .dashboards/{dashboard_name}.json file."""
+IMPORTANT:
+- For stat_card widgets: use "value" (the number/text) and "subtitle" (description)
+- For chart widgets: use "plotly" with actual data arrays from the files, NOT placeholders
+- Load the actual CSV/Excel data to populate chart arrays
+- You MUST create the .dashboards/{dashboard_name}.json file."""
 
         async for event in self._run_claude(session_id, project_dir, prompt, mode):
             yield event
@@ -407,8 +420,6 @@ If asked to create a visualization, output a Plotly JSON specification."""
             "--verbose",
             "--permission-mode", "bypassPermissions"
         ]
-
-        yield {"type": "status", "content": "Starting Claude Code session..."}
 
         try:
             process = await asyncio.create_subprocess_exec(
