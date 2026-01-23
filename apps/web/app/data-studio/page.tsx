@@ -863,14 +863,18 @@ function DashboardView({
 
                         {/* Stats Grid */}
                         <div className="grid grid-cols-2 gap-2 mb-4">
-                            <StatCard label="Files" value={metadata.summary.total_files} icon={FileText} />
-                            <StatCard label="Rows" value={formatNumber(metadata.summary.total_rows)} icon={Table} />
-                            <StatCard label="Columns" value={metadata.summary.total_columns} icon={Hash} />
-                            <StatCard label="Type" value={metadata.summary.primary_data_type.split('_')[0]} icon={Database} />
+                            <StatCard label="Files" value={metadata.summary.total_files || 0} icon={FileText} />
+                            <StatCard label="Rows" value={formatNumber(metadata.summary.total_rows || 0)} icon={Table} />
+                            {metadata.summary.total_columns && (
+                                <StatCard label="Columns" value={metadata.summary.total_columns} icon={Hash} />
+                            )}
+                            {metadata.summary.primary_data_type && (
+                                <StatCard label="Type" value={metadata.summary.primary_data_type.split('_')[0]} icon={Database} />
+                            )}
                         </div>
 
                         {/* Themes */}
-                        {metadata.summary.themes.length > 0 && (
+                        {metadata.summary.themes && metadata.summary.themes.length > 0 && (
                             <div className="mb-4">
                                 <h4 className="text-xs font-medium text-gray-500 mb-2">Detected Themes</h4>
                                 <div className="flex flex-wrap gap-1">
@@ -897,11 +901,11 @@ function DashboardView({
                         {/* Files List */}
                         <h4 className="text-xs font-medium text-gray-500 mb-2">Analyzed Files</h4>
                         <div className="space-y-2">
-                            {Object.entries(metadata.files).map(([filename, analysis]) => (
+                            {metadata.files && Object.entries(metadata.files).map(([filename, analysis]: [string, any]) => (
                                 <div key={filename} className="bg-gray-800 rounded p-2 text-sm">
                                     <p className="text-gray-200 truncate font-medium">{filename}</p>
                                     <p className="text-xs text-gray-500">
-                                        {formatNumber(analysis.row_count)} rows, {analysis.column_count} cols
+                                        {formatNumber(analysis.rows || analysis.row_count || 0)} rows, {analysis.columns || analysis.column_count || 0} cols
                                     </p>
                                 </div>
                             ))}
