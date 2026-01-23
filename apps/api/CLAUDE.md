@@ -377,13 +377,22 @@ def list_data_files(project_dir) -> List[dict]
 
 **Claude Execution:**
 ```bash
-claude -p \
+# First message - create session
+claude -p "message" \
   --output-format stream-json \
-  --input-format stream-json \
-  --session-id {uuid} \
-  --permission-mode bypassPermissions \
-  --cwd {project_dir}/.data-studio
+  --verbose \
+  --session-id {deterministic-uuid} \
+  --permission-mode bypassPermissions
+
+# Subsequent messages - resume session
+claude -p "message" \
+  --output-format stream-json \
+  --verbose \
+  --resume {same-uuid} \
+  --permission-mode bypassPermissions
 ```
+
+**Note:** `--verbose` is required when using `-p` with `--output-format stream-json`.
 
 ---
 

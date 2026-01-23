@@ -154,13 +154,16 @@ AI-powered data analysis and visualization using headless Claude Code.
 - `ChatPanel` - Send messages, view Claude's responses, quick actions
 - `MessageBubble` - Renders text, tool calls, code blocks
 - `DashboardCanvas` - Draggable widget grid (react-grid-layout)
-- `DataFilesList` - Interactive file browser with click-to-analyze
+- `DataFilesList` - File browser with search, multi-select, folder grouping
 
 **Interactive Features:**
-- Click any file → sends analyze request to Claude
-- File type icons: CSV (green), Excel (emerald), JSON (yellow), Parquet (purple)
+- File search by name
+- Multi-select with checkboxes
+- Folder grouping with collapsible sections
+- File type icons: CSV (green), Excel (emerald), JSON (yellow), MD (blue)
+- "Analyze Selected" button for multi-file analysis
+- "Select All" / "Clear Selection" quick actions
 - Quick actions: List all, Data overview, Find patterns, Create chart
-- "Analyze All Files" button for full project summary
 
 **WebSocket Events:**
 | Event Type | Description |

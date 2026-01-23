@@ -50,13 +50,13 @@ lsof -i :3000 -i :8000  # Check our ports
 - `/ccresearch` redirects to `/workspace?tab=terminal`
 
 **C3 Data Studio Features (NEW):**
-- Headless Claude Code (`-p --output-format stream-json`)
+- Headless Claude Code (`-p --output-format stream-json --verbose`)
 - Real-time streaming of thinking, tool calls, and outputs
 - Chat interface for data analysis requests
 - Dashboard canvas with draggable widgets (Plotly.js)
-- Uses workspace project data files (shared access)
-- Interactive file browser - click to analyze
-- Quick actions: List files, Overview, Patterns, Charts
+- Scans entire project for files (csv, json, md, xlsx)
+- File search, multi-select, folder grouping
+- Deterministic session ID (user+project hash) for continuity
 - Session isolation (`.data-studio/` separate from `.claude/`)
 
 **Unified Project Architecture:**
@@ -220,7 +220,7 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
-| 2026-01-22 | **NEW: C3 Data Studio** - AI-powered data analysis with headless Claude, chat interface, dashboard canvas |
+| 2026-01-22 | **C3 Data Studio** - File search, multi-select, folder grouping, --verbose fix |
 | 2026-01-22 | **Code Cleanup:** Removed unused core modules (ai_provider, file_processor, langgraph_workflows, report_generator) |
 | 2026-01-22 | **Frontend Cleanup:** Removed unused APIs (analystApi, researchApi, notesApi, projectsApi, chartsApi, mermaidDiskApi) |
 | 2026-01-22 | **Fix:** GitHub clone `re` module error (Python 3.13 scoping issue) |
