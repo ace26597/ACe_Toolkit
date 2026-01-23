@@ -30,6 +30,7 @@ class DataStudioSession:
     created_at: datetime = field(default_factory=datetime.utcnow)
     last_activity: datetime = field(default_factory=datetime.utcnow)
     is_active: bool = True
+    active_process: Optional[asyncio.subprocess.Process] = field(default=None, repr=False)
 
 
 class DataStudioManager:
@@ -219,8 +220,8 @@ Always explain what the data shows in plain language.
         """
         Execute Claude and stream the output.
 
-        Spawns: claude -p "message" --output-format stream-json --session-id {uuid}
-        Or for continuation: claude -p "message" --resume {uuid} --output-format stream-json
+        Spawns: claude -p "message" --output-format stream-json --resume {uuid}
+        Uses chunked reading to handle Claude's buffered output properly.
         """
         session = self.sessions.get(session_id)
         if not session:
@@ -231,42 +232,96 @@ Always explain what the data shows in plain language.
             yield {"type": "error", "message": "No message to process"}
             return
 
-        # Build command
+        # Build command with minimal MCP config to reduce memory usage
         # Note: --output-format stream-json requires --verbose when using -p
         # Always use --resume - it resumes existing session or creates new one
+        # Use --strict-mcp-config with only filesystem to prevent loading 100+ MCP processes
+        minimal_mcp_config = json.dumps({
+            "mcpServers": {
+                "filesystem": {
+                    "command": "npx",
+                    "args": ["-y", "@modelcontextprotocol/server-filesystem", session.project_dir]
+                }
+            }
+        })
         cmd = [
             "claude", "-p", message,
             "--output-format", "stream-json",
             "--verbose",
             "--resume", session.claude_session_id,
-            "--permission-mode", "bypassPermissions"
+            "--permission-mode", "bypassPermissions",
+            "--strict-mcp-config",
+            "--mcp-config", minimal_mcp_config
         ]
 
         logger.info(f"Executing: {' '.join(cmd[:6])}...")  # Log truncated command
         logger.info(f"Working directory: {session.project_dir}")
 
+        # Kill any existing process for this session to prevent accumulation
+        if session.active_process is not None:
+            try:
+                if session.active_process.returncode is None:
+                    logger.warning(f"Killing existing Claude process for session {session_id}")
+                    session.active_process.kill()
+                    await session.active_process.wait()
+            except Exception as e:
+                logger.debug(f"Error killing previous process: {e}")
+            session.active_process = None
+
         try:
-            # Spawn process
+            # Spawn process with unbuffered output
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=session.project_dir,
             )
+            session.active_process = process
 
-            # Stream stdout
+            # Read stdout in chunks and parse lines
+            # Claude buffers output when not connected to TTY, so we need to
+            # read chunks and split into lines ourselves
+            buffer = ""
             if process.stdout:
-                async for line in process.stdout:
-                    line_str = line.decode().strip()
-                    if not line_str:
-                        continue
+                while True:
+                    try:
+                        # Read up to 8KB at a time with timeout
+                        chunk = await asyncio.wait_for(
+                            process.stdout.read(8192),
+                            timeout=120.0  # 2 minute timeout per chunk
+                        )
+                        if not chunk:
+                            break  # EOF
 
-                    event = self._parse_output_line(line_str)
+                        buffer += chunk.decode()
+
+                        # Process complete lines
+                        while "\n" in buffer:
+                            line, buffer = buffer.split("\n", 1)
+                            line = line.strip()
+                            if line:
+                                event = self._parse_output_line(line)
+                                if event:
+                                    yield event
+
+                    except asyncio.TimeoutError:
+                        logger.warning(f"Timeout waiting for Claude output in session {session_id}")
+                        break
+
+                # Process any remaining buffer
+                if buffer.strip():
+                    event = self._parse_output_line(buffer.strip())
                     if event:
                         yield event
 
-            # Wait for process to complete
-            await process.wait()
+            # Wait for process to complete with timeout
+            try:
+                await asyncio.wait_for(process.wait(), timeout=300.0)  # 5 min max
+            except asyncio.TimeoutError:
+                logger.warning(f"Claude process timed out for session {session_id}")
+                process.kill()
+                await process.wait()
+                yield {"type": "error", "message": "Analysis timed out after 5 minutes"}
 
             # Check for errors
             if process.returncode != 0 and process.stderr:
@@ -280,10 +335,17 @@ Always explain what the data shows in plain language.
 
         except asyncio.CancelledError:
             logger.info(f"Output streaming cancelled for session {session_id}")
+            if 'process' in locals() and process.returncode is None:
+                process.kill()
+                await process.wait()
             raise
         except Exception as e:
             logger.error(f"Error in stream_output for session {session_id}: {e}")
             yield {"type": "error", "message": str(e)}
+        finally:
+            # Clear active process reference
+            if session_id in self.sessions:
+                self.sessions[session_id].active_process = None
 
     def _parse_output_line(self, line: str) -> Optional[Dict]:
         """Parse a line of Claude's stream-json output."""
@@ -291,19 +353,36 @@ Always explain what the data shows in plain language.
             data = json.loads(line)
         except json.JSONDecodeError:
             # Plain text output
+            logger.debug(f"Non-JSON line: {line[:100]}")
             return {"type": "text", "content": line}
 
         msg_type = data.get("type")
+        logger.debug(f"Parsing message type: {msg_type}")
 
         # Handle different message types from Claude's stream-json output
-        if msg_type == "assistant":
+        if msg_type == "system":
+            # System messages - init, session info, etc.
+            subtype = data.get("subtype", "")
+            if subtype == "init":
+                # Session initialized - show brief status
+                session_id = data.get("session_id", "")
+                return {"type": "thinking", "content": f"Session ready ({session_id[:8]}...)"}
+            message = data.get("message", "")
+            if message:
+                return {"type": "thinking", "content": message}
+            return None
+
+        elif msg_type == "assistant":
             message = data.get("message", {})
             content_blocks = message.get("content", [])
 
+            # Return first meaningful content block
             for block in content_blocks:
                 block_type = block.get("type")
                 if block_type == "text":
-                    return {"type": "text", "content": block.get("text", "")}
+                    text = block.get("text", "")
+                    if text:
+                        return {"type": "text", "content": text}
                 elif block_type == "tool_use":
                     return {
                         "type": "tool_call",
@@ -312,6 +391,7 @@ Always explain what the data shows in plain language.
                         "input": block.get("input", {}),
                         "status": "running"
                     }
+            return None
 
         elif msg_type == "content_block_start":
             block = data.get("content_block", {})
@@ -347,28 +427,38 @@ Always explain what the data shows in plain language.
             return None  # Will send done after
 
         elif msg_type == "result":
-            # Final result
+            # Final result - this is the main response
             result = data.get("result", "")
             if result:
-                return {"type": "text", "content": result}
+                logger.info(f"Claude result received ({len(result)} chars)")
+                return {"type": "result", "content": result}
             return None
 
         elif msg_type == "error":
-            return {"type": "error", "message": data.get("error", {}).get("message", "Unknown error")}
-
-        elif msg_type == "system":
-            # System messages (e.g., session info)
-            return {"type": "thinking", "content": data.get("message", "")}
+            error_msg = data.get("error", {}).get("message", "Unknown error")
+            logger.error(f"Claude error: {error_msg}")
+            return {"type": "error", "message": error_msg}
 
         # Unknown type - log and skip
-        logger.debug(f"Unknown message type: {msg_type}")
+        logger.debug(f"Skipping unknown message type: {msg_type}")
         return None
 
     async def close_session(self, session_id: str) -> bool:
-        """Close a Data Studio session."""
+        """Close a Data Studio session and kill any running Claude process."""
         session = self.sessions.get(session_id)
         if not session:
             return False
+
+        # Kill active Claude process if any
+        if session.active_process is not None:
+            try:
+                if session.active_process.returncode is None:
+                    logger.info(f"Killing Claude process for session {session_id}")
+                    session.active_process.kill()
+                    await session.active_process.wait()
+            except Exception as e:
+                logger.debug(f"Error killing process on close: {e}")
+            session.active_process = None
 
         session.is_active = False
         del self.sessions[session_id]

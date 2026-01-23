@@ -5,7 +5,7 @@ import { dataStudioApi, DashboardWidget, DataFile } from '@/lib/api';
 
 // Event types from Claude output
 export interface DataStudioEvent {
-    type: 'thinking' | 'tool_call' | 'tool_result' | 'code' | 'text' | 'text_delta' | 'chart' | 'table' | 'error' | 'done' | 'raw' | 'pong';
+    type: 'thinking' | 'tool_call' | 'tool_result' | 'code' | 'text' | 'text_delta' | 'result' | 'chart' | 'table' | 'error' | 'done' | 'raw' | 'pong' | 'input_delta';
     content?: string;
     tool?: string;
     input?: Record<string, any>;
@@ -145,13 +145,17 @@ export function useDataStudioSession(): UseDataStudioSessionReturn {
 
             if (currentMsg) {
                 // Add event to current message
-                if (event.type === 'text') {
+                if (event.type === 'text' || event.type === 'result') {
+                    // Main text content or final result
                     currentMsg.content += event.content || '';
                 } else if (event.type === 'text_delta') {
                     currentMsg.content += event.content || '';
                 } else if (event.type === 'done') {
                     currentMessageRef.current = null;
+                } else if (event.type === 'pong') {
+                    // Ignore keepalive responses
                 } else {
+                    // Store other events (tool_call, thinking, etc.)
                     currentMsg.events.push(event);
                 }
             }

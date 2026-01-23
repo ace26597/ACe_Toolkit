@@ -365,32 +365,36 @@ Manages headless Claude Code sessions for Data Studio:
 - Parses JSON output stream into frontend events
 - Maintains session state in `.data-studio/sessions/`
 - Creates CLAUDE.md with data analysis guidelines
+- **Process tracking** - Kills existing process before spawning new one
+- **Minimal MCP config** - Only loads filesystem server (reduces memory 500MB → ~50MB)
+- **Timeout handling** - 5-minute max timeout kills hung processes
 
 **Key Methods:**
 ```python
 async def create_session(user_id, project_name, session_id=None) -> DataStudioSession
 async def send_message(session_id, message) -> None
 async def stream_output(session_id) -> AsyncGenerator[Dict, None]
-async def close_session(session_id) -> bool
+async def close_session(session_id) -> bool  # Kills active process
 def list_data_files(project_dir) -> List[dict]
 ```
 
 **Claude Execution:**
 ```bash
-# First message - create session
+# All messages use --resume (works for new and existing sessions)
 claude -p "message" \
   --output-format stream-json \
   --verbose \
-  --session-id {deterministic-uuid} \
-  --permission-mode bypassPermissions
-
-# Subsequent messages - resume session
-claude -p "message" \
-  --output-format stream-json \
-  --verbose \
-  --resume {same-uuid} \
-  --permission-mode bypassPermissions
+  --resume {deterministic-uuid} \
+  --permission-mode bypassPermissions \
+  --strict-mcp-config \
+  --mcp-config '{"mcpServers":{"filesystem":{"command":"npx","args":["-y","@modelcontextprotocol/server-filesystem","/path/to/project"]}}}'
 ```
+
+**Memory Optimization:**
+- Uses `--strict-mcp-config` to prevent loading default MCP servers (100+ processes)
+- Only loads filesystem MCP server for reading data files
+- Process tracked per session, killed on new message or session close
+- Chunk-based stdout reading to handle Claude's buffered output
 
 **Note:** `--verbose` is required when using `-p` with `--output-format stream-json`.
 

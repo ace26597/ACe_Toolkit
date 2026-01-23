@@ -58,6 +58,8 @@ lsof -i :3000 -i :8000  # Check our ports
 - File search, multi-select, folder grouping
 - Deterministic session ID (user+project hash) for continuity
 - Session isolation (`.data-studio/` separate from `.claude/`)
+- Minimal MCP config (only filesystem) to reduce memory usage
+- Process tracking with automatic cleanup (prevents accumulation)
 
 **Unified Project Architecture:**
 - Projects live at `/data/users/{user-id}/projects/{project-name}/`
@@ -220,6 +222,7 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
+| 2026-01-22 | **Data Studio Fix:** Minimal MCP config, process tracking, memory optimization |
 | 2026-01-22 | **C3 Data Studio** - File search, multi-select, folder grouping, --verbose fix |
 | 2026-01-22 | **Code Cleanup:** Removed unused core modules (ai_provider, file_processor, langgraph_workflows, report_generator) |
 | 2026-01-22 | **Frontend Cleanup:** Removed unused APIs (analystApi, researchApi, notesApi, projectsApi, chartsApi, mermaidDiskApi) |

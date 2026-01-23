@@ -141,6 +141,8 @@ AI-powered data analysis and visualization using headless Claude Code.
 - No terminal UI - clean chat + dashboard interface
 - Uses existing Workspace project data files
 - Separate `.data-studio/` directory to avoid session conflicts
+- Minimal MCP config (only filesystem) for reduced memory usage
+- Process tracking with automatic cleanup on new message/session close
 
 **Features:**
 - Real-time streaming of Claude's thinking, tool calls, and outputs
@@ -148,6 +150,7 @@ AI-powered data analysis and visualization using headless Claude Code.
 - Dashboard canvas for pinned visualizations (Plotly.js)
 - Data file browser (CSV, JSON, Excel, Parquet)
 - Code execution display with syntax highlighting
+- 5-minute timeout for long-running operations
 
 **Components:**
 - `ProjectSelector` - Select existing workspace project
@@ -405,6 +408,7 @@ npm run start
 
 | Date | Change |
 |------|--------|
+| 2026-01-22 | **Data Studio Fix:** Added `result` event type, improved event handling |
 | 2026-01-22 | **C3 Data Studio** - AI-powered data analysis with headless Claude |
 | 2026-01-22 | Added react-grid-layout, Plotly.js for dashboard visualizations |
 | 2026-01-22 | Terminal as default view when opening workspace |
