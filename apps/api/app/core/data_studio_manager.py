@@ -76,6 +76,20 @@ class DataStudioManager:
 
 You are a data analysis assistant. Your role is to help analyze data files in this project.
 
+## CRITICAL: Response Output
+
+**You MUST write ALL your responses to the file `.data-studio/response.md`**
+
+For EVERY response, use the Write tool to output to `.data-studio/response.md`:
+- Start fresh each time (overwrite the file)
+- Include your full analysis, charts, tables, and explanations
+- The UI reads this file and renders it with chart support
+
+Example workflow:
+1. User asks a question
+2. You analyze the data
+3. You write your complete response to `.data-studio/response.md`
+
 ## Available Data Files
 
 Data files are in this project directory. Use the Read tool or Bash `ls` to explore.
@@ -96,10 +110,11 @@ Data files are in this project directory. Use the Read tool or Bash `ls` to expl
 3. **Show your work**: Display sample data before transformations
 4. **Be concise**: Summarize findings clearly
 5. **Handle errors gracefully**: Report issues without failing
+6. **ALWAYS write to response.md**: Your response MUST be in `.data-studio/response.md`
 
-## CRITICAL: Chart Output Format
+## Chart Output Format
 
-When creating visualizations, you MUST output them in special code blocks that the UI will render:
+When creating visualizations, use these code blocks in your response.md:
 
 ### For Plotly Charts (Interactive)
 Use the `plotly` language tag with a JSON figure specification:
@@ -107,7 +122,7 @@ Use the `plotly` language tag with a JSON figure specification:
 ```plotly
 {
   "data": [{"type": "bar", "x": ["A", "B", "C"], "y": [10, 20, 15]}],
-  "layout": {"title": "Sample Chart", "height": 400}
+  "layout": {"title": "Sample Chart", "height": 400, "template": "plotly_dark"}
 }
 ```
 
@@ -122,7 +137,7 @@ pie title Data Distribution
 ```
 
 ### For Tables
-Use markdown tables (will render nicely):
+Use markdown tables:
 
 | Column A | Column B | Column C |
 |----------|----------|----------|
@@ -166,6 +181,7 @@ flowchart TD
 
 ## Important Notes
 
+- **ALWAYS write your response to `.data-studio/response.md`**
 - Always use `"template": "plotly_dark"` for Plotly charts (dark theme)
 - Keep chart heights around 300-400px for good display
 - For large datasets, aggregate or sample before charting
@@ -290,8 +306,8 @@ flowchart TD
         """
         Execute Claude and stream the output.
 
-        Spawns: claude -p "message" --output-format stream-json --resume {uuid}
-        Uses chunked reading to handle Claude's buffered output properly.
+        Uses simple text output format for reliability.
+        Streams chunks directly to the frontend.
         """
         session = self.sessions.get(session_id)
         if not session:
@@ -302,9 +318,7 @@ flowchart TD
             yield {"type": "error", "message": "No message to process"}
             return
 
-        # Build command with minimal MCP config to reduce memory usage
-        # Note: --output-format stream-json requires --verbose when using -p
-        # Always use --resume - it resumes existing session or creates new one
+        # Build command - use simple text output for reliability
         # Use --strict-mcp-config with only filesystem to prevent loading 100+ MCP processes
         minimal_mcp_config = json.dumps({
             "mcpServers": {
@@ -316,15 +330,14 @@ flowchart TD
         })
         cmd = [
             "claude", "-p", message,
-            "--output-format", "stream-json",
-            "--verbose",
-            "--resume", session.claude_session_id,
+            "--output-format", "text",  # Simple text output
+            "--continue",  # Continue last session in this directory
             "--permission-mode", "bypassPermissions",
             "--strict-mcp-config",
             "--mcp-config", minimal_mcp_config
         ]
 
-        logger.info(f"Executing: {' '.join(cmd[:6])}...")  # Log truncated command
+        logger.info(f"Executing: {' '.join(cmd[:6])}...")
         logger.info(f"Working directory: {session.project_dir}")
 
         # Kill any existing process for this session to prevent accumulation
@@ -338,8 +351,10 @@ flowchart TD
                 logger.debug(f"Error killing previous process: {e}")
             session.active_process = None
 
+        yield {"type": "thinking", "content": "Claude is analyzing..."}
+
         try:
-            # Spawn process with unbuffered output
+            # Spawn process
             process = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -348,41 +363,29 @@ flowchart TD
             )
             session.active_process = process
 
-            # Read stdout in chunks and parse lines
-            # Claude buffers output when not connected to TTY, so we need to
-            # read chunks and split into lines ourselves
-            buffer = ""
+            # Read all output at once (simpler and more reliable)
+            full_output = ""
             if process.stdout:
                 while True:
                     try:
-                        # Read up to 8KB at a time with timeout
                         chunk = await asyncio.wait_for(
-                            process.stdout.read(8192),
-                            timeout=120.0  # 2 minute timeout per chunk
+                            process.stdout.read(4096),
+                            timeout=120.0
                         )
                         if not chunk:
                             break  # EOF
 
-                        buffer += chunk.decode()
+                        # Decode and accumulate
+                        text = chunk.decode()
+                        full_output += text
 
-                        # Process complete lines
-                        while "\n" in buffer:
-                            line, buffer = buffer.split("\n", 1)
-                            line = line.strip()
-                            if line:
-                                event = self._parse_output_line(line)
-                                if event:
-                                    yield event
+                        # Send incremental updates (every chunk)
+                        yield {"type": "text_delta", "content": text}
 
                     except asyncio.TimeoutError:
                         logger.warning(f"Timeout waiting for Claude output in session {session_id}")
+                        yield {"type": "error", "message": "Timeout waiting for response"}
                         break
-
-                # Process any remaining buffer
-                if buffer.strip():
-                    event = self._parse_output_line(buffer.strip())
-                    if event:
-                        yield event
 
             # Wait for process to complete with timeout
             try:
@@ -401,6 +404,11 @@ flowchart TD
                     logger.error(f"Claude error: {error_msg}")
                     yield {"type": "error", "message": error_msg[:500]}
 
+            # Send final complete response
+            if full_output.strip():
+                logger.info(f"Claude response: {len(full_output)} chars")
+                yield {"type": "result", "content": full_output.strip()}
+
             yield {"type": "done"}
 
         except asyncio.CancelledError:
@@ -411,107 +419,13 @@ flowchart TD
             raise
         except Exception as e:
             logger.error(f"Error in stream_output for session {session_id}: {e}")
+            import traceback
+            traceback.print_exc()
             yield {"type": "error", "message": str(e)}
         finally:
             # Clear active process reference
             if session_id in self.sessions:
                 self.sessions[session_id].active_process = None
-
-    def _parse_output_line(self, line: str) -> Optional[Dict]:
-        """Parse a line of Claude's stream-json output."""
-        try:
-            data = json.loads(line)
-        except json.JSONDecodeError:
-            # Plain text output
-            logger.debug(f"Non-JSON line: {line[:100]}")
-            return {"type": "text", "content": line}
-
-        msg_type = data.get("type")
-        logger.debug(f"Parsing message type: {msg_type}")
-
-        # Handle different message types from Claude's stream-json output
-        if msg_type == "system":
-            # System messages - init, session info, etc.
-            subtype = data.get("subtype", "")
-            if subtype == "init":
-                # Session initialized - show brief status
-                session_id = data.get("session_id", "")
-                return {"type": "thinking", "content": f"Session ready ({session_id[:8]}...)"}
-            message = data.get("message", "")
-            if message:
-                return {"type": "thinking", "content": message}
-            return None
-
-        elif msg_type == "assistant":
-            message = data.get("message", {})
-            content_blocks = message.get("content", [])
-
-            # Return first meaningful content block
-            for block in content_blocks:
-                block_type = block.get("type")
-                if block_type == "text":
-                    text = block.get("text", "")
-                    if text:
-                        return {"type": "text", "content": text}
-                elif block_type == "tool_use":
-                    return {
-                        "type": "tool_call",
-                        "id": block.get("id"),
-                        "tool": block.get("name"),
-                        "input": block.get("input", {}),
-                        "status": "running"
-                    }
-            return None
-
-        elif msg_type == "content_block_start":
-            block = data.get("content_block", {})
-            if block.get("type") == "tool_use":
-                return {
-                    "type": "tool_call",
-                    "id": block.get("id"),
-                    "tool": block.get("name"),
-                    "input": {},
-                    "status": "starting"
-                }
-            elif block.get("type") == "text":
-                return None  # Wait for delta
-
-        elif msg_type == "content_block_delta":
-            delta = data.get("delta", {})
-            if delta.get("type") == "text_delta":
-                return {"type": "text_delta", "content": delta.get("text", "")}
-            elif delta.get("type") == "input_json_delta":
-                return {"type": "input_delta", "content": delta.get("partial_json", "")}
-
-        elif msg_type == "content_block_stop":
-            return None  # Block finished
-
-        elif msg_type == "message_start":
-            return {"type": "thinking", "content": "Processing..."}
-
-        elif msg_type == "message_delta":
-            # Contains stop_reason, usage, etc.
-            return None
-
-        elif msg_type == "message_stop":
-            return None  # Will send done after
-
-        elif msg_type == "result":
-            # Final result - this is the main response
-            result = data.get("result", "")
-            if result:
-                logger.info(f"Claude result received ({len(result)} chars)")
-                return {"type": "result", "content": result}
-            return None
-
-        elif msg_type == "error":
-            error_msg = data.get("error", {}).get("message", "Unknown error")
-            logger.error(f"Claude error: {error_msg}")
-            return {"type": "error", "message": error_msg}
-
-        # Unknown type - log and skip
-        logger.debug(f"Skipping unknown message type: {msg_type}")
-        return None
 
     async def close_session(self, session_id: str) -> bool:
         """Close a Data Studio session and kill any running Claude process."""
