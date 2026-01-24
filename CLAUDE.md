@@ -39,7 +39,7 @@ lsof -i :3000 -i :8000  # Check our ports
 |-----|-------|-------------|
 | **C3 Researcher Workspace** | `/workspace` | Claude Code Custom Researcher - AI-powered research terminal |
 | **C3 Data Studio** | `/data-studio` | AI-powered data analysis with headless Claude (NEW) |
-| **Video Factory** | `/video-factory` | Video channel management (Starting Fresh) |
+| **Video Studio** | `/video-factory` | AI video generation - Plan → Edit → Render (v3.0) |
 
 **C3 Researcher Workspace Features:**
 - 145+ scientific skills, 26 MCP servers, 14 plugins
@@ -66,10 +66,13 @@ lsof -i :3000 -i :8000  # Check our ports
 4. Auto-generated dashboard with editable widgets
 5. NLP-based customization ("Add a pie chart for categories")
 
-**Video Factory (v2.0 - Starting Fresh):**
-- Channel/project management only (cleaned up for rebuild)
-- Niche-based organization
-- Coming soon: AI script generation, research, voiceover, captions, rendering
+**Video Studio (v3.0):**
+- **Two-Phase Generation**: Claude creates plan → User reviews → Claude generates script
+- **Rich Context**: Upload images/files, import from Workspace, add notes
+- **Scene Editing**: Full editor with Content/Style/Animation/Media tabs
+- **Skill File**: Comprehensive Remotion documentation at `~/.claude/skills/remotion-video-generator/`
+- **10 Scene Types**: hook, content, bullet-list, quote, cta, title-card, whiteboard, stats, icon-reveal, split-screen
+- **Visual Elements**: 11 gradient presets, Lottie animations, drawing paths, particles
 
 **Unified Project Architecture:**
 - Workspace projects: `/data/users/{user-id}/projects/{project-name}/`
@@ -232,9 +235,11 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
-| 2026-01-24 | **Video Factory:** CLEANUP - Starting fresh with channel management only |
-| 2026-01-24 | **Video Factory:** Removed video_research.py, video_audio.py, complex UI components |
-| 2026-01-24 | **Video Factory:** Minimal API (project CRUD) and UI for rebuild foundation |
+| 2026-01-24 | **MAJOR: Video Studio v3.0** - Full Plan → Edit → Render workflow |
+| 2026-01-24 | **Video Studio:** Two-phase Claude generation (plan + script) with SSE streaming |
+| 2026-01-24 | **Video Studio:** New backend `video_studio_generator.py` with context management |
+| 2026-01-24 | **Video Studio:** New components - ContextPanel, PlanPreview, SceneEditor |
+| 2026-01-24 | **Video Studio:** Comprehensive Remotion skill file at `~/.claude/skills/remotion-video-generator/` |
 | 2026-01-23 | **Data Studio:** Fix empty stat cards/charts - support alternate field names |
 | 2026-01-23 | **Data Studio:** Fix [Object] display - properly stringify result objects |
 | 2026-01-23 | **Data Studio:** Multi-file analysis mode selector (combined vs separate) |

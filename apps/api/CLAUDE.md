@@ -212,38 +212,80 @@ Legacy Data Studio API using headless Claude Code. See V2 for new implementation
 }
 ```
 
-### Video Factory (`/video-factory`) - MINIMAL (v2.0)
+### Video Studio (`/video-factory`) - v3.0 ENHANCED
 
-**Starting fresh** - Only channel/project management for now. All complex features removed for rebuild.
+**AI-powered video script generation** with two-phase Claude generation, scene editing, and Remotion rendering.
 
-**Available Endpoints:**
+**Workflow:** Context → Plan (Claude SSE) → Script (Claude SSE) → Edit → Render
+
+**Project Management:**
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/auth/check` | Check email authorization |
 | GET | `/projects` | List projects (filter by email) |
 | POST | `/projects` | Create channel |
 | GET | `/projects/{id}` | Get project details |
 | DELETE | `/projects/{id}` | Delete project |
-| GET | `/status` | Get service status |
 
-**Key Module:**
+**Context Management:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/projects/{id}/context` | Upload context (files, images, notes) |
+| GET | `/projects/{id}/context` | Get all context |
+| DELETE | `/projects/{id}/context/{type}/{name}` | Remove context item |
+| POST | `/projects/{id}/context/import` | Import from workspace project |
+
+**Two-Phase Generation:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/projects/{id}/plan` | Generate plan (SSE streaming) |
+| GET | `/projects/{id}/plans` | List plans |
+| GET | `/projects/{id}/plans/{plan_id}` | Get plan details |
+| PUT | `/projects/{id}/plans/{plan_id}` | Update plan (user edits) |
+| POST | `/projects/{id}/plans/{plan_id}/generate` | Generate script from plan (SSE) |
+
+**Script Editing:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/projects/{id}/scripts` | List scripts |
+| GET | `/projects/{id}/scripts/{script_id}` | Get script |
+| PUT | `/projects/{id}/scripts/{script_id}` | Update full script |
+| DELETE | `/projects/{id}/scripts/{script_id}/scenes/{scene_id}` | Delete scene |
+
+**Rendering:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/projects/{id}/renders` | List rendered videos |
+| GET | `/projects/{id}/renders/{filename}` | Serve video file |
+| POST | `/projects/{id}/scripts/{script_id}/render` | Start Remotion render |
+
+**Key Modules:**
 
 | Module | Purpose |
 |--------|---------|
-| `video_factory_manager.py` | Project CRUD only |
+| `video_studio_generator.py` | Two-phase Claude generation with context |
+| `video_factory_manager.py` | Project CRUD |
 
-**Coming Soon:**
-- AI script generation
-- Web research integration
-- Voiceover generation
-- TikTok-style captions
-- Remotion video rendering
+**Skill File:**
+`~/.claude/skills/remotion-video-generator/skill.md` - Comprehensive Remotion documentation for Claude
 
 **Storage:**
 ```
-/data/video-factory/
-└── projects/                  # Project JSON files
+/data/video-factory/project-data/{project_id}/
+├── .claude/CLAUDE.md      # Dynamic context + task
+├── context/               # User-uploaded context
+│   ├── images/            # Context images
+│   ├── files/             # Data files
+│   ├── notes.md           # User notes
+│   └── references.json    # Workspace refs
+├── .plans/                # Video plans
+├── scripts/               # EnhancedVideoProps JSON
+├── images/                # Scene images
+└── renders/               # MP4 outputs
 ```
 
 ---

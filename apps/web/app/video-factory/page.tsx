@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   Home,
@@ -8,13 +8,28 @@ import {
   Trash2,
   Loader2,
   Film,
-  Calendar,
   Sparkles,
+  Send,
+  FileJson,
+  Play,
+  Download,
+  RefreshCw,
+  Check,
+  X,
+  Eye,
+  Wand2,
+  ChevronRight,
+  FileText,
+  Edit3,
+  Layers,
+  Clock,
+  ArrowLeft,
 } from 'lucide-react';
 import { ProtectedRoute, useAuth } from '@/components/auth';
 import { getApiUrl } from '@/lib/api';
+import { ContextPanel, PlanPreview, SceneEditor, Scene } from '@/components/video-studio';
 
-// Simple API client
+// API client
 const api = {
   get: async (url: string) => {
     const baseUrl = getApiUrl();
@@ -31,13 +46,41 @@ const api = {
     });
     return { data: await res.json() };
   },
+  put: async (url: string, data: any) => {
+    const baseUrl = getApiUrl();
+    const res = await fetch(`${baseUrl}${url}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data),
+    });
+    return { data: await res.json() };
+  },
   delete: async (url: string) => {
     const baseUrl = getApiUrl();
     const res = await fetch(`${baseUrl}${url}`, {
       method: 'DELETE',
-      credentials: 'include'
+      credentials: 'include',
     });
     return { data: await res.json() };
+  },
+  uploadForm: async (url: string, formData: FormData) => {
+    const baseUrl = getApiUrl();
+    const res = await fetch(`${baseUrl}${url}`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+    return { data: await res.json() };
+  },
+  stream: (url: string, data: any) => {
+    const baseUrl = getApiUrl();
+    return fetch(`${baseUrl}${url}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(data),
+    });
   },
 };
 
@@ -52,8 +95,49 @@ interface ContentProject {
   updated_at: string;
 }
 
+interface Plan {
+  plan_id: string;
+  idea: string;
+  research_summary: string;
+  hook: { concept: string; type: string };
+  scenes: Array<{
+    order: number;
+    type: string;
+    concept: string;
+    visual_idea: string;
+    duration_estimate: string;
+  }>;
+  cta: { message: string; style: string };
+  total_duration_estimate: string;
+  notes?: string;
+}
+
+interface VideoScript {
+  id: string;
+  title?: string;
+  scene_count: number;
+  modified_at: number;
+}
+
+interface ScriptData {
+  title?: string;
+  scenes: Scene[];
+  backgroundColor: string;
+  textColor: string;
+  accentColor: string;
+}
+
+interface VideoRender {
+  filename: string;
+  path: string;
+  size: number;
+  created_at: number;
+}
+
+type ViewState = 'context' | 'plan' | 'edit' | 'render';
+
 // Main Component
-function VideoFactoryContent() {
+function VideoStudioContent() {
   const { user } = useAuth();
   const email = user?.email || '';
 
@@ -67,6 +151,38 @@ function VideoFactoryContent() {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectNiche, setNewProjectNiche] = useState('');
 
+  // View state
+  const [currentView, setCurrentView] = useState<ViewState>('context');
+
+  // Context state
+  const [context, setContext] = useState<any>(null);
+  const [ideaInput, setIdeaInput] = useState('');
+
+  // Plan state
+  const [plans, setPlans] = useState<Array<{ id: string; idea: string; scene_count: number; modified_at: number }>>([]);
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [planLog, setPlanLog] = useState<string[]>([]);
+
+  // Script state
+  const [scripts, setScripts] = useState<VideoScript[]>([]);
+  const [selectedScript, setSelectedScript] = useState<ScriptData | null>(null);
+  const [selectedScriptId, setSelectedScriptId] = useState<string | null>(null);
+  const [generatingScript, setGeneratingScript] = useState(false);
+  const [scriptLog, setScriptLog] = useState<string[]>([]);
+
+  // Scene editing
+  const [editingScene, setEditingScene] = useState<Scene | null>(null);
+
+  // Render state
+  const [renders, setRenders] = useState<VideoRender[]>([]);
+  const [rendering, setRendering] = useState(false);
+  const [renderStatus, setRenderStatus] = useState<string | null>(null);
+  const [playingVideo, setPlayingVideo] = useState<string | null>(null);
+
+  const logRef = useRef<HTMLDivElement>(null);
+
   // Load projects on mount
   useEffect(() => {
     if (email) {
@@ -74,11 +190,30 @@ function VideoFactoryContent() {
     }
   }, [email]);
 
-  // Load projects
+  // Auto-scroll log
+  useEffect(() => {
+    if (logRef.current) {
+      logRef.current.scrollTop = logRef.current.scrollHeight;
+    }
+  }, [planLog, scriptLog]);
+
+  // Load data when project changes
+  useEffect(() => {
+    if (selectedProject) {
+      loadContext(selectedProject.id);
+      loadPlans(selectedProject.id);
+      loadScripts(selectedProject.id);
+      loadRenders(selectedProject.id);
+    }
+  }, [selectedProject]);
+
+  // API Functions
   const loadProjects = async (userEmail?: string) => {
     setLoading(true);
     try {
-      const response = await api.get(`/video-factory/projects?email=${encodeURIComponent(userEmail || email)}`);
+      const response = await api.get(
+        `/video-factory/projects?email=${encodeURIComponent(userEmail || email)}`
+      );
       setProjects(response.data.projects || []);
     } catch (error) {
       console.error('Failed to load projects:', error);
@@ -87,17 +222,57 @@ function VideoFactoryContent() {
     }
   };
 
-  // Load project details
   const loadProjectDetails = async (projectId: string) => {
     try {
       const response = await api.get(`/video-factory/projects/${projectId}`);
       setSelectedProject(response.data);
+      setCurrentView('context');
+      setSelectedPlan(null);
+      setSelectedPlanId(null);
+      setSelectedScript(null);
+      setSelectedScriptId(null);
     } catch (error) {
       console.error('Failed to load project details:', error);
     }
   };
 
-  // Create project
+  const loadContext = async (projectId: string) => {
+    try {
+      const response = await api.get(`/video-factory/projects/${projectId}/context`);
+      setContext(response.data);
+    } catch (error) {
+      console.error('Failed to load context:', error);
+    }
+  };
+
+  const loadPlans = async (projectId: string) => {
+    try {
+      const response = await api.get(`/video-factory/projects/${projectId}/plans`);
+      setPlans(response.data.plans || []);
+    } catch (error) {
+      console.error('Failed to load plans:', error);
+    }
+  };
+
+  const loadScripts = async (projectId: string) => {
+    try {
+      const response = await api.get(`/video-factory/projects/${projectId}/scripts`);
+      setScripts(response.data.scripts || []);
+    } catch (error) {
+      console.error('Failed to load scripts:', error);
+    }
+  };
+
+  const loadRenders = async (projectId: string) => {
+    try {
+      const response = await api.get(`/video-factory/projects/${projectId}/renders`);
+      setRenders(response.data.renders || []);
+    } catch (error) {
+      console.error('Failed to load renders:', error);
+    }
+  };
+
+  // Project CRUD
   const createProject = async () => {
     if (!newProjectName || !newProjectNiche) return;
 
@@ -105,7 +280,7 @@ function VideoFactoryContent() {
       const response = await api.post('/video-factory/projects', {
         email,
         name: newProjectName,
-        niche: newProjectNiche
+        niche: newProjectNiche,
       });
 
       setShowCreateModal(false);
@@ -118,7 +293,6 @@ function VideoFactoryContent() {
     }
   };
 
-  // Delete project
   const deleteProject = async (projectId: string) => {
     if (!confirm('Delete this channel? This cannot be undone.')) return;
 
@@ -133,14 +307,334 @@ function VideoFactoryContent() {
     }
   };
 
-  // Format date
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+  // Context Management
+  const handleUploadContext = async (files: FileList, notes?: string) => {
+    if (!selectedProject) return;
+
+    const formData = new FormData();
+    if (notes) {
+      formData.append('notes', notes);
+    }
+    for (let i = 0; i < files.length; i++) {
+      formData.append('files', files[i]);
+    }
+
+    await api.uploadForm(`/video-factory/projects/${selectedProject.id}/context`, formData);
+    loadContext(selectedProject.id);
+  };
+
+  const handleImportWorkspace = async (projectName: string) => {
+    if (!selectedProject || !user) return;
+
+    await api.post(`/video-factory/projects/${selectedProject.id}/context/import`, {
+      workspace_project: projectName,
+      user_id: user.id,
+    });
+    loadContext(selectedProject.id);
+  };
+
+  const handleDeleteContextItem = async (type: string, name: string) => {
+    if (!selectedProject) return;
+
+    await api.delete(
+      `/video-factory/projects/${selectedProject.id}/context/${type}/${encodeURIComponent(
+        name
+      )}`
+    );
+    loadContext(selectedProject.id);
+  };
+
+  // Plan Generation
+  const generatePlan = async () => {
+    if (!ideaInput.trim() || !selectedProject || generatingPlan) return;
+
+    setGeneratingPlan(true);
+    setPlanLog(['Starting plan generation...']);
+    setCurrentView('plan');
+
+    try {
+      const response = await api.stream(
+        `/video-factory/projects/${selectedProject.id}/plan`,
+        { idea: ideaInput }
+      );
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) throw new Error('No response body');
+
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6));
+
+              if (event.type === 'status') {
+                setPlanLog((prev) => [...prev, `[Status] ${event.message}`]);
+              } else if (event.type === 'text') {
+                const text = event.content?.slice(0, 300);
+                if (text) {
+                  setPlanLog((prev) => [...prev, text]);
+                }
+              } else if (event.type === 'tool') {
+                setPlanLog((prev) => [...prev, `[Tool] ${event.tool}`]);
+              } else if (event.type === 'complete') {
+                if (event.success) {
+                  setPlanLog((prev) => [...prev, `[Success] Plan created: ${event.plan_id}`]);
+                  setSelectedPlan(event.plan);
+                  setSelectedPlanId(event.plan_id);
+                  loadPlans(selectedProject.id);
+                } else {
+                  setPlanLog((prev) => [...prev, `[Error] ${event.error}`]);
+                }
+              } else if (event.type === 'error') {
+                setPlanLog((prev) => [...prev, `[Error] ${event.error}`]);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Plan generation failed:', error);
+      setPlanLog((prev) => [...prev, `[Error] ${error}`]);
+    } finally {
+      setGeneratingPlan(false);
+    }
+  };
+
+  const loadPlan = async (planId: string) => {
+    if (!selectedProject) return;
+
+    try {
+      const response = await api.get(
+        `/video-factory/projects/${selectedProject.id}/plans/${planId}`
+      );
+      setSelectedPlan(response.data.plan);
+      setSelectedPlanId(planId);
+      setCurrentView('plan');
+    } catch (error) {
+      console.error('Failed to load plan:', error);
+    }
+  };
+
+  const updatePlan = async (updates: Partial<Plan>) => {
+    if (!selectedProject || !selectedPlanId) return;
+
+    await api.put(`/video-factory/projects/${selectedProject.id}/plans/${selectedPlanId}`, {
+      updates,
+    });
+    const response = await api.get(
+      `/video-factory/projects/${selectedProject.id}/plans/${selectedPlanId}`
+    );
+    setSelectedPlan(response.data.plan);
+  };
+
+  // Script Generation
+  const generateScriptFromPlan = async () => {
+    if (!selectedProject || !selectedPlanId || generatingScript) return;
+
+    setGeneratingScript(true);
+    setScriptLog(['Starting script generation from plan...']);
+
+    try {
+      const response = await api.stream(
+        `/video-factory/projects/${selectedProject.id}/plans/${selectedPlanId}/generate`,
+        {}
+      );
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) throw new Error('No response body');
+
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6));
+
+              if (event.type === 'status') {
+                setScriptLog((prev) => [...prev, `[Status] ${event.message}`]);
+              } else if (event.type === 'text') {
+                const text = event.content?.slice(0, 300);
+                if (text) {
+                  setScriptLog((prev) => [...prev, text]);
+                }
+              } else if (event.type === 'tool') {
+                setScriptLog((prev) => [...prev, `[Tool] ${event.tool}`]);
+              } else if (event.type === 'complete') {
+                if (event.success) {
+                  setScriptLog((prev) => [
+                    ...prev,
+                    `[Success] Script generated: ${event.script_id}`,
+                  ]);
+                  setSelectedScript(event.script);
+                  setSelectedScriptId(event.script_id);
+                  loadScripts(selectedProject.id);
+                  setCurrentView('edit');
+                } else {
+                  setScriptLog((prev) => [...prev, `[Error] ${event.error}`]);
+                }
+              } else if (event.type === 'error') {
+                setScriptLog((prev) => [...prev, `[Error] ${event.error}`]);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Script generation failed:', error);
+      setScriptLog((prev) => [...prev, `[Error] ${error}`]);
+    } finally {
+      setGeneratingScript(false);
+    }
+  };
+
+  const loadScript = async (scriptId: string) => {
+    if (!selectedProject) return;
+
+    try {
+      const response = await api.get(
+        `/video-factory/projects/${selectedProject.id}/scripts/${scriptId}`
+      );
+      setSelectedScript(response.data.script);
+      setSelectedScriptId(scriptId);
+      setCurrentView('edit');
+    } catch (error) {
+      console.error('Failed to load script:', error);
+    }
+  };
+
+  const saveScene = async (scene: Scene) => {
+    if (!selectedProject || !selectedScriptId || !selectedScript) return;
+
+    const sceneIndex = selectedScript.scenes.findIndex((s) => s.id === scene.id);
+    if (sceneIndex >= 0) {
+      const newScenes = [...selectedScript.scenes];
+      newScenes[sceneIndex] = scene;
+      const newScript = { ...selectedScript, scenes: newScenes };
+
+      await api.put(
+        `/video-factory/projects/${selectedProject.id}/scripts/${selectedScriptId}`,
+        { script: newScript }
+      );
+      setSelectedScript(newScript);
+    }
+    setEditingScene(null);
+  };
+
+  const deleteScene = async (sceneId: string) => {
+    if (!selectedProject || !selectedScriptId) return;
+
+    await api.delete(
+      `/video-factory/projects/${selectedProject.id}/scripts/${selectedScriptId}/scenes/${sceneId}`
+    );
+    if (selectedScript) {
+      setSelectedScript({
+        ...selectedScript,
+        scenes: selectedScript.scenes.filter((s) => s.id !== sceneId),
+      });
+    }
+    setEditingScene(null);
+  };
+
+  // Render
+  const renderVideo = async () => {
+    if (!selectedProject || !selectedScriptId || rendering) return;
+
+    setRendering(true);
+    setRenderStatus('Starting render...');
+    setCurrentView('render');
+
+    try {
+      const response = await api.post(
+        `/video-factory/projects/${selectedProject.id}/scripts/${selectedScriptId}/render`,
+        { composition: 'EnhancedVideo' }
+      );
+
+      if (response.data.status === 'started') {
+        setRenderStatus('Rendering video... This may take a minute.');
+
+        const pollInterval = setInterval(async () => {
+          const rendersResponse = await api.get(
+            `/video-factory/projects/${selectedProject.id}/renders`
+          );
+          const newRenders = rendersResponse.data.renders || [];
+
+          // Check for new video
+          if (newRenders.length > renders.length) {
+            clearInterval(pollInterval);
+            setRenders(newRenders);
+            setRenderStatus('Video rendered successfully!');
+            setTimeout(() => {
+              setRendering(false);
+            }, 2000);
+          }
+        }, 5000);
+
+        // Timeout after 5 minutes
+        setTimeout(() => {
+          clearInterval(pollInterval);
+          if (rendering) {
+            setRenderStatus('Render taking longer than expected. Check renders list.');
+            setRendering(false);
+            loadRenders(selectedProject.id);
+          }
+        }, 300000);
+      }
+    } catch (error) {
+      console.error('Render failed:', error);
+      setRenderStatus(`Error: ${error}`);
+      setRendering(false);
+    }
+  };
+
+  // Helpers
+  const formatDate = (dateStr: string | number) => {
+    const date = new Date(typeof dateStr === 'number' ? dateStr * 1000 : dateStr);
     return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
     });
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const getVideoUrl = (filename: string) => {
+    if (!selectedProject) return '';
+    const baseUrl = getApiUrl();
+    return `${baseUrl}/video-factory/projects/${selectedProject.id}/renders/${filename}`;
+  };
+
+  const downloadRender = (filename: string) => {
+    window.open(getVideoUrl(filename), '_blank');
   };
 
   return (
@@ -157,8 +651,10 @@ function VideoFactoryContent() {
                 <Film className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold">Video Factory</h1>
-                <p className="text-[10px] text-gray-500 -mt-0.5">Starting Fresh - Channel Management</p>
+                <h1 className="text-xl font-bold">Video Studio</h1>
+                <p className="text-[10px] text-gray-500 -mt-0.5">
+                  Plan → Generate → Edit → Render
+                </p>
               </div>
             </div>
           </div>
@@ -177,10 +673,13 @@ function VideoFactoryContent() {
       </header>
 
       <div className="flex h-[calc(100vh-73px)]">
-        {/* Sidebar - Project List */}
-        <div className="w-72 bg-gray-800/50 border-r border-gray-700 overflow-y-auto">
-          <div className="p-4">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase mb-3">Channels</h2>
+        {/* Sidebar */}
+        <div className="w-72 bg-gray-800/50 border-r border-gray-700 overflow-y-auto flex flex-col">
+          {/* Channels */}
+          <div className="p-4 flex-1">
+            <h2 className="text-sm font-semibold text-gray-400 uppercase mb-3">
+              Channels
+            </h2>
 
             {loading ? (
               <div className="flex items-center justify-center py-8">
@@ -222,96 +721,436 @@ function VideoFactoryContent() {
                       </button>
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500">
-                      <span className="bg-gray-700 px-2 py-0.5 rounded">{project.niche}</span>
+                      <span className="bg-gray-700 px-2 py-0.5 rounded">
+                        {project.niche}
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* Scripts & Renders (when project selected) */}
+          {selectedProject && (
+            <div className="border-t border-gray-700 p-4">
+              {/* Scripts */}
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                Scripts ({scripts.length})
+              </h3>
+              <div className="space-y-1 mb-4 max-h-32 overflow-y-auto">
+                {scripts.map((script) => (
+                  <button
+                    key={script.id}
+                    onClick={() => loadScript(script.id)}
+                    className={`w-full text-left p-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2 ${
+                      selectedScriptId === script.id ? 'bg-gray-700' : ''
+                    }`}
+                  >
+                    <FileJson className="w-4 h-4 text-purple-400" />
+                    <span className="truncate">{script.title || script.id}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Renders */}
+              <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">
+                Videos ({renders.length})
+              </h3>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {renders.map((render) => (
+                  <button
+                    key={render.filename}
+                    onClick={() => setPlayingVideo(render.filename)}
+                    className="w-full text-left p-2 rounded text-sm hover:bg-gray-700 flex items-center gap-2"
+                  >
+                    <Play className="w-4 h-4 text-green-400" />
+                    <span className="truncate">{render.filename}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Main Content */}
         <div className="flex-1 overflow-y-auto">
           {!selectedProject ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center text-gray-500 max-w-md">
-                <Film className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                <h2 className="text-xl font-semibold text-gray-300 mb-2">Video Factory 2.0</h2>
-                <p className="mb-4">Starting fresh with channel management.</p>
-                <p className="text-sm mb-6">Select a channel or create a new one to get started.</p>
-
-                {/* Coming Soon Features */}
-                <div className="bg-gray-800/50 rounded-lg p-4 text-left">
-                  <h3 className="text-sm font-semibold text-purple-400 mb-3 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    Coming Soon
-                  </h3>
-                  <ul className="space-y-2 text-sm text-gray-400">
-                    <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-purple-500 rounded-full" />
-                      AI script generation
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-purple-500 rounded-full" />
-                      Web research integration
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-purple-500 rounded-full" />
-                      Voiceover generation
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-purple-500 rounded-full" />
-                      TikTok-style captions
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 bg-purple-500 rounded-full" />
-                      Remotion video rendering
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </div>
+            <WelcomeView onCreateChannel={() => setShowCreateModal(true)} />
           ) : (
-            <div className="p-6">
-              {/* Project Header */}
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold">{selectedProject.name}</h2>
-                <p className="text-gray-400">Niche: {selectedProject.niche}</p>
+            <>
+              {/* View Navigation */}
+              <div className="sticky top-0 bg-gray-900 border-b border-gray-700 px-6 py-3 flex items-center gap-2 z-10">
+                <ViewNavButton
+                  active={currentView === 'context'}
+                  onClick={() => setCurrentView('context')}
+                  icon={FileText}
+                  label="1. Context"
+                />
+                <ChevronRight className="w-4 h-4 text-gray-600" />
+                <ViewNavButton
+                  active={currentView === 'plan'}
+                  onClick={() => setCurrentView('plan')}
+                  icon={Layers}
+                  label="2. Plan"
+                  disabled={!selectedPlan && plans.length === 0}
+                />
+                <ChevronRight className="w-4 h-4 text-gray-600" />
+                <ViewNavButton
+                  active={currentView === 'edit'}
+                  onClick={() => setCurrentView('edit')}
+                  icon={Edit3}
+                  label="3. Edit"
+                  disabled={!selectedScript && scripts.length === 0}
+                />
+                <ChevronRight className="w-4 h-4 text-gray-600" />
+                <ViewNavButton
+                  active={currentView === 'render'}
+                  onClick={() => setCurrentView('render')}
+                  icon={Play}
+                  label="4. Render"
+                  disabled={!selectedScript}
+                />
               </div>
 
-              {/* Project Info */}
-              <div className="bg-gray-800 rounded-lg p-6">
-                <h3 className="text-lg font-semibold mb-4">Channel Details</h3>
+              <div className="p-6">
+                {/* Context View */}
+                {currentView === 'context' && (
+                  <div className="max-w-2xl mx-auto">
+                    <h2 className="text-2xl font-bold mb-2">{selectedProject.name}</h2>
+                    <p className="text-gray-400 mb-6">
+                      Add context and enter your video idea
+                    </p>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-gray-700/50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500 mb-1">Created</div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      {formatDate(selectedProject.created_at)}
+                    {/* Idea Input */}
+                    <div className="bg-gray-800 rounded-lg p-4 mb-6">
+                      <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                        <Wand2 className="w-5 h-5 text-purple-400" />
+                        Video Idea
+                      </h3>
+                      <textarea
+                        value={ideaInput}
+                        onChange={(e) => setIdeaInput(e.target.value)}
+                        placeholder="Describe your video idea...
+
+Example: '5 AI tools that will save you 10 hours per week'
+or 'Why most people fail at productivity'"
+                        className="w-full h-24 px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500 resize-none"
+                        disabled={generatingPlan}
+                      />
+                      <button
+                        onClick={generatePlan}
+                        disabled={!ideaInput.trim() || generatingPlan}
+                        className="mt-3 px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {generatingPlan ? (
+                          <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-5 h-5" />
+                        )}
+                        Create Video Plan
+                      </button>
                     </div>
-                  </div>
 
-                  <div className="bg-gray-700/50 rounded-lg p-4">
-                    <div className="text-sm text-gray-500 mb-1">Last Updated</div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      {formatDate(selectedProject.updated_at)}
-                    </div>
-                  </div>
-                </div>
+                    {/* Context Panel */}
+                    <ContextPanel
+                      projectId={selectedProject.id}
+                      context={context || { notes: null, images: [], files: [], references: [] }}
+                      onContextUpdate={() => loadContext(selectedProject.id)}
+                      onUpload={handleUploadContext}
+                      onImportWorkspace={handleImportWorkspace}
+                      onDeleteItem={handleDeleteContextItem}
+                    />
 
-                {/* Placeholder for future content */}
-                <div className="mt-6 text-center py-12 bg-gray-700/30 rounded-lg border-2 border-dashed border-gray-600">
-                  <Sparkles className="w-12 h-12 mx-auto mb-3 text-purple-500 opacity-50" />
-                  <p className="text-gray-400 mb-2">Content features coming soon</p>
-                  <p className="text-sm text-gray-500">
-                    AI script generation, video rendering, and more...
-                  </p>
-                </div>
+                    {/* Existing Plans */}
+                    {plans.length > 0 && (
+                      <div className="mt-6 bg-gray-800 rounded-lg p-4">
+                        <h3 className="text-sm font-semibold text-gray-400 mb-3">
+                          Previous Plans
+                        </h3>
+                        <div className="space-y-2">
+                          {plans.map((plan) => (
+                            <button
+                              key={plan.id}
+                              onClick={() => loadPlan(plan.id)}
+                              className="w-full text-left p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700 flex items-center justify-between"
+                            >
+                              <div>
+                                <p className="font-medium truncate">{plan.idea}</p>
+                                <p className="text-xs text-gray-500">
+                                  {plan.scene_count} scenes •{' '}
+                                  {formatDate(plan.modified_at)}
+                                </p>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-gray-400" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Plan View */}
+                {currentView === 'plan' && (
+                  <div className="max-w-2xl mx-auto">
+                    {generatingPlan ? (
+                      <div className="bg-gray-800 rounded-lg p-4">
+                        <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                          <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
+                          Generating Plan...
+                        </h3>
+                        <div
+                          ref={logRef}
+                          className="bg-gray-900 rounded-lg p-3 max-h-96 overflow-y-auto font-mono text-xs"
+                        >
+                          {planLog.map((line, i) => (
+                            <div key={i} className="text-gray-400 mb-1">
+                              {line}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : selectedPlan ? (
+                      <>
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h2 className="text-2xl font-bold">Review Plan</h2>
+                            <p className="text-gray-400">{selectedPlan.idea}</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setSelectedPlan(null);
+                              setSelectedPlanId(null);
+                              setCurrentView('context');
+                            }}
+                            className="text-gray-400 hover:text-white"
+                          >
+                            <ArrowLeft className="w-5 h-5" />
+                          </button>
+                        </div>
+
+                        <PlanPreview
+                          plan={selectedPlan}
+                          onUpdate={updatePlan}
+                          onGenerate={generateScriptFromPlan}
+                          generating={generatingScript}
+                        />
+
+                        {/* Script Generation Log */}
+                        {generatingScript && scriptLog.length > 0 && (
+                          <div className="mt-6 bg-gray-800 rounded-lg p-4">
+                            <h3 className="text-sm font-semibold text-gray-400 mb-2">
+                              Generation Log
+                            </h3>
+                            <div
+                              ref={logRef}
+                              className="bg-gray-900 rounded-lg p-3 max-h-48 overflow-y-auto font-mono text-xs"
+                            >
+                              {scriptLog.map((line, i) => (
+                                <div key={i} className="text-gray-400 mb-1">
+                                  {line}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-12 text-gray-500">
+                        <Layers className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                        <h3 className="text-xl font-semibold text-gray-300 mb-2">
+                          No Plan Selected
+                        </h3>
+                        <p>Enter a video idea in the Context tab to generate a plan.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Edit View */}
+                {currentView === 'edit' && (
+                  <div className="max-w-4xl mx-auto">
+                    {selectedScript ? (
+                      <>
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h2 className="text-2xl font-bold">
+                              {selectedScript.title || 'Untitled Script'}
+                            </h2>
+                            <p className="text-gray-400">
+                              {selectedScript.scenes?.length || 0} scenes •{' '}
+                              {(
+                                (selectedScript.scenes?.reduce(
+                                  (acc, s) => acc + (s.duration || 90),
+                                  0
+                                ) || 0) / 30
+                              ).toFixed(1)}
+                              s total
+                            </p>
+                          </div>
+                          <button
+                            onClick={renderVideo}
+                            disabled={rendering}
+                            className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-lg flex items-center gap-2 disabled:opacity-50"
+                          >
+                            {rendering ? (
+                              <Loader2 className="w-5 h-5 animate-spin" />
+                            ) : (
+                              <Play className="w-5 h-5" />
+                            )}
+                            Render Video
+                          </button>
+                        </div>
+
+                        {/* Scene Timeline */}
+                        <div className="space-y-3">
+                          {selectedScript.scenes?.map((scene, index) => (
+                            <div
+                              key={scene.id}
+                              className="bg-gray-800 rounded-lg p-4 hover:bg-gray-750 cursor-pointer"
+                              onClick={() => setEditingScene(scene)}
+                            >
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-sm text-gray-500 w-6">
+                                    {index + 1}
+                                  </span>
+                                  <span className="px-2 py-0.5 bg-purple-600/30 text-purple-300 text-xs rounded">
+                                    {scene.type}
+                                  </span>
+                                  <span className="text-xs text-gray-500 flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    {(scene.duration / 30).toFixed(1)}s
+                                  </span>
+                                </div>
+                                <Edit3 className="w-4 h-4 text-gray-400" />
+                              </div>
+                              {scene.title && (
+                                <p className="font-medium text-purple-400 mb-1">
+                                  {scene.title}
+                                </p>
+                              )}
+                              {scene.text && (
+                                <p className="text-sm text-gray-300 line-clamp-2">
+                                  {scene.text}
+                                </p>
+                              )}
+                              {scene.bullets && (
+                                <ul className="text-sm text-gray-400 mt-1">
+                                  {scene.bullets.slice(0, 2).map((b, i) => (
+                                    <li key={i}>• {b}</li>
+                                  ))}
+                                  {scene.bullets.length > 2 && (
+                                    <li className="text-gray-500">
+                                      +{scene.bullets.length - 2} more
+                                    </li>
+                                  )}
+                                </ul>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Raw JSON toggle */}
+                        <details className="mt-6">
+                          <summary className="text-sm text-gray-400 cursor-pointer hover:text-gray-300">
+                            View Raw JSON
+                          </summary>
+                          <pre className="mt-2 p-4 bg-gray-800 rounded-lg text-xs overflow-x-auto max-h-96">
+                            {JSON.stringify(selectedScript, null, 2)}
+                          </pre>
+                        </details>
+                      </>
+                    ) : (
+                      <div className="text-center py-12 text-gray-500">
+                        <FileJson className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                        <h3 className="text-xl font-semibold text-gray-300 mb-2">
+                          No Script Selected
+                        </h3>
+                        <p>Generate a script from a plan or select an existing one.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Render View */}
+                {currentView === 'render' && (
+                  <div className="max-w-4xl mx-auto">
+                    <h2 className="text-2xl font-bold mb-6">Rendered Videos</h2>
+
+                    {renderStatus && (
+                      <div
+                        className={`mb-6 p-4 rounded-lg flex items-center gap-3 ${
+                          renderStatus.includes('Error')
+                            ? 'bg-red-500/20 text-red-300'
+                            : renderStatus.includes('success')
+                            ? 'bg-green-500/20 text-green-300'
+                            : 'bg-purple-500/20 text-purple-300'
+                        }`}
+                      >
+                        {rendering && <Loader2 className="w-5 h-5 animate-spin" />}
+                        {renderStatus.includes('success') && (
+                          <Check className="w-5 h-5" />
+                        )}
+                        {renderStatus}
+                      </div>
+                    )}
+
+                    {renders.length === 0 ? (
+                      <div className="text-center py-12 text-gray-500">
+                        <Film className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                        <h3 className="text-xl font-semibold text-gray-300 mb-2">
+                          No Videos Yet
+                        </h3>
+                        <p>Edit a script and click "Render Video" to create a video.</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-4">
+                        {renders.map((render) => (
+                          <div
+                            key={render.filename}
+                            className="bg-gray-800 rounded-lg overflow-hidden"
+                          >
+                            <div className="aspect-[9/16] bg-gray-900 flex items-center justify-center">
+                              <button
+                                onClick={() => setPlayingVideo(render.filename)}
+                                className="p-4 bg-purple-600/30 rounded-full hover:bg-purple-600/50"
+                              >
+                                <Play className="w-8 h-8" />
+                              </button>
+                            </div>
+                            <div className="p-3">
+                              <p className="font-medium truncate">{render.filename}</p>
+                              <p className="text-xs text-gray-500">
+                                {formatFileSize(render.size)} •{' '}
+                                {formatDate(render.created_at)}
+                              </p>
+                              <div className="flex gap-2 mt-2">
+                                <button
+                                  onClick={() => setPlayingVideo(render.filename)}
+                                  className="flex-1 py-1.5 bg-purple-600 hover:bg-purple-500 rounded text-sm flex items-center justify-center gap-1"
+                                >
+                                  <Play className="w-4 h-4" />
+                                  Play
+                                </button>
+                                <button
+                                  onClick={() => downloadRender(render.filename)}
+                                  className="flex-1 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-sm flex items-center justify-center gap-1"
+                                >
+                                  <Download className="w-4 h-4" />
+                                  Download
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-            </div>
+            </>
           )}
         </div>
       </div>
@@ -324,7 +1163,9 @@ function VideoFactoryContent() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Channel Name</label>
+                <label className="block text-sm text-gray-400 mb-1">
+                  Channel Name
+                </label>
                 <input
                   type="text"
                   value={newProjectName}
@@ -372,6 +1213,170 @@ function VideoFactoryContent() {
           </div>
         </div>
       )}
+
+      {/* Scene Editor Modal */}
+      {editingScene && (
+        <SceneEditor
+          scene={editingScene}
+          onSave={saveScene}
+          onDelete={() => deleteScene(editingScene.id)}
+          onClose={() => setEditingScene(null)}
+        />
+      )}
+
+      {/* Video Player Modal */}
+      {playingVideo && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
+          <div className="relative w-full max-w-xl mx-4">
+            <button
+              onClick={() => setPlayingVideo(null)}
+              className="absolute -top-12 right-0 p-2 text-gray-400 hover:text-white flex items-center gap-2"
+            >
+              <X className="w-5 h-5" />
+              Close
+            </button>
+            <div className="bg-gray-900 rounded-xl overflow-hidden">
+              <video
+                src={getVideoUrl(playingVideo)}
+                controls
+                autoPlay
+                className="w-full"
+              >
+                Your browser does not support the video tag.
+              </video>
+              <div className="p-4 flex items-center justify-between border-t border-gray-800">
+                <div>
+                  <div className="font-medium">{playingVideo}</div>
+                  <div className="text-xs text-gray-500">
+                    {renders.find((r) => r.filename === playingVideo)?.size
+                      ? formatFileSize(
+                          renders.find((r) => r.filename === playingVideo)!.size
+                        )
+                      : ''}
+                  </div>
+                </div>
+                <button
+                  onClick={() => downloadRender(playingVideo)}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  Download
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Helper Components
+function ViewNavButton({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  disabled,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: any;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm transition-colors ${
+        active
+          ? 'bg-purple-600 text-white'
+          : disabled
+          ? 'text-gray-600 cursor-not-allowed'
+          : 'text-gray-400 hover:text-white hover:bg-gray-700'
+      }`}
+    >
+      <Icon className="w-4 h-4" />
+      {label}
+    </button>
+  );
+}
+
+function WelcomeView({ onCreateChannel }: { onCreateChannel: () => void }) {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="text-center text-gray-500 max-w-lg">
+        <div className="p-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl inline-block mb-4">
+          <Film className="w-12 h-12 text-white" />
+        </div>
+        <h2 className="text-2xl font-bold text-white mb-2">Video Studio</h2>
+        <p className="mb-6 text-gray-400">
+          AI-powered video script generation with plan review, scene editing, and
+          Remotion rendering.
+        </p>
+
+        <div className="bg-gray-800 rounded-lg p-4 text-left mb-6">
+          <h3 className="text-sm font-semibold text-purple-400 mb-3 flex items-center gap-2">
+            <Sparkles className="w-4 h-4" />
+            Workflow
+          </h3>
+          <div className="space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-xs text-purple-400">
+                1
+              </div>
+              <div>
+                <p className="font-medium text-white">Add Context</p>
+                <p className="text-xs text-gray-500">
+                  Upload images, files, notes, or reference workspace projects
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-xs text-purple-400">
+                2
+              </div>
+              <div>
+                <p className="font-medium text-white">Generate Plan</p>
+                <p className="text-xs text-gray-500">
+                  Claude researches and outlines your video
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-xs text-purple-400">
+                3
+              </div>
+              <div>
+                <p className="font-medium text-white">Edit Script</p>
+                <p className="text-xs text-gray-500">
+                  Review scenes, adjust backgrounds, animations, and timing
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-xs text-purple-400">
+                4
+              </div>
+              <div>
+                <p className="font-medium text-white">Render Video</p>
+                <p className="text-xs text-gray-500">
+                  Generate the final video with Remotion
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={onCreateChannel}
+          className="px-6 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg flex items-center gap-2 mx-auto"
+        >
+          <Plus className="w-5 h-5" />
+          Create Your First Channel
+        </button>
+      </div>
     </div>
   );
 }
@@ -379,7 +1384,7 @@ function VideoFactoryContent() {
 export default function VideoFactoryPage() {
   return (
     <ProtectedRoute>
-      <VideoFactoryContent />
+      <VideoStudioContent />
     </ProtectedRoute>
   );
 }

@@ -212,27 +212,54 @@ Uses `dataStudioV2Api` from `lib/api.ts`:
 └── .claude/               # Claude config
 ```
 
-### Video Factory (`/video-factory`) - MINIMAL (v2.0)
+### Video Studio (`/video-factory`) - v3.0 ENHANCED
 
-**Starting fresh** - Only channel/project management for now. All complex features removed for rebuild.
+**AI-powered video script generation** with plan review, scene editing, and Remotion rendering.
 
-**Current Features:**
-- Channel/project management with niche categories
-- Create/list/delete channels
-- Channel details view
-- "Coming Soon" placeholder for future features
+**Workflow:** Context → Plan → Edit → Render
 
-**UI Components:**
-- Sidebar with channel list
-- Create channel modal (name + niche selector)
-- Channel details panel
+**Features:**
+- **Plan Mode First**: Claude researches and plans before generating scripts
+- **Rich Context Input**: Text notes, image upload/paste, files, workspace references
+- **Draft Review**: Scene-by-scene preview and editing before render
+- **Two-Phase Generation**: Plan phase (SSE streaming) → Script generation (SSE streaming)
+- **Scene Editing**: Full modal with tabs for Content, Style, Animation, Media
+- **Background Presets**: 11 gradient presets (purpleNight, deepOcean, sunset, etc.)
+- **Lottie Animations**: robot, brain, rocket, success, chart, medical, science
+- **Drawing Paths**: check, cross, arrows, lightbulb, star, heart, brain, rocket, chart
+- **Remotion Rendering**: EnhancedVideo composition with 10 scene types
 
-**Coming Soon (displayed in UI):**
-- AI script generation
-- Web research integration
-- Voiceover generation
-- TikTok-style captions
-- Remotion video rendering
+**Views:**
+1. **Context View**: Add idea, upload context files/images, import from Workspace
+2. **Plan View**: Review AI-generated plan, edit scenes/hook/CTA inline
+3. **Edit View**: Full scene editor, duration controls, background/animation/media settings
+4. **Render View**: Video playback, download, render status
+
+**Components (`components/video-studio/`):**
+| Component | Purpose |
+|-----------|---------|
+| `ContextPanel.tsx` | File upload, paste images, notes, workspace import |
+| `PlanPreview.tsx` | Editable plan preview with collapsible sections |
+| `SceneEditor.tsx` | Full scene modal with Content/Style/Animation/Media tabs |
+| `index.ts` | Exports all video-studio components |
+
+**Scene Types:**
+hook, content, bullet-list, quote, cta, title-card, whiteboard, stats, icon-reveal, split-screen
+
+**Storage:**
+```
+/data/video-factory/project-data/{project_id}/
+├── .claude/CLAUDE.md      # Dynamic context + task
+├── context/               # User-uploaded context
+│   ├── images/            # Context images
+│   ├── files/             # Data files
+│   ├── notes.md           # User notes
+│   └── references.json    # Workspace refs
+├── .plans/                # Video plans
+├── scripts/               # EnhancedVideoProps JSON
+├── images/                # Scene images
+└── renders/               # MP4 outputs
+```
 
 ---
 
@@ -451,9 +478,11 @@ npm run start
 
 | Date | Change |
 |------|--------|
-| 2026-01-24 | **Video Factory:** CLEANUP - Starting fresh with channel management only |
-| 2026-01-24 | **Video Factory:** Removed complex UI (idea cards, render modal, research modal, voiceover) |
-| 2026-01-24 | **Video Factory:** Minimal UI - sidebar, channel details, "Coming Soon" placeholder |
+| 2026-01-24 | **Video Studio v3.0:** Full implementation - Plan → Edit → Render workflow |
+| 2026-01-24 | **Video Studio:** New components - ContextPanel, PlanPreview, SceneEditor |
+| 2026-01-24 | **Video Studio:** SSE streaming for plan and script generation |
+| 2026-01-24 | **Video Studio:** Scene editing with Content/Style/Animation/Media tabs |
+| 2026-01-24 | **Video Studio:** 11 gradient presets, Lottie animations, drawing paths |
 | 2026-01-23 | **Data Studio:** Fix empty stat cards - support alternate field names (value/stat_value) |
 | 2026-01-23 | **Data Studio:** Fix [Object] display - properly stringify result objects |
 | 2026-01-23 | **Data Studio:** Remove redundant "Starting Claude Code session" message |
