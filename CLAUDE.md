@@ -39,7 +39,7 @@ lsof -i :3000 -i :8000  # Check our ports
 |-----|-------|-------------|
 | **C3 Researcher Workspace** | `/workspace` | Claude Code Custom Researcher - AI-powered research terminal |
 | **C3 Data Studio** | `/data-studio` | AI-powered data analysis with headless Claude (NEW) |
-| **Video Factory** | `/video-factory` | AI video production pipeline |
+| **Video Factory** | `/video-factory` | Video channel management (Starting Fresh) |
 
 **C3 Researcher Workspace Features:**
 - 145+ scientific skills, 26 MCP servers, 14 plugins
@@ -66,24 +66,10 @@ lsof -i :3000 -i :8000  # Check our ports
 4. Auto-generated dashboard with editable widgets
 5. NLP-based customization ("Add a pie chart for categories")
 
-**Video Factory Features (Enhanced Pipeline):**
-- **Research**: Claude Code with built-in web search (no external APIs)
-- **Script Generation**: AI-powered scripts with timing markers
-- **Voiceover**: OpenAI TTS with 6 voice options
-- **Captions**: TikTok-style word-by-word highlighting (Whisper)
-- **Animations**: Spring physics with configurable damping/stiffness
-- **Transitions**: Professional fade, slide, wipe, flip effects
-- **Rendering**: Remotion-powered video generation
-- **Formats**: Vertical (9:16), Square (1:1), Horizontal (16:9)
-- **Durations**: 15s, 30s, 60s presets
-
-**Video Factory Workflow:**
-1. Create channel with niche
-2. Generate content ideas or single detailed script
-3. Research topic (Claude Code web search)
-4. Generate AI voiceover with captions
-5. Render with enhanced mode (transitions + animations)
-6. Download and post to platforms
+**Video Factory (v2.0 - Starting Fresh):**
+- Channel/project management only (cleaned up for rebuild)
+- Niche-based organization
+- Coming soon: AI script generation, research, voiceover, captions, rendering
 
 **Unified Project Architecture:**
 - Workspace projects: `/data/users/{user-id}/projects/{project-name}/`
@@ -123,19 +109,12 @@ ACe_Toolkit/
 │   │   ├── components/         # React components
 │   │   └── lib/                # Utilities
 │   │
-│   ├── api/                    # FastAPI Backend (see apps/api/CLAUDE.md)
-│   │   ├── app/
-│   │   │   ├── routers/        # API endpoints
-│   │   │   ├── core/           # Managers, config, security
-│   │   │   └── models/         # SQLAlchemy models
-│   │   └── requirements.txt
-│   │
-│   └── remotion/               # Remotion Video Rendering
-│       ├── src/
-│       │   ├── TransitionVideo.tsx   # Enhanced video with transitions
-│       │   ├── CaptionDisplay.tsx    # TikTok-style captions
-│       │   └── Root.tsx              # Composition definitions
-│       └── package.json
+│   └── api/                    # FastAPI Backend (see apps/api/CLAUDE.md)
+│       ├── app/
+│       │   ├── routers/        # API endpoints
+│       │   ├── core/           # Managers, config, security
+│       │   └── models/         # SQLAlchemy models
+│       └── requirements.txt
 │
 ├── infra/scripts/              # start_all.sh, stop_all.sh, status.sh
 ├── logs/                       # Application logs
@@ -253,11 +232,9 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
-| 2026-01-24 | **Video Factory:** Enhanced pipeline with Remotion, TikTok captions, spring animations |
-| 2026-01-24 | **Video Factory:** Claude Code web research (removed Tavily API dependency) |
-| 2026-01-24 | **Video Factory:** OpenAI TTS voiceover with Whisper word-level timestamps |
-| 2026-01-24 | **Video Factory:** UI refresh with pipeline features banner |
-| 2026-01-24 | **Remotion:** Added apps/remotion with TransitionVideo, CaptionDisplay components |
+| 2026-01-24 | **Video Factory:** CLEANUP - Starting fresh with channel management only |
+| 2026-01-24 | **Video Factory:** Removed video_research.py, video_audio.py, complex UI components |
+| 2026-01-24 | **Video Factory:** Minimal API (project CRUD) and UI for rebuild foundation |
 | 2026-01-23 | **Data Studio:** Fix empty stat cards/charts - support alternate field names |
 | 2026-01-23 | **Data Studio:** Fix [Object] display - properly stringify result objects |
 | 2026-01-23 | **Data Studio:** Multi-file analysis mode selector (combined vs separate) |

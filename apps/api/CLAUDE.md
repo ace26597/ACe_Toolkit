@@ -34,7 +34,7 @@ apps/api/
 │   │   ├── workspace.py           # Workspace API
 │   │   ├── data_studio.py         # C3 Data Studio (Legacy)
 │   │   ├── data_studio_v2.py      # C3 Data Studio V2 (REDESIGNED)
-│   │   ├── video_factory.py       # Video Factory (enhanced pipeline)
+│   │   ├── video_factory.py       # Video Factory (minimal - channel management)
 │   │   └── public_api.py          # Public endpoints
 │   └── core/
 │       ├── config.py              # Settings (Pydantic)
@@ -47,9 +47,7 @@ apps/api/
 │       ├── session_manager.py     # Session management
 │       ├── notifications.py       # Discord/ntfy alerts
 │       ├── user_access.py         # Per-user data access
-│       ├── video_research.py      # Claude Code web research for Video Factory
-│       ├── video_audio.py         # OpenAI TTS/Whisper for voiceover + captions
-│       └── video_factory_manager.py # Video Factory project/idea management
+│       └── video_factory_manager.py # Video Factory project management
 ├── requirements.txt
 ├── .env                           # Environment variables
 └── app.db                         # SQLite database
@@ -214,68 +212,38 @@ Legacy Data Studio API using headless Claude Code. See V2 for new implementation
 }
 ```
 
-### Video Factory (`/video-factory`) - ENHANCED
+### Video Factory (`/video-factory`) - MINIMAL (v2.0)
 
-**AI-powered short-form video creation** with Claude Code research, OpenAI TTS voiceover, TikTok-style captions, and Remotion rendering.
+**Starting fresh** - Only channel/project management for now. All complex features removed for rebuild.
 
-**Pipeline:** Idea → Research → Script → Voiceover → Captions → Enhanced Video → Render
-
-**Project Management:**
+**Available Endpoints:**
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/projects` | List projects |
+| GET | `/auth/check` | Check email authorization |
+| GET | `/projects` | List projects (filter by email) |
 | POST | `/projects` | Create channel |
-| GET | `/projects/{id}` | Get project with ideas |
+| GET | `/projects/{id}` | Get project details |
 | DELETE | `/projects/{id}` | Delete project |
+| GET | `/status` | Get service status |
 
-**Content Generation:**
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/projects/{id}/generate-ideas` | Generate multiple ideas |
-| POST | `/projects/{id}/generate-script` | Generate detailed script |
-| POST | `/projects/{id}/ideas/{id}/research` | Research topic (Claude Code web search) |
-| POST | `/projects/{id}/ideas/{id}/generate-enhanced-script` | Script with research context |
-| POST | `/projects/{id}/ideas/{id}/improve-hook` | Generate alternative hooks |
-
-**Voiceover & Captions:**
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/voices` | List available TTS voices |
-| POST | `/projects/{id}/ideas/{id}/voiceover` | Generate voiceover + captions |
-
-**Video Rendering:**
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/projects/{id}/ideas/{id}/enhance` | Generate enhanced props |
-| POST | `/projects/{id}/ideas/{id}/render` | Start Remotion render |
-| GET | `/render-jobs/{job_id}` | Get render status |
-| GET | `/render-jobs/{job_id}/download` | Download video |
-| GET | `/renders/{project_id}` | List rendered videos |
-| GET | `/projects/{id}/ideas/{id}/renders` | List idea renders |
-
-**Key Modules:**
+**Key Module:**
 
 | Module | Purpose |
 |--------|---------|
-| `video_research.py` | Claude Code web research (no external API) |
-| `video_audio.py` | OpenAI TTS + Whisper word-level timestamps |
-| `video_factory_manager.py` | Project/idea CRUD, script generation |
+| `video_factory_manager.py` | Project CRUD only |
 
-**Render Options:**
-- **Compositions:** ShortVideo (60s), ShortVideo30, ShortVideo15, SquareVideo, EnhancedVideo
-- **Enhanced Mode:** Spring animations, transitions (fade/slide/wipe/flip)
-- **Voiceover:** 6 voices (alloy, echo, fable, onyx, nova, shimmer)
-- **Captions:** TikTok-style word-by-word with highlighting
+**Coming Soon:**
+- AI script generation
+- Web research integration
+- Voiceover generation
+- TikTok-style captions
+- Remotion video rendering
 
 **Storage:**
 ```
 /data/video-factory/
-├── projects/                  # Project JSON files
-└── renders/{project_id}/      # Rendered MP4 files
+└── projects/                  # Project JSON files
 ```
 
 ---
@@ -544,6 +512,8 @@ The following modules were removed during cleanup:
 
 | Module | Date | Reason |
 |--------|------|--------|
+| `core/video_research.py` | 2026-01-24 | Video Factory cleanup - starting fresh |
+| `core/video_audio.py` | 2026-01-24 | Video Factory cleanup - starting fresh |
 | `core/data_analyzer.py` | 2026-01-23 | Replaced by claude_runner.py (Claude Code First) |
 | `core/dashboard_generator.py` | 2026-01-23 | Replaced by claude_runner.py (Claude Code First) |
 | `core/data_studio_manager.py` | 2026-01-23 | Replaced by claude_runner.py |

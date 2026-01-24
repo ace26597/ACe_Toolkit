@@ -212,56 +212,27 @@ Uses `dataStudioV2Api` from `lib/api.ts`:
 └── .claude/               # Claude config
 ```
 
-### Video Factory (`/video-factory`) - ENHANCED
+### Video Factory (`/video-factory`) - MINIMAL (v2.0)
 
-**AI-powered short-form video creation** with research, voiceover, captions, and Remotion rendering.
+**Starting fresh** - Only channel/project management for now. All complex features removed for rebuild.
 
-**Pipeline Features Banner:**
-Displays the enhanced pipeline capabilities:
-- Web Research (Claude Code) - No external API
-- AI Voiceover (OpenAI TTS) - 6 voice options
-- TikTok Captions (Word-by-word) - Whisper timestamps
-- Pro Animations (Spring Physics) - Configurable damping
-
-**Features:**
+**Current Features:**
 - Channel/project management with niche categories
-- AI content idea generation (batch or single script)
-- Web research toggle (Claude Code built-in search)
-- AI voiceover generation with voice selection
-- TikTok-style caption preview
-- Enhanced mode toggle (transitions + animations)
-- Multiple video formats (60s, 30s, 15s vertical, square)
-- Color customization (background, text, accent)
-- Video preview modal with playback
-- Download and platform tracking
+- Create/list/delete channels
+- Channel details view
+- "Coming Soon" placeholder for future features
 
-**Generate Content Modal:**
-- Topic input with style selection
-- Styles: Educational, Listicle, Tutorial, Reaction, Storytime, Controversial
-- Web Research toggle with "Claude Code" badge
-- Batch (3-5 ideas) or single detailed script
+**UI Components:**
+- Sidebar with channel list
+- Create channel modal (name + niche selector)
+- Channel details panel
 
-**Render Video Modal:**
-- Enhanced Mode toggle (spring animations, transitions)
-- Format selection (Vertical 60s/30s, Square)
-- Color pickers for background/text/accent
-- AI Voiceover section with voice dropdown
-- Caption preview info
-- Background image URL (optional)
-- Render progress with status polling
-
-**Research Modal:**
-- Claude Code web search indicator
-- Statistics, facts, quotes, trends sections
-- Click to copy individual items
-- Suggested hook highlight
-
-**Content Card Features:**
-- Hook display with improve/copy buttons
-- Script toggle (show/hide full script)
-- Rendered videos list with play/download
-- Platform posting status (YouTube, TikTok, Instagram)
-- Research and Render buttons
+**Coming Soon (displayed in UI):**
+- AI script generation
+- Web research integration
+- Voiceover generation
+- TikTok-style captions
+- Remotion video rendering
 
 ---
 
@@ -480,10 +451,9 @@ npm run start
 
 | Date | Change |
 |------|--------|
-| 2026-01-24 | **Video Factory:** Pipeline features banner (Research, Voiceover, Captions, Animations) |
-| 2026-01-24 | **Video Factory:** Header redesign with "AI-Powered Short Video Creation" subtitle |
-| 2026-01-24 | **Video Factory:** Enhanced research modal with "Claude Code" branding |
-| 2026-01-24 | **Video Factory:** Web Research toggle shows "Claude Code" badge |
+| 2026-01-24 | **Video Factory:** CLEANUP - Starting fresh with channel management only |
+| 2026-01-24 | **Video Factory:** Removed complex UI (idea cards, render modal, research modal, voiceover) |
+| 2026-01-24 | **Video Factory:** Minimal UI - sidebar, channel details, "Coming Soon" placeholder |
 | 2026-01-23 | **Data Studio:** Fix empty stat cards - support alternate field names (value/stat_value) |
 | 2026-01-23 | **Data Studio:** Fix [Object] display - properly stringify result objects |
 | 2026-01-23 | **Data Studio:** Remove redundant "Starting Claude Code session" message |
