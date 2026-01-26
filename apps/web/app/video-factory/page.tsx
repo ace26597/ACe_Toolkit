@@ -9,14 +9,12 @@ import {
   Loader2,
   Film,
   Sparkles,
-  Send,
   FileJson,
   Play,
   Download,
   RefreshCw,
   Check,
   X,
-  Eye,
   Wand2,
   ChevronRight,
   FileText,
@@ -24,10 +22,21 @@ import {
   Layers,
   Clock,
   ArrowLeft,
+  RotateCcw,
 } from 'lucide-react';
 import { ProtectedRoute, useAuth } from '@/components/auth';
 import { getApiUrl } from '@/lib/api';
-import { ContextPanel, PlanPreview, SceneEditor, Scene } from '@/components/video-studio';
+import {
+  ContextPanel,
+  PlanPreview,
+  SceneEditor,
+  RecommendationsPanel,
+  StepIndicator,
+  VisualPreview,
+  VideoPopup,
+  VIDEO_STUDIO_STEPS,
+  Scene,
+} from '@/components/video-studio';
 
 // API client
 const api = {
@@ -95,20 +104,30 @@ interface ContentProject {
   updated_at: string;
 }
 
+interface Recommendations {
+  rec_id: string;
+  idea: string;
+  generated_at: string;
+  genres: any[];
+  styles: any[];
+  animation_presets: any[];
+  research_sources: any[];
+  hook_suggestions: any[];
+  scene_structure: any[];
+  selected_options?: { [key: string]: string };
+}
+
 interface Plan {
   plan_id: string;
   idea: string;
-  research_summary: string;
-  hook: { concept: string; type: string };
-  scenes: Array<{
-    order: number;
-    type: string;
-    concept: string;
-    visual_idea: string;
-    duration_estimate: string;
-  }>;
-  cta: { message: string; style: string };
-  total_duration_estimate: string;
+  research_summary?: string;
+  research_findings?: any[];
+  selected_options?: any;
+  hook?: { concept: string; type: string; text?: string };
+  scenes: any[];
+  cta?: { message: string; style: string };
+  total_duration_estimate?: string;
+  total_duration_seconds?: number;
   notes?: string;
 }
 
@@ -134,7 +153,18 @@ interface VideoRender {
   created_at: number;
 }
 
-type ViewState = 'context' | 'plan' | 'edit' | 'render';
+// View states for v4.0 flow
+type ViewState = 'idea' | 'recommendations' | 'planning' | 'preview' | 'edit' | 'render';
+
+// Map view state to step index
+const viewToStep: { [key in ViewState]: number } = {
+  idea: 0,
+  recommendations: 1,
+  planning: 2,
+  preview: 3,
+  edit: 3,
+  render: 4,
+};
 
 // Main Component
 function VideoStudioContent() {
@@ -151,12 +181,20 @@ function VideoStudioContent() {
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectNiche, setNewProjectNiche] = useState('');
 
-  // View state
-  const [currentView, setCurrentView] = useState<ViewState>('context');
+  // View state (v4.0 flow)
+  const [currentView, setCurrentView] = useState<ViewState>('idea');
+  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
+
+  // Idea input
+  const [ideaInput, setIdeaInput] = useState('');
 
   // Context state
   const [context, setContext] = useState<any>(null);
-  const [ideaInput, setIdeaInput] = useState('');
+
+  // Recommendations state
+  const [recommendations, setRecommendations] = useState<Recommendations | null>(null);
+  const [generatingRecs, setGeneratingRecs] = useState(false);
+  const [recsLog, setRecsLog] = useState<string[]>([]);
 
   // Plan state
   const [plans, setPlans] = useState<Array<{ id: string; idea: string; scene_count: number; modified_at: number }>>([]);
@@ -195,7 +233,7 @@ function VideoStudioContent() {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  }, [planLog, scriptLog]);
+  }, [recsLog, planLog, scriptLog]);
 
   // Load data when project changes
   useEffect(() => {
@@ -204,6 +242,7 @@ function VideoStudioContent() {
       loadPlans(selectedProject.id);
       loadScripts(selectedProject.id);
       loadRenders(selectedProject.id);
+      loadRecommendations(selectedProject.id);
     }
   }, [selectedProject]);
 
@@ -226,11 +265,14 @@ function VideoStudioContent() {
     try {
       const response = await api.get(`/video-factory/projects/${projectId}`);
       setSelectedProject(response.data);
-      setCurrentView('context');
+      setCurrentView('idea');
+      setCompletedSteps([]);
+      setRecommendations(null);
       setSelectedPlan(null);
       setSelectedPlanId(null);
       setSelectedScript(null);
       setSelectedScriptId(null);
+      setIdeaInput('');
     } catch (error) {
       console.error('Failed to load project details:', error);
     }
@@ -242,6 +284,17 @@ function VideoStudioContent() {
       setContext(response.data);
     } catch (error) {
       console.error('Failed to load context:', error);
+    }
+  };
+
+  const loadRecommendations = async (projectId: string) => {
+    try {
+      const response = await api.get(`/video-factory/projects/${projectId}/recommendations`);
+      if (response.data.recommendations) {
+        setRecommendations(response.data.recommendations);
+      }
+    } catch (error) {
+      console.error('Failed to load recommendations:', error);
     }
   };
 
@@ -307,6 +360,21 @@ function VideoStudioContent() {
     }
   };
 
+  // Reset session for fresh start
+  const resetSession = async () => {
+    if (!selectedProject) return;
+    try {
+      await api.delete(`/video-factory/projects/${selectedProject.id}/session`);
+      setRecommendations(null);
+      setSelectedPlan(null);
+      setSelectedPlanId(null);
+      setCompletedSteps([]);
+      setCurrentView('idea');
+    } catch (error) {
+      console.error('Failed to reset session:', error);
+    }
+  };
+
   // Context Management
   const handleUploadContext = async (files: FileList, notes?: string) => {
     if (!selectedProject) return;
@@ -337,25 +405,106 @@ function VideoStudioContent() {
     if (!selectedProject) return;
 
     await api.delete(
-      `/video-factory/projects/${selectedProject.id}/context/${type}/${encodeURIComponent(
-        name
-      )}`
+      `/video-factory/projects/${selectedProject.id}/context/${type}/${encodeURIComponent(name)}`
     );
     loadContext(selectedProject.id);
   };
 
-  // Plan Generation
-  const generatePlan = async () => {
-    if (!ideaInput.trim() || !selectedProject || generatingPlan) return;
+  // Step 1: Generate Recommendations
+  const generateRecommendations = async () => {
+    if (!ideaInput.trim() || !selectedProject || generatingRecs) return;
+
+    setGeneratingRecs(true);
+    setRecsLog(['Starting recommendations generation...']);
+    setCurrentView('recommendations');
+
+    try {
+      const response = await api.stream(
+        `/video-factory/projects/${selectedProject.id}/recommendations`,
+        { idea: ideaInput }
+      );
+
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+
+      if (!reader) throw new Error('No response body');
+
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const event = JSON.parse(line.slice(6));
+
+              if (event.type === 'status') {
+                setRecsLog((prev) => [...prev, `[Status] ${event.message}`]);
+              } else if (event.type === 'text') {
+                const text = event.content?.slice(0, 300);
+                if (text) {
+                  setRecsLog((prev) => [...prev, text]);
+                }
+              } else if (event.type === 'tool') {
+                setRecsLog((prev) => [...prev, `[Tool] ${event.tool}`]);
+              } else if (event.type === 'complete') {
+                if (event.success) {
+                  setRecsLog((prev) => [...prev, `[Success] Recommendations ready`]);
+                  setRecommendations(event.recommendations);
+                  setCompletedSteps([0]);
+                } else {
+                  setRecsLog((prev) => [...prev, `[Error] ${event.error}`]);
+                }
+              } else if (event.type === 'error') {
+                setRecsLog((prev) => [...prev, `[Error] ${event.error}`]);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Recommendations generation failed:', error);
+      setRecsLog((prev) => [...prev, `[Error] ${error}`]);
+    } finally {
+      setGeneratingRecs(false);
+    }
+  };
+
+  // Handle recommendation selections
+  const handleRecsSelect = async (selections: { [key: string]: string }) => {
+    if (!selectedProject || !recommendations) return;
+
+    try {
+      await api.put(
+        `/video-factory/projects/${selectedProject.id}/recommendations/${recommendations.rec_id}`,
+        { selections }
+      );
+      setRecommendations({ ...recommendations, selected_options: selections });
+    } catch (error) {
+      console.error('Failed to update recommendations:', error);
+    }
+  };
+
+  // Step 2: Generate Plan (after recommendations)
+  const generatePlanFromRecs = async () => {
+    if (!selectedProject || !recommendations || generatingPlan) return;
 
     setGeneratingPlan(true);
-    setPlanLog(['Starting plan generation...']);
-    setCurrentView('plan');
+    setPlanLog(['Starting plan generation with research...']);
+    setCurrentView('planning');
 
     try {
       const response = await api.stream(
         `/video-factory/projects/${selectedProject.id}/plan`,
-        { idea: ideaInput }
+        { idea: ideaInput, use_continue: true }
       );
 
       const reader = response.body?.getReader();
@@ -392,7 +541,9 @@ function VideoStudioContent() {
                   setPlanLog((prev) => [...prev, `[Success] Plan created: ${event.plan_id}`]);
                   setSelectedPlan(event.plan);
                   setSelectedPlanId(event.plan_id);
+                  setCompletedSteps([0, 1, 2]);
                   loadPlans(selectedProject.id);
+                  setCurrentView('preview');
                 } else {
                   setPlanLog((prev) => [...prev, `[Error] ${event.error}`]);
                 }
@@ -422,7 +573,7 @@ function VideoStudioContent() {
       );
       setSelectedPlan(response.data.plan);
       setSelectedPlanId(planId);
-      setCurrentView('plan');
+      setCurrentView('preview');
     } catch (error) {
       console.error('Failed to load plan:', error);
     }
@@ -440,7 +591,7 @@ function VideoStudioContent() {
     setSelectedPlan(response.data.plan);
   };
 
-  // Script Generation
+  // Step 3: Generate Script from Plan
   const generateScriptFromPlan = async () => {
     if (!selectedProject || !selectedPlanId || generatingScript) return;
 
@@ -490,6 +641,7 @@ function VideoStudioContent() {
                   ]);
                   setSelectedScript(event.script);
                   setSelectedScriptId(event.script_id);
+                  setCompletedSteps([0, 1, 2, 3]);
                   loadScripts(selectedProject.id);
                   setCurrentView('edit');
                 } else {
@@ -583,18 +735,21 @@ function VideoStudioContent() {
           );
           const newRenders = rendersResponse.data.renders || [];
 
-          // Check for new video
           if (newRenders.length > renders.length) {
             clearInterval(pollInterval);
             setRenders(newRenders);
             setRenderStatus('Video rendered successfully!');
+            setCompletedSteps([0, 1, 2, 3, 4]);
             setTimeout(() => {
               setRendering(false);
-            }, 2000);
+              // Auto-play the newest video
+              if (newRenders[0]) {
+                setPlayingVideo(newRenders[0].filename);
+              }
+            }, 1000);
           }
         }, 5000);
 
-        // Timeout after 5 minutes
         setTimeout(() => {
           clearInterval(pollInterval);
           if (rendering) {
@@ -637,6 +792,14 @@ function VideoStudioContent() {
     window.open(getVideoUrl(filename), '_blank');
   };
 
+  // Handle step navigation
+  const handleStepClick = (stepIndex: number) => {
+    const viewMap: ViewState[] = ['idea', 'recommendations', 'planning', 'preview', 'render'];
+    if (stepIndex <= Math.max(...completedSteps, viewToStep[currentView])) {
+      setCurrentView(viewMap[stepIndex]);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white">
       {/* Header */}
@@ -653,7 +816,7 @@ function VideoStudioContent() {
               <div>
                 <h1 className="text-xl font-bold">Video Studio</h1>
                 <p className="text-[10px] text-gray-500 -mt-0.5">
-                  Plan → Generate → Edit → Render
+                  v4.0 - Idea → Options → Plan → Preview → Render
                 </p>
               </div>
             </div>
@@ -779,48 +942,33 @@ function VideoStudioContent() {
             <WelcomeView onCreateChannel={() => setShowCreateModal(true)} />
           ) : (
             <>
-              {/* View Navigation */}
-              <div className="sticky top-0 bg-gray-900 border-b border-gray-700 px-6 py-3 flex items-center gap-2 z-10">
-                <ViewNavButton
-                  active={currentView === 'context'}
-                  onClick={() => setCurrentView('context')}
-                  icon={FileText}
-                  label="1. Context"
-                />
-                <ChevronRight className="w-4 h-4 text-gray-600" />
-                <ViewNavButton
-                  active={currentView === 'plan'}
-                  onClick={() => setCurrentView('plan')}
-                  icon={Layers}
-                  label="2. Plan"
-                  disabled={!selectedPlan && plans.length === 0}
-                />
-                <ChevronRight className="w-4 h-4 text-gray-600" />
-                <ViewNavButton
-                  active={currentView === 'edit'}
-                  onClick={() => setCurrentView('edit')}
-                  icon={Edit3}
-                  label="3. Edit"
-                  disabled={!selectedScript && scripts.length === 0}
-                />
-                <ChevronRight className="w-4 h-4 text-gray-600" />
-                <ViewNavButton
-                  active={currentView === 'render'}
-                  onClick={() => setCurrentView('render')}
-                  icon={Play}
-                  label="4. Render"
-                  disabled={!selectedScript}
-                />
-              </div>
+              {/* Step Indicator */}
+              <StepIndicator
+                steps={VIDEO_STUDIO_STEPS}
+                currentStep={viewToStep[currentView]}
+                completedSteps={completedSteps}
+                onStepClick={handleStepClick}
+              />
 
               <div className="p-6">
-                {/* Context View */}
-                {currentView === 'context' && (
+                {/* Step 1: Idea Input */}
+                {currentView === 'idea' && (
                   <div className="max-w-2xl mx-auto">
-                    <h2 className="text-2xl font-bold mb-2">{selectedProject.name}</h2>
-                    <p className="text-gray-400 mb-6">
-                      Add context and enter your video idea
-                    </p>
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-2xl font-bold">{selectedProject.name}</h2>
+                        <p className="text-gray-400">Enter your video idea to get started</p>
+                      </div>
+                      {(recommendations || plans.length > 0) && (
+                        <button
+                          onClick={resetSession}
+                          className="text-sm text-gray-400 hover:text-white flex items-center gap-1"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                          Start Fresh
+                        </button>
+                      )}
+                    </div>
 
                     {/* Idea Input */}
                     <div className="bg-gray-800 rounded-lg p-4 mb-6">
@@ -835,20 +983,20 @@ function VideoStudioContent() {
 
 Example: '5 AI tools that will save you 10 hours per week'
 or 'Why most people fail at productivity'"
-                        className="w-full h-24 px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500 resize-none"
-                        disabled={generatingPlan}
+                        className="w-full h-32 px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-purple-500 resize-none"
+                        disabled={generatingRecs}
                       />
                       <button
-                        onClick={generatePlan}
-                        disabled={!ideaInput.trim() || generatingPlan}
-                        className="mt-3 px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={generateRecommendations}
+                        disabled={!ideaInput.trim() || generatingRecs}
+                        className="mt-3 px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {generatingPlan ? (
+                        {generatingRecs ? (
                           <Loader2 className="w-5 h-5 animate-spin" />
                         ) : (
                           <Sparkles className="w-5 h-5" />
                         )}
-                        Create Video Plan
+                        Get Recommendations
                       </button>
                     </div>
 
@@ -878,8 +1026,7 @@ or 'Why most people fail at productivity'"
                               <div>
                                 <p className="font-medium truncate">{plan.idea}</p>
                                 <p className="text-xs text-gray-500">
-                                  {plan.scene_count} scenes •{' '}
-                                  {formatDate(plan.modified_at)}
+                                  {plan.scene_count} scenes • {formatDate(plan.modified_at)}
                                 </p>
                               </div>
                               <ChevronRight className="w-4 h-4 text-gray-400" />
@@ -891,48 +1038,118 @@ or 'Why most people fail at productivity'"
                   </div>
                 )}
 
-                {/* Plan View */}
-                {currentView === 'plan' && (
+                {/* Step 2: Recommendations */}
+                {currentView === 'recommendations' && (
                   <div className="max-w-2xl mx-auto">
-                    {generatingPlan ? (
+                    {generatingRecs ? (
                       <div className="bg-gray-800 rounded-lg p-4">
                         <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
                           <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
-                          Generating Plan...
+                          Analyzing Your Idea...
                         </h3>
                         <div
                           ref={logRef}
                           className="bg-gray-900 rounded-lg p-3 max-h-96 overflow-y-auto font-mono text-xs"
                         >
-                          {planLog.map((line, i) => (
+                          {recsLog.map((line, i) => (
                             <div key={i} className="text-gray-400 mb-1">
                               {line}
                             </div>
                           ))}
                         </div>
                       </div>
-                    ) : selectedPlan ? (
+                    ) : recommendations ? (
                       <>
                         <div className="flex items-center justify-between mb-6">
                           <div>
-                            <h2 className="text-2xl font-bold">Review Plan</h2>
-                            <p className="text-gray-400">{selectedPlan.idea}</p>
+                            <h2 className="text-2xl font-bold">Choose Your Options</h2>
+                            <p className="text-gray-400">
+                              Select the style and approach for your video
+                            </p>
                           </div>
                           <button
-                            onClick={() => {
-                              setSelectedPlan(null);
-                              setSelectedPlanId(null);
-                              setCurrentView('context');
-                            }}
-                            className="text-gray-400 hover:text-white"
+                            onClick={() => setCurrentView('idea')}
+                            className="text-gray-400 hover:text-white flex items-center gap-1"
                           >
-                            <ArrowLeft className="w-5 h-5" />
+                            <ArrowLeft className="w-4 h-4" />
+                            Back
                           </button>
                         </div>
 
-                        <PlanPreview
+                        <RecommendationsPanel
+                          recommendations={recommendations}
+                          onSelect={handleRecsSelect}
+                          onContinue={generatePlanFromRecs}
+                          loading={generatingPlan}
+                        />
+                      </>
+                    ) : (
+                      <div className="text-center py-12 text-gray-500">
+                        <Sparkles className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                        <h3 className="text-xl font-semibold text-gray-300 mb-2">
+                          No Recommendations Yet
+                        </h3>
+                        <p>Enter a video idea first to get recommendations.</p>
+                        <button
+                          onClick={() => setCurrentView('idea')}
+                          className="mt-4 text-purple-400 hover:text-purple-300"
+                        >
+                          Go back to idea input
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Step 3: Planning (shows log while generating) */}
+                {currentView === 'planning' && (
+                  <div className="max-w-2xl mx-auto">
+                    <div className="bg-gray-800 rounded-lg p-4">
+                      <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
+                        Researching & Planning...
+                      </h3>
+                      <div
+                        ref={logRef}
+                        className="bg-gray-900 rounded-lg p-3 max-h-96 overflow-y-auto font-mono text-xs"
+                      >
+                        {planLog.map((line, i) => (
+                          <div key={i} className="text-gray-400 mb-1">
+                            {line}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Step 4: Visual Preview */}
+                {currentView === 'preview' && (
+                  <div className="max-w-3xl mx-auto">
+                    {selectedPlan ? (
+                      <>
+                        <div className="flex items-center justify-between mb-6">
+                          <div>
+                            <h2 className="text-2xl font-bold">Visual Preview</h2>
+                            <p className="text-gray-400">
+                              Review the plan and generate the full script
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setCurrentView('recommendations')}
+                            className="text-gray-400 hover:text-white flex items-center gap-1"
+                          >
+                            <ArrowLeft className="w-4 h-4" />
+                            Back to Options
+                          </button>
+                        </div>
+
+                        <VisualPreview
                           plan={selectedPlan}
-                          onUpdate={updatePlan}
+                          onEditScene={(index) => {
+                            // For now, just show plan preview editing
+                            // In a full implementation, this would open a plan scene editor
+                          }}
                           onGenerate={generateScriptFromPlan}
                           generating={generatingScript}
                         />
@@ -962,13 +1179,13 @@ or 'Why most people fail at productivity'"
                         <h3 className="text-xl font-semibold text-gray-300 mb-2">
                           No Plan Selected
                         </h3>
-                        <p>Enter a video idea in the Context tab to generate a plan.</p>
+                        <p>Generate a plan from the recommendations first.</p>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Edit View */}
+                {/* Step 5: Edit (Scene Editor) */}
                 {currentView === 'edit' && (
                   <div className="max-w-4xl mx-auto">
                     {selectedScript ? (
@@ -989,18 +1206,27 @@ or 'Why most people fail at productivity'"
                               s total
                             </p>
                           </div>
-                          <button
-                            onClick={renderVideo}
-                            disabled={rendering}
-                            className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-lg flex items-center gap-2 disabled:opacity-50"
-                          >
-                            {rendering ? (
-                              <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
-                              <Play className="w-5 h-5" />
-                            )}
-                            Render Video
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setCurrentView('preview')}
+                              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg flex items-center gap-2"
+                            >
+                              <ArrowLeft className="w-4 h-4" />
+                              Back
+                            </button>
+                            <button
+                              onClick={renderVideo}
+                              disabled={rendering}
+                              className="px-6 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 rounded-lg flex items-center gap-2 disabled:opacity-50"
+                            >
+                              {rendering ? (
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                              ) : (
+                                <Play className="w-5 h-5" />
+                              )}
+                              Render Video
+                            </button>
+                          </div>
                         </div>
 
                         {/* Scene Timeline */}
@@ -1038,7 +1264,7 @@ or 'Why most people fail at productivity'"
                               )}
                               {scene.bullets && (
                                 <ul className="text-sm text-gray-400 mt-1">
-                                  {scene.bullets.slice(0, 2).map((b, i) => (
+                                  {scene.bullets.slice(0, 2).map((b: string, i: number) => (
                                     <li key={i}>• {b}</li>
                                   ))}
                                   {scene.bullets.length > 2 && (
@@ -1074,7 +1300,7 @@ or 'Why most people fail at productivity'"
                   </div>
                 )}
 
-                {/* Render View */}
+                {/* Step 6: Render View */}
                 {currentView === 'render' && (
                   <div className="max-w-4xl mx-auto">
                     <h2 className="text-2xl font-bold mb-6">Rendered Videos</h2>
@@ -1112,7 +1338,7 @@ or 'Why most people fail at productivity'"
                             key={render.filename}
                             className="bg-gray-800 rounded-lg overflow-hidden"
                           >
-                            <div className="aspect-[9/16] bg-gray-900 flex items-center justify-center">
+                            <div className="aspect-[9/16] bg-gray-900 flex items-center justify-center max-h-64">
                               <button
                                 onClick={() => setPlayingVideo(render.filename)}
                                 className="p-4 bg-purple-600/30 rounded-full hover:bg-purple-600/50"
@@ -1123,8 +1349,7 @@ or 'Why most people fail at productivity'"
                             <div className="p-3">
                               <p className="font-medium truncate">{render.filename}</p>
                               <p className="text-xs text-gray-500">
-                                {formatFileSize(render.size)} •{' '}
-                                {formatDate(render.created_at)}
+                                {formatFileSize(render.size)} • {formatDate(render.created_at)}
                               </p>
                               <div className="flex gap-2 mt-2">
                                 <button
@@ -1163,9 +1388,7 @@ or 'Why most people fail at productivity'"
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-1">
-                  Channel Name
-                </label>
+                <label className="block text-sm text-gray-400 mb-1">Channel Name</label>
                 <input
                   type="text"
                   value={newProjectName}
@@ -1224,85 +1447,20 @@ or 'Why most people fail at productivity'"
         />
       )}
 
-      {/* Video Player Modal */}
+      {/* Video Popup (compact player) */}
       {playingVideo && (
-        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50">
-          <div className="relative w-full max-w-xl mx-4">
-            <button
-              onClick={() => setPlayingVideo(null)}
-              className="absolute -top-12 right-0 p-2 text-gray-400 hover:text-white flex items-center gap-2"
-            >
-              <X className="w-5 h-5" />
-              Close
-            </button>
-            <div className="bg-gray-900 rounded-xl overflow-hidden">
-              <video
-                src={getVideoUrl(playingVideo)}
-                controls
-                autoPlay
-                className="w-full"
-              >
-                Your browser does not support the video tag.
-              </video>
-              <div className="p-4 flex items-center justify-between border-t border-gray-800">
-                <div>
-                  <div className="font-medium">{playingVideo}</div>
-                  <div className="text-xs text-gray-500">
-                    {renders.find((r) => r.filename === playingVideo)?.size
-                      ? formatFileSize(
-                          renders.find((r) => r.filename === playingVideo)!.size
-                        )
-                      : ''}
-                  </div>
-                </div>
-                <button
-                  onClick={() => downloadRender(playingVideo)}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Download
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <VideoPopup
+          src={getVideoUrl(playingVideo)}
+          filename={playingVideo}
+          onClose={() => setPlayingVideo(null)}
+          onDownload={() => downloadRender(playingVideo)}
+        />
       )}
     </div>
   );
 }
 
-// Helper Components
-function ViewNavButton({
-  active,
-  onClick,
-  icon: Icon,
-  label,
-  disabled,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: any;
-  label: string;
-  disabled?: boolean;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`px-3 py-1.5 rounded-lg flex items-center gap-2 text-sm transition-colors ${
-        active
-          ? 'bg-purple-600 text-white'
-          : disabled
-          ? 'text-gray-600 cursor-not-allowed'
-          : 'text-gray-400 hover:text-white hover:bg-gray-700'
-      }`}
-    >
-      <Icon className="w-4 h-4" />
-      {label}
-    </button>
-  );
-}
-
+// Welcome View
 function WelcomeView({ onCreateChannel }: { onCreateChannel: () => void }) {
   return (
     <div className="flex items-center justify-center h-full">
@@ -1310,16 +1468,15 @@ function WelcomeView({ onCreateChannel }: { onCreateChannel: () => void }) {
         <div className="p-3 bg-gradient-to-r from-purple-600 to-pink-600 rounded-2xl inline-block mb-4">
           <Film className="w-12 h-12 text-white" />
         </div>
-        <h2 className="text-2xl font-bold text-white mb-2">Video Studio</h2>
+        <h2 className="text-2xl font-bold text-white mb-2">Video Studio v4.0</h2>
         <p className="mb-6 text-gray-400">
-          AI-powered video script generation with plan review, scene editing, and
-          Remotion rendering.
+          Interactive video creation with recommendations, research, and visual previews.
         </p>
 
         <div className="bg-gray-800 rounded-lg p-4 text-left mb-6">
           <h3 className="text-sm font-semibold text-purple-400 mb-3 flex items-center gap-2">
             <Sparkles className="w-4 h-4" />
-            Workflow
+            New v4.0 Workflow
           </h3>
           <div className="space-y-3">
             <div className="flex items-start gap-3">
@@ -1327,9 +1484,9 @@ function WelcomeView({ onCreateChannel }: { onCreateChannel: () => void }) {
                 1
               </div>
               <div>
-                <p className="font-medium text-white">Add Context</p>
+                <p className="font-medium text-white">Enter Idea + Context</p>
                 <p className="text-xs text-gray-500">
-                  Upload images, files, notes, or reference workspace projects
+                  Upload images, files, and describe your video concept
                 </p>
               </div>
             </div>
@@ -1338,9 +1495,9 @@ function WelcomeView({ onCreateChannel }: { onCreateChannel: () => void }) {
                 2
               </div>
               <div>
-                <p className="font-medium text-white">Generate Plan</p>
+                <p className="font-medium text-white">Get Recommendations</p>
                 <p className="text-xs text-gray-500">
-                  Claude researches and outlines your video
+                  Claude suggests genre, style, animations, and hooks
                 </p>
               </div>
             </div>
@@ -1349,9 +1506,9 @@ function WelcomeView({ onCreateChannel }: { onCreateChannel: () => void }) {
                 3
               </div>
               <div>
-                <p className="font-medium text-white">Edit Script</p>
+                <p className="font-medium text-white">Research & Plan</p>
                 <p className="text-xs text-gray-500">
-                  Review scenes, adjust backgrounds, animations, and timing
+                  Claude researches facts and creates detailed plan with image suggestions
                 </p>
               </div>
             </div>
@@ -1360,9 +1517,20 @@ function WelcomeView({ onCreateChannel }: { onCreateChannel: () => void }) {
                 4
               </div>
               <div>
-                <p className="font-medium text-white">Render Video</p>
+                <p className="font-medium text-white">Visual Preview</p>
                 <p className="text-xs text-gray-500">
-                  Generate the final video with Remotion
+                  Review scene cards with gradient previews and thumbnails
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-purple-600/30 flex items-center justify-center text-xs text-purple-400">
+                5
+              </div>
+              <div>
+                <p className="font-medium text-white">Edit & Render</p>
+                <p className="text-xs text-gray-500">
+                  Fine-tune scenes and render your video with Remotion
                 </p>
               </div>
             </div>

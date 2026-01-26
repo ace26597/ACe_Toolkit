@@ -1,5 +1,8 @@
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import { loadFont } from "@remotion/google-fonts/Inter";
 import { AnimatedText } from "./AnimatedText";
+
+const { fontFamily } = loadFont();
 
 interface HookSlideProps {
   text: string;
@@ -24,21 +27,27 @@ export const HookSlide: React.FC<HookSlideProps> = ({
 
   return (
     <AbsoluteFill
-      style={{ backgroundColor }}
-      className="flex items-center justify-center p-12"
+      style={{
+        backgroundColor,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 48,
+        fontFamily,
+      }}
     >
       <div
         style={{
           transform: `scale(${scale})`,
           color: textColor,
+          textAlign: "center",
         }}
-        className="text-center"
       >
         <AnimatedText
           text={text}
           animation="scale"
           duration={20}
-          className="text-6xl font-bold leading-tight"
+          style={{ fontSize: 72, fontWeight: 700, lineHeight: 1.1 }}
         />
       </div>
     </AbsoluteFill>

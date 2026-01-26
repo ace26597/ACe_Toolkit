@@ -57,6 +57,15 @@ class WorkspaceRefRequest(BaseModel):
 
 class GeneratePlanRequest(BaseModel):
     idea: str
+    use_continue: bool = True
+
+
+class GenerateRecommendationsRequest(BaseModel):
+    idea: str
+
+
+class UpdateRecommendationsRequest(BaseModel):
+    selections: dict
 
 
 class UpdatePlanRequest(BaseModel):
@@ -247,6 +256,91 @@ async def delete_context_item(project_id: str, item_type: str, item_name: str):
     return {"success": True}
 
 
+# ==================== Session Management ====================
+
+@router.get("/projects/{project_id}/session")
+async def get_session(project_id: str):
+    """Get current session info for a project."""
+    project = video_factory.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    session = video_studio.get_session(project_id)
+    return session or {"session_id": None, "project_id": project_id}
+
+
+@router.delete("/projects/{project_id}/session")
+async def reset_session(project_id: str):
+    """Reset session to start fresh."""
+    project = video_factory.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    video_studio.reset_session(project_id)
+    return {"success": True, "message": "Session reset"}
+
+
+# ==================== Recommendations Phase ====================
+
+@router.post("/projects/{project_id}/recommendations")
+async def generate_recommendations(project_id: str, request: GenerateRecommendationsRequest):
+    """
+    Generate video recommendations using Claude Code.
+
+    Returns SSE stream with progress and final recommendations.
+    """
+    project = video_factory.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    async def event_stream():
+        async for event in video_studio.generate_recommendations(
+            project_id=project_id,
+            project_name=project.name,
+            niche=project.niche,
+            idea=request.idea
+        ):
+            yield f"data: {json.dumps(event)}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no"
+        }
+    )
+
+
+@router.get("/projects/{project_id}/recommendations")
+async def get_recommendations(project_id: str, rec_id: str = None):
+    """Get recommendations, optionally by ID (latest if not specified)."""
+    project = video_factory.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    recommendations = video_studio.get_recommendations(project_id, rec_id)
+    if not recommendations:
+        return {"recommendations": None}
+
+    return {"recommendations": recommendations}
+
+
+@router.put("/projects/{project_id}/recommendations/{rec_id}")
+async def update_recommendations(project_id: str, rec_id: str, request: UpdateRecommendationsRequest):
+    """Update recommendations with user selections."""
+    project = video_factory.get_project(project_id)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    recommendations = video_studio.update_recommendations(project_id, rec_id, request.selections)
+    if not recommendations:
+        raise HTTPException(status_code=404, detail="Recommendations not found")
+
+    return {"recommendations": recommendations}
+
+
 # ==================== Plan Phase ====================
 
 @router.post("/projects/{project_id}/plan")
@@ -255,17 +349,23 @@ async def generate_plan(project_id: str, request: GeneratePlanRequest):
     Generate a video plan using Claude Code.
 
     Returns SSE stream with progress and final plan.
+    Uses --continue if recommendations were previously generated.
     """
     project = video_factory.get_project(project_id)
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    # Get recommendations to pass context
+    recommendations = video_studio.get_recommendations(project_id)
 
     async def event_stream():
         async for event in video_studio.generate_plan(
             project_id=project_id,
             project_name=project.name,
             niche=project.niche,
-            idea=request.idea
+            idea=request.idea,
+            recommendations=recommendations,
+            use_continue=request.use_continue
         ):
             yield f"data: {json.dumps(event)}\n\n"
 
@@ -633,14 +733,19 @@ async def get_status():
     return {
         "status": "ok",
         "total_projects": len(video_factory.projects),
-        "version": "3.0",
+        "version": "4.0",
         "features": [
             "Project/channel management",
             "Context management (images, files, notes)",
-            "Two-phase generation (plan → script)",
-            "Plan review and editing",
+            "Recommendations agent (genre, style, animations)",
+            "Three-phase generation (recommendations → plan → script)",
+            "Session continuity with --continue",
+            "Research integration with web search",
+            "Plan review with image suggestions",
+            "Visual preview with scene thumbnails",
             "Script and scene editing",
             "Image upload and management",
             "Remotion video rendering",
+            "Compact video popup player",
         ],
     }

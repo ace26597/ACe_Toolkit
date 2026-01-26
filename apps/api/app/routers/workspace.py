@@ -357,6 +357,105 @@ async def upload_data(
     return DataUploadResponse(**result)
 
 
+def is_local_network(client_ip: str) -> bool:
+    """Check if the client IP is from a local/private network."""
+    import ipaddress
+    try:
+        ip = ipaddress.ip_address(client_ip)
+        return ip.is_private or ip.is_loopback
+    except ValueError:
+        return False
+
+
+@router.post("/projects/{name}/data/upload-local", response_model=DataUploadResponse)
+async def upload_data_local(
+    name: str,
+    request: Request,
+    file: UploadFile = File(...),
+    path: str = Form(default=""),
+    user: User = Depends(require_valid_access)
+):
+    """Upload large files from local network (bypasses Cloudflare limits).
+
+    This endpoint:
+    - Only works from local/private IP addresses (192.168.x.x, 10.x.x.x, etc.)
+    - Has 2GB file size limit (streams to disk)
+    - Use this instead of /upload when uploading large files from the same network.
+    """
+    import aiofiles
+
+    # Get client IP
+    client_ip = request.headers.get("X-Real-IP") or \
+                request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or \
+                (request.client.host if request.client else "0.0.0.0")
+
+    # Security: Only allow from local network
+    if not is_local_network(client_ip):
+        logger.warning(f"Local upload rejected from non-local IP: {client_ip}")
+        raise HTTPException(
+            status_code=403,
+            detail=f"This endpoint is only accessible from local network. Your IP: {client_ip}"
+        )
+
+    logger.info(f"Local upload from {client_ip} for project {name}")
+
+    manager = get_user_workspace_manager(user)
+    project = await manager.get_project(name)
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Get project data directory
+    from pathlib import Path
+    project_path = Path(manager.projects_dir) / name / "data"
+    if path:
+        # Sanitize and validate subpath
+        safe_path = Path(path).as_posix().strip("/")
+        if ".." in safe_path:
+            raise HTTPException(status_code=400, detail="Invalid path")
+        target_dir = project_path / safe_path
+    else:
+        target_dir = project_path
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    # Stream file to disk
+    MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB
+    safe_filename = Path(file.filename or "file").name
+    temp_path = target_dir / f".uploading_{safe_filename}"
+    final_path = target_dir / safe_filename
+
+    try:
+        file_size = 0
+        async with aiofiles.open(temp_path, 'wb') as out_file:
+            chunk_size = 1024 * 1024  # 1MB chunks
+            while True:
+                chunk = await file.read(chunk_size)
+                if not chunk:
+                    break
+                file_size += len(chunk)
+                if file_size > MAX_FILE_SIZE:
+                    await out_file.close()
+                    temp_path.unlink(missing_ok=True)
+                    raise HTTPException(status_code=400, detail="File too large (max 2GB)")
+                await out_file.write(chunk)
+
+        # Move temp file to final location
+        temp_path.rename(final_path)
+        logger.info(f"Local upload complete: {safe_filename} ({file_size // (1024*1024)}MB)")
+
+        return DataUploadResponse(
+            path=str(final_path.relative_to(Path(manager.projects_dir) / name)),
+            name=safe_filename,
+            size=file_size
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        temp_path.unlink(missing_ok=True)
+        logger.error(f"Local upload error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/projects/{name}/data/folder")
 async def create_data_folder(name: str, folder: FolderCreate, user: User = Depends(require_valid_access)):
     """Create a new folder in the data directory."""

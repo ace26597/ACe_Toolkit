@@ -50,6 +50,20 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         return response
 
 
+def is_local_network_request(request: Request) -> bool:
+    """Check if request is from local/private network."""
+    import ipaddress
+    # Get client IP from headers or direct connection
+    client_ip = request.headers.get("X-Real-IP") or \
+                request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or \
+                (request.client.host if request.client else "0.0.0.0")
+    try:
+        ip = ipaddress.ip_address(client_ip)
+        return ip.is_private or ip.is_loopback
+    except ValueError:
+        return False
+
+
 class FileSizeLimitMiddleware(BaseHTTPMiddleware):
     """Limit upload file sizes to prevent OOM"""
     async def dispatch(self, request: Request, call_next):
@@ -57,12 +71,19 @@ class FileSizeLimitMiddleware(BaseHTTPMiddleware):
         content_length = request.headers.get("content-length")
         if content_length:
             content_length = int(content_length)
-            if content_length > MAX_UPLOAD_SIZE:
+
+            # Allow larger uploads for local network requests
+            if is_local_network_request(request):
+                max_size = 2 * 1024 * 1024 * 1024  # 2GB for local network
+            else:
+                max_size = MAX_UPLOAD_SIZE  # 50MB for remote
+
+            if content_length > max_size:
                 return JSONResponse(
                     status_code=413,
                     content={
-                        "detail": f"File too large. Maximum size is {MAX_UPLOAD_SIZE // (1024*1024)}MB",
-                        "max_size_bytes": MAX_UPLOAD_SIZE,
+                        "detail": f"File too large. Maximum size is {max_size // (1024*1024)}MB",
+                        "max_size_bytes": max_size,
                         "received_bytes": content_length
                     }
                 )
@@ -187,6 +208,7 @@ app = FastAPI(
 # CORS Configuration - Restrict to allowed origins
 ALLOWED_ORIGINS = [
     "https://orpheuscore.uk",        # Primary domain
+    "https://clawd.orpheuscore.uk",  # Clawd dashboard
     "https://api.orpheuscore.uk",    # Primary API
     "https://ai.ultronsolar.in",     # Legacy domain
     "https://api.ultronsolar.in",    # Legacy API

@@ -27,12 +27,20 @@ export const CTASlide: React.FC<CTASlideProps> = ({
 
   return (
     <AbsoluteFill
-      style={{ backgroundColor }}
-      className="flex flex-col items-center justify-center p-12"
+      style={{
+        backgroundColor,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 48,
+      }}
     >
       <div
-        className="p-8 rounded-2xl text-center"
         style={{
+          padding: 32,
+          borderRadius: 16,
+          textAlign: "center",
           boxShadow: `0 0 ${40 * glowIntensity}px ${accentColor}40`,
           border: `3px solid ${accentColor}`,
         }}
@@ -41,8 +49,7 @@ export const CTASlide: React.FC<CTASlideProps> = ({
           text={text}
           animation="scale"
           duration={20}
-          className="text-5xl font-bold mb-4"
-          style={{ color: textColor }}
+          style={{ color: textColor, fontSize: 48, fontWeight: 700, marginBottom: 16 }}
         />
         {subtext && (
           <AnimatedText
@@ -50,8 +57,7 @@ export const CTASlide: React.FC<CTASlideProps> = ({
             animation="fadeIn"
             delay={0.5}
             duration={15}
-            className="text-2xl"
-            style={{ color: accentColor }}
+            style={{ color: accentColor, fontSize: 24 }}
           />
         )}
       </div>

@@ -19,22 +19,87 @@ export const TransitionConfigSchema = z.object({
   duration: z.number(),
 });
 
+// Creative element schemas
+export const LottieElementSchema = z.object({
+  src: z.string(), // URL to Lottie JSON
+  loop: z.boolean().optional(),
+  playbackRate: z.number().optional(),
+  size: z.number().optional(), // Size in pixels
+  position: z.enum(["top", "center", "bottom", "left", "right"]).optional(),
+});
+
+export const DrawingPathSchema = z.object({
+  path: z.string().optional(), // Custom SVG path
+  preset: z.enum(["check", "cross", "arrowRight", "arrowUp", "lightbulb", "star", "heart", "brain", "codeBrackets", "rocket", "chart"]).optional(),
+  stroke: z.string().optional(),
+  strokeWidth: z.number().optional(),
+  duration: z.number().optional(), // frames
+});
+
+export const BackgroundConfigSchema = z.object({
+  type: z.enum(["solid", "gradient", "mesh", "image", "grid", "dots"]),
+  // For solid
+  color: z.string().optional(),
+  // For gradient
+  gradientPreset: z.enum([
+    "purpleNight", "deepOcean", "darkPurple", "midnight",
+    "sunset", "neonPink", "aurora", "fire",
+    "peach", "mint", "lavender",
+    "cyber", "matrix", "electric"
+  ]).optional(),
+  gradientColors: z.array(z.string()).optional(),
+  gradientAngle: z.number().optional(),
+  animated: z.boolean().optional(),
+  // For image
+  imageUrl: z.string().optional(),
+  overlay: z.string().optional(),
+  blur: z.number().optional(),
+  zoom: z.boolean().optional(),
+  // For grid/dots
+  gridSize: z.number().optional(),
+  lineColor: z.string().optional(),
+});
+
 export const EnhancedSceneSchema = z.object({
   id: z.string(),
-  type: z.enum(["hook", "content", "bullet-list", "quote", "cta", "title-card"]),
+  type: z.enum([
+    "hook", "content", "bullet-list", "quote", "cta", "title-card",
+    // New creative types
+    "whiteboard", "stats", "icon-reveal", "split-screen"
+  ]),
   duration: z.number(),
   text: z.string().optional(),
   title: z.string().optional(),
   bullets: z.array(z.string()).optional(),
   emphasis: z.array(z.string()).optional(),
-  animation: z.enum(["fadeIn", "slideUp", "slideDown", "slideLeft", "slideRight", "scale", "typewriter", "bounce", "blur"]),
+  animation: z.enum(["fadeIn", "slideUp", "slideDown", "slideLeft", "slideRight", "scale", "typewriter", "bounce", "blur", "draw"]),
   timing: TimingConfigSchema,
   staggerDelay: z.number().optional(),
   transitionIn: TransitionConfigSchema.optional(),
   transitionOut: TransitionConfigSchema.optional(),
+  // Colors (can override global)
   backgroundColor: z.string().optional(),
   textColor: z.string().optional(),
   accentColor: z.string().optional(),
+  // Creative elements
+  background: BackgroundConfigSchema.optional(),
+  lottie: LottieElementSchema.optional(),
+  drawingPath: DrawingPathSchema.optional(),
+  // For stats scene
+  stats: z.array(z.object({
+    label: z.string(),
+    value: z.number(),
+    maxValue: z.number().optional(),
+    color: z.string().optional(),
+  })).optional(),
+  // For icon-reveal
+  icon: z.enum(["check", "cross", "arrowRight", "arrowUp", "lightbulb", "star", "heart", "brain", "codeBrackets", "rocket", "chart"]).optional(),
+  // For split-screen
+  leftContent: z.string().optional(),
+  rightContent: z.string().optional(),
+  // Floating particles
+  particles: z.boolean().optional(),
+  particleColors: z.array(z.string()).optional(),
 });
 
 export const CaptionStyleSchema = z.object({
@@ -71,6 +136,12 @@ export const EnhancedVideoPropsSchema = z.object({
   backgroundVideo: z.string().optional(),
   backgroundImage: z.string().optional(),
   backgroundOpacity: z.number().min(0).max(1).optional(),
+  // Global background config (can be overridden per scene)
+  background: BackgroundConfigSchema.optional(),
+  // Global particles
+  particles: z.boolean().optional(),
+  particleColors: z.array(z.string()).optional(),
+  // Audio
   musicUrl: z.string().optional(),
   musicVolume: z.number().min(0).max(1).optional(),
   voiceoverUrl: z.string().optional(),
@@ -84,6 +155,9 @@ export const EnhancedVideoPropsSchema = z.object({
 
 export type TimingConfig = z.infer<typeof TimingConfigSchema>;
 export type TransitionConfig = z.infer<typeof TransitionConfigSchema>;
+export type LottieElement = z.infer<typeof LottieElementSchema>;
+export type DrawingPath = z.infer<typeof DrawingPathSchema>;
+export type BackgroundConfig = z.infer<typeof BackgroundConfigSchema>;
 export type EnhancedScene = z.infer<typeof EnhancedSceneSchema>;
 export type CaptionStyle = z.infer<typeof CaptionStyleSchema>;
 export type CaptionToken = z.infer<typeof CaptionTokenSchema>;

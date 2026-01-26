@@ -39,7 +39,7 @@ lsof -i :3000 -i :8000  # Check our ports
 |-----|-------|-------------|
 | **C3 Researcher Workspace** | `/workspace` | Claude Code Custom Researcher - AI-powered research terminal |
 | **C3 Data Studio** | `/data-studio` | AI-powered data analysis with headless Claude (NEW) |
-| **Video Studio** | `/video-factory` | AI video generation - Plan → Edit → Render (v3.0) |
+| **Video Studio** | `/video-factory` | AI video generation - Idea → Options → Plan → Preview → Render (v4.0) |
 
 **C3 Researcher Workspace Features:**
 - 145+ scientific skills, 26 MCP servers, 14 plugins
@@ -66,8 +66,13 @@ lsof -i :3000 -i :8000  # Check our ports
 4. Auto-generated dashboard with editable widgets
 5. NLP-based customization ("Add a pie chart for categories")
 
-**Video Studio (v3.0):**
-- **Two-Phase Generation**: Claude creates plan → User reviews → Claude generates script
+**Video Studio (v4.0 - Interactive Step-by-Step Flow):**
+- **Recommendations Agent**: Claude suggests genre, style, animation presets, hooks before planning
+- **Research Integration**: Web research for facts/stats during planning phase
+- **Visual Preview**: Scene cards with gradient previews and image thumbnails
+- **Session Continuity**: Uses `--continue` flag to maintain Claude context across steps
+- **Compact Video Popup**: Small draggable player instead of full-screen modal
+- **5-Step Workflow**: Idea → Options → Plan → Preview → Render
 - **Rich Context**: Upload images/files, import from Workspace, add notes
 - **Scene Editing**: Full editor with Content/Style/Animation/Media tabs
 - **Skill File**: Comprehensive Remotion documentation at `~/.claude/skills/remotion-video-generator/`
@@ -235,11 +240,13 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
-| 2026-01-24 | **MAJOR: Video Studio v3.0** - Full Plan → Edit → Render workflow |
-| 2026-01-24 | **Video Studio:** Two-phase Claude generation (plan + script) with SSE streaming |
-| 2026-01-24 | **Video Studio:** New backend `video_studio_generator.py` with context management |
-| 2026-01-24 | **Video Studio:** New components - ContextPanel, PlanPreview, SceneEditor |
-| 2026-01-24 | **Video Studio:** Comprehensive Remotion skill file at `~/.claude/skills/remotion-video-generator/` |
+| 2026-01-24 | **MAJOR: Video Studio v4.0** - Interactive step-by-step flow with recommendations |
+| 2026-01-24 | **Video Studio:** Recommendations Agent - Claude suggests genre, style, animations, hooks |
+| 2026-01-24 | **Video Studio:** Visual Preview - Scene cards with gradient previews and image thumbnails |
+| 2026-01-24 | **Video Studio:** Session continuity via `--continue` flag across steps |
+| 2026-01-24 | **Video Studio:** Compact video popup player (draggable, minimizable) |
+| 2026-01-24 | **Video Studio:** New components - RecommendationsPanel, VisualPreview, VideoPopup, StepIndicator |
+| 2026-01-24 | **Video Studio:** Enhanced Remotion skill file with v4.0 workflow documentation |
 | 2026-01-23 | **Data Studio:** Fix empty stat cards/charts - support alternate field names |
 | 2026-01-23 | **Data Studio:** Fix [Object] display - properly stringify result objects |
 | 2026-01-23 | **Data Studio:** Multi-file analysis mode selector (combined vs separate) |

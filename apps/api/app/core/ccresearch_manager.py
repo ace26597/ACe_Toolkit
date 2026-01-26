@@ -453,6 +453,12 @@ mkdir -p output
 - Full internet access available for API calls
 - All installed plugins and MCP servers are available
 
+### External SSD Note (Important!)
+This workspace is on an external SSD mounted at `/data`. When running `npm install`:
+- **Always use `--no-bin-links` flag** to avoid symlink errors on exFAT/NTFS filesystems
+- Example: `npm install --no-bin-links`
+- Without this flag, npm may fail with "EPERM: operation not permitted, symlink" errors
+
 ---
 
 *CCResearch - Claude Code Research Platform*
@@ -1178,9 +1184,21 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             # Claude uses global ~/.claude and ~/.claude.json for all configuration
             # Use --continue flag to resume previous conversation for existing sessions
             claude_args = ['--continue'] if continue_session else []
-            logger.info(f"Spawning Claude Code for {ccresearch_id} in {workspace_dir} (continue={continue_session})")
+            
+            # Find claude binary - check common locations since PATH may not be set in service
+            claude_bin = shutil.which('claude')
+            if not claude_bin:
+                # Check common install locations
+                for path in ['/home/ace/.local/bin/claude', '/usr/local/bin/claude', '/usr/bin/claude']:
+                    if os.path.isfile(path) and os.access(path, os.X_OK):
+                        claude_bin = path
+                        break
+            if not claude_bin:
+                raise FileNotFoundError("claude CLI not found in PATH or standard locations")
+            
+            logger.info(f"Spawning Claude Code for {ccresearch_id} in {workspace_dir} (continue={continue_session}, bin={claude_bin})")
             process = pexpect.spawn(
-                'claude',
+                claude_bin,
                 args=claude_args,
                 cwd=str(workspace_dir),
                 env=env,
@@ -1322,14 +1340,19 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
         ccresearch_id: str,
         callback: Callable[[bytes], Any]
     ):
-        """Async loop reading from pexpect process and calling callback with output"""
+        """Async loop reading from pexpect process and calling callback with output.
+
+        The callback may return False to signal that the loop should stop
+        (e.g., when the WebSocket connection is closed).
+        """
         process_info = self.processes.get(ccresearch_id)
         if not process_info:
             return
 
         process = process_info.process
+        callback_failed = False
 
-        while process_info.is_alive:
+        while process_info.is_alive and not callback_failed:
             try:
                 if process.isalive():
                     # Use asyncio.to_thread for blocking read
@@ -1351,18 +1374,32 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
                             logger.debug(f"Buffer update error: {e}")
 
                         # Call callback (might be async or sync)
-                        result = callback(data)
-                        if asyncio.iscoroutine(result):
-                            await result
+                        # Callback may return False to signal stop
+                        try:
+                            result = callback(data)
+                            if asyncio.iscoroutine(result):
+                                result = await result
+                            # If callback returns False, stop the loop
+                            if result is False:
+                                logger.info(f"Callback signaled stop for {ccresearch_id}")
+                                callback_failed = True
+                                break
+                        except Exception as cb_error:
+                            logger.error(f"Callback error for {ccresearch_id}: {cb_error}")
+                            callback_failed = True
+                            break
 
                         # Check automation rules and apply if matched
                         await self._apply_automation(process_info)
                 else:
                     # Process terminated
                     process_info.is_alive = False
-                    result = callback(b'\r\n\x1b[1;33m[Session ended]\x1b[0m\r\n')
-                    if asyncio.iscoroutine(result):
-                        await result
+                    try:
+                        result = callback(b'\r\n\x1b[1;33m[Session ended]\x1b[0m\r\n')
+                        if asyncio.iscoroutine(result):
+                            await result
+                    except Exception:
+                        pass  # Ignore callback errors on final message
                     break
 
                 # Small delay to prevent busy loop
@@ -1370,9 +1407,12 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
 
             except pexpect.EOF:
                 process_info.is_alive = False
-                result = callback(b'\r\n\x1b[1;33m[Session ended - EOF]\x1b[0m\r\n')
-                if asyncio.iscoroutine(result):
-                    await result
+                try:
+                    result = callback(b'\r\n\x1b[1;33m[Session ended - EOF]\x1b[0m\r\n')
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception:
+                    pass  # Ignore callback errors on final message
                 break
             except asyncio.CancelledError:
                 logger.info(f"Read task cancelled for {ccresearch_id}")

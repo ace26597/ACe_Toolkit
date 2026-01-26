@@ -2,7 +2,6 @@ import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 
 interface AnimatedTextProps {
   text: string;
-  className?: string;
   delay?: number;
   duration?: number;
   animation?: "fadeIn" | "slideUp" | "typewriter" | "scale";
@@ -11,7 +10,6 @@ interface AnimatedTextProps {
 
 export const AnimatedText: React.FC<AnimatedTextProps> = ({
   text,
-  className = "",
   delay = 0,
   duration = 30,
   animation = "fadeIn",
@@ -30,20 +28,20 @@ export const AnimatedText: React.FC<AnimatedTextProps> = ({
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
 
-  let style: React.CSSProperties = {};
+  let animationStyle: React.CSSProperties = {};
 
   switch (animation) {
     case "fadeIn":
-      style = { opacity: progress };
+      animationStyle = { opacity: progress };
       break;
     case "slideUp":
-      style = {
+      animationStyle = {
         opacity: progress,
         transform: `translateY(${interpolate(progress, [0, 1], [50, 0])}px)`,
       };
       break;
     case "scale":
-      style = {
+      animationStyle = {
         opacity: progress,
         transform: `scale(${interpolate(progress, [0, 1], [0.8, 1])})`,
       };
@@ -51,15 +49,15 @@ export const AnimatedText: React.FC<AnimatedTextProps> = ({
     case "typewriter":
       const visibleChars = Math.floor(progress * text.length);
       return (
-        <span className={className} style={externalStyle}>
+        <span style={{ display: "block", ...externalStyle }}>
           {text.slice(0, visibleChars)}
-          <span className="opacity-0">{text.slice(visibleChars)}</span>
+          <span style={{ opacity: 0 }}>{text.slice(visibleChars)}</span>
         </span>
       );
   }
 
   return (
-    <span className={className} style={{ ...style, ...externalStyle }}>
+    <span style={{ display: "block", ...animationStyle, ...externalStyle }}>
       {text}
     </span>
   );

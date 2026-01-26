@@ -38,7 +38,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, UploadFile, File, Form
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, UploadFile, File, Form, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select, delete, func
@@ -261,6 +261,53 @@ class GitCloneResponse(BaseModel):
     message: str
 
 
+# ============ Helper Functions ============
+
+async def ensure_project_claude_setup(
+    workspace_dir: Path,
+    session_id: str,
+    email: str,
+    force: bool = False
+) -> None:
+    """Ensure CLAUDE.md and .claude/settings.local.json exist for a project.
+    
+    This is called when starting a terminal session to ensure proper 
+    workspace boundaries and permissions are in place.
+    
+    Args:
+        workspace_dir: Path to project directory
+        session_id: CCResearch session ID
+        email: User's email
+        force: If True, overwrite existing CLAUDE.md (use for new projects)
+    """
+    from app.core.ccresearch_manager import CLAUDE_MD_TEMPLATE, CCRESEARCH_PERMISSIONS_TEMPLATE
+    
+    # Ensure .claude directory exists
+    claude_dir = workspace_dir / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create/update CLAUDE.md
+    claude_md_path = workspace_dir / "CLAUDE.md"
+    should_write_claude_md = force or not claude_md_path.exists() or claude_md_path.stat().st_size == 0
+    
+    if should_write_claude_md:
+        claude_md_content = CLAUDE_MD_TEMPLATE.format(
+            session_id=session_id,
+            email=email or "Not provided",
+            created_at=datetime.utcnow().isoformat(),
+            workspace_dir=str(workspace_dir),
+            uploaded_files_section=""
+        )
+        claude_md_path.write_text(claude_md_content)
+        logger.info(f"{'Overwrote' if force else 'Created'} CLAUDE.md for project at {workspace_dir}")
+    
+    # Always ensure settings.local.json exists with security rules
+    settings_local_path = claude_dir / "settings.local.json"
+    if force or not settings_local_path.exists():
+        settings_local_path.write_text(json.dumps(CCRESEARCH_PERMISSIONS_TEMPLATE, indent=2))
+        logger.info(f"{'Overwrote' if force else 'Created'} .claude/settings.local.json for project at {workspace_dir}")
+
+
 # ============ REST Endpoints ============
 
 @router.post("/sessions", response_model=SessionResponse)
@@ -334,6 +381,9 @@ async def create_session(
             linked_project_name = existing_project["name"]
             logger.info(f"Using existing project '{project_name}' at {workspace_dir}")
 
+            # Ensure CLAUDE.md and permissions exist (fixes projects created without them)
+            await ensure_project_claude_setup(workspace_dir, ccresearch_id, email)
+
             # Update terminal status
             await pm.update_terminal_status(project_name, ccresearch_id, "active")
         else:
@@ -345,6 +395,9 @@ async def create_session(
             )
             workspace_dir = await pm.get_project_path(project_name)
             linked_project_name = project["name"]
+
+            # Override with CCResearch security template (more comprehensive than default)
+            await ensure_project_claude_setup(workspace_dir, ccresearch_id, email, force=True)
 
             # Update terminal status
             await pm.update_terminal_status(project_name, ccresearch_id, "active")
@@ -661,6 +714,209 @@ async def upload_files_to_session(
     return UploadResponse(
         uploaded_files=uploaded_files_list,
         data_dir=str(data_dir)
+    )
+
+
+def is_local_network(client_ip: str) -> bool:
+    """Check if the client IP is from a local/private network."""
+    import ipaddress
+    try:
+        ip = ipaddress.ip_address(client_ip)
+        # Check for private networks (RFC 1918) and loopback
+        return ip.is_private or ip.is_loopback
+    except ValueError:
+        return False
+
+
+@router.post("/sessions/{ccresearch_id}/upload-local", response_model=UploadResponse)
+async def upload_files_local(
+    ccresearch_id: str,
+    request: Request,
+    files: List[UploadFile] = File(...),
+    target_path: Optional[str] = Form(None),
+    extract_zip: bool = Form(True),
+    db: AsyncSession = Depends(get_db)
+):
+    """Upload large files from local network (bypasses Cloudflare limits).
+
+    This endpoint:
+    - Only works from local/private IP addresses (192.168.x.x, 10.x.x.x, etc.)
+    - Has no file size limit (streams to disk)
+    - Supports files up to 2GB per file, 10GB total per request
+    - Auto-extracts ZIP files if extract_zip=True
+
+    Use this instead of /upload when uploading large files from the same network.
+    """
+    # Get client IP - check X-Forwarded-For for proxied requests, else use direct IP
+    client_ip = request.headers.get("X-Real-IP") or \
+                request.headers.get("X-Forwarded-For", "").split(",")[0].strip() or \
+                request.client.host if request.client else "0.0.0.0"
+
+    # Security: Only allow from local network
+    if not is_local_network(client_ip):
+        logger.warning(f"Local upload rejected from non-local IP: {client_ip}")
+        raise HTTPException(
+            status_code=403,
+            detail=f"This endpoint is only accessible from local network. Your IP: {client_ip}"
+        )
+
+    logger.info(f"Local upload from {client_ip} for session {ccresearch_id}")
+
+    # Get session
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    workspace = Path(session.workspace_dir)
+
+    # Determine target directory
+    if target_path:
+        target_dir = (workspace / target_path).resolve()
+        if not str(target_dir).startswith(str(workspace.resolve())):
+            raise HTTPException(status_code=403, detail="Invalid target path")
+    else:
+        target_dir = workspace / "data"
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    uploaded_files_list = []
+    existing_files = json.loads(session.uploaded_files) if session.uploaded_files else []
+
+    # Higher limits for local upload
+    MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024  # 2GB per file
+    MAX_TOTAL_SIZE = 10 * 1024 * 1024 * 1024  # 10GB total
+    total_size = 0
+
+    for file in files:
+        if not file.filename:
+            continue
+
+        # Stream file to temp location first, then move
+        safe_filename = Path(file.filename).name
+        temp_path = target_dir / f".uploading_{safe_filename}"
+        final_path = target_dir / safe_filename
+
+        try:
+            file_size = 0
+            async with aiofiles.open(temp_path, 'wb') as out_file:
+                # Stream in chunks to handle large files
+                chunk_size = 1024 * 1024  # 1MB chunks
+                while True:
+                    chunk = await file.read(chunk_size)
+                    if not chunk:
+                        break
+                    file_size += len(chunk)
+
+                    # Check limits
+                    if file_size > MAX_FILE_SIZE:
+                        await out_file.close()
+                        temp_path.unlink(missing_ok=True)
+                        raise HTTPException(
+                            status_code=413,
+                            detail=f"File '{file.filename}' exceeds 2GB limit"
+                        )
+
+                    total_size += len(chunk)
+                    if total_size > MAX_TOTAL_SIZE:
+                        await out_file.close()
+                        temp_path.unlink(missing_ok=True)
+                        raise HTTPException(
+                            status_code=413,
+                            detail="Total upload size exceeds 10GB limit"
+                        )
+
+                    await out_file.write(chunk)
+
+            # Handle ZIP extraction
+            if extract_zip and safe_filename.lower().endswith('.zip'):
+                try:
+                    MAX_ZIP_SIZE = 10 * 1024 * 1024 * 1024  # 10GB for local
+                    MAX_ZIP_FILES = 10000
+
+                    with zipfile.ZipFile(temp_path, 'r') as zip_ref:
+                        total_uncompressed = sum(info.file_size for info in zip_ref.infolist())
+
+                        if total_uncompressed > MAX_ZIP_SIZE:
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"ZIP contents too large: {total_uncompressed // (1024*1024)}MB"
+                            )
+
+                        if len(zip_ref.infolist()) > MAX_ZIP_FILES:
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"ZIP has too many files: {len(zip_ref.infolist())}"
+                            )
+
+                        for zip_info in zip_ref.infolist():
+                            if zip_info.is_dir():
+                                continue
+                            if '..' in zip_info.filename or zip_info.filename.startswith('/'):
+                                continue
+
+                            extracted_path = target_dir / zip_info.filename
+                            extracted_path.parent.mkdir(parents=True, exist_ok=True)
+
+                            with zip_ref.open(zip_info) as src:
+                                async with aiofiles.open(extracted_path, 'wb') as dst:
+                                    # Stream extraction
+                                    while True:
+                                        chunk = src.read(1024 * 1024)
+                                        if not chunk:
+                                            break
+                                        await dst.write(chunk)
+
+                            uploaded_files_list.append(str(extracted_path.relative_to(workspace)))
+
+                    # Remove the ZIP after extraction
+                    temp_path.unlink(missing_ok=True)
+                    logger.info(f"Extracted ZIP {file.filename} ({file_size // (1024*1024)}MB)")
+
+                except zipfile.BadZipFile:
+                    # Not a valid ZIP, save as regular file
+                    temp_path.rename(final_path)
+                    uploaded_files_list.append(str(final_path.relative_to(workspace)))
+            else:
+                # Move temp file to final location
+                temp_path.rename(final_path)
+                uploaded_files_list.append(str(final_path.relative_to(workspace)))
+                logger.info(f"Uploaded {file.filename} ({file_size // (1024*1024)}MB)")
+
+        except Exception as e:
+            # Cleanup on error
+            temp_path.unlink(missing_ok=True)
+            if not isinstance(e, HTTPException):
+                logger.error(f"Upload error: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+            raise
+
+        # Track in existing files list
+        for uf in uploaded_files_list:
+            if uf not in existing_files:
+                existing_files.append(uf)
+
+    # Update database
+    session.uploaded_files = json.dumps(existing_files)
+    await db.commit()
+
+    # Update CLAUDE.md
+    ccresearch_manager.update_workspace_claude_md(
+        ccresearch_id,
+        session.workspace_dir,
+        email=session.email,
+        uploaded_files=existing_files
+    )
+
+    logger.info(f"Local upload complete: {len(uploaded_files_list)} files to {ccresearch_id}")
+
+    return UploadResponse(
+        uploaded_files=uploaded_files_list,
+        data_dir=str(target_dir)
     )
 
 
@@ -2340,19 +2596,33 @@ async def terminal_websocket(
                 await websocket.close()
                 return
 
+            # Track WebSocket state to prevent sending to closed connections
+            ws_closed = False
+
             # Define output callback to send data to WebSocket
+            # Returns False to signal the read loop to stop when WebSocket is closed
             async def send_output(data: bytes):
+                nonlocal ws_closed
+                if ws_closed:
+                    return False  # Signal to stop the read loop
                 try:
                     await websocket.send_bytes(data)
+                    return True  # Continue the read loop
                 except Exception as e:
+                    ws_closed = True  # Mark as closed so future sends are skipped
                     logger.error(f"Failed to send output: {e}")
+                    return False  # Signal to stop the read loop
 
             # Define automation callback to notify client of triggered rules
             async def send_automation_notification(notification: dict):
+                nonlocal ws_closed
+                if ws_closed:
+                    return  # Don't try to send to closed WebSocket
                 try:
                     await websocket.send_json(notification)
                     logger.info(f"Sent automation notification: {notification.get('description')}")
                 except Exception as e:
+                    ws_closed = True
                     logger.error(f"Failed to send automation notification: {e}")
 
             # Check session mode and spawn appropriate process

@@ -212,11 +212,17 @@ Legacy Data Studio API using headless Claude Code. See V2 for new implementation
 }
 ```
 
-### Video Studio (`/video-factory`) - v3.0 ENHANCED
+### Video Studio (`/video-factory`) - v4.0 INTERACTIVE WORKFLOW
 
-**AI-powered video script generation** with two-phase Claude generation, scene editing, and Remotion rendering.
+**AI-powered video script generation** with recommendations, research integration, and Remotion rendering.
 
-**Workflow:** Context → Plan (Claude SSE) → Script (Claude SSE) → Edit → Render
+**Workflow:** Idea → Recommendations → Plan (with research) → Preview → Script → Edit → Render
+
+**v4.0 Features:**
+- Session continuity via `--continue` flag
+- Recommendations agent for genre/style/animation suggestions
+- Research integration for facts/stats during planning
+- Visual preview with gradient and image thumbnails
 
 **Project Management:**
 
@@ -227,6 +233,13 @@ Legacy Data Studio API using headless Claude Code. See V2 for new implementation
 | GET | `/projects/{id}` | Get project details |
 | DELETE | `/projects/{id}` | Delete project |
 
+**Session Management:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/projects/{id}/session` | Get current session ID |
+| DELETE | `/projects/{id}/session` | Reset session (fresh start) |
+
 **Context Management:**
 
 | Method | Endpoint | Description |
@@ -236,11 +249,19 @@ Legacy Data Studio API using headless Claude Code. See V2 for new implementation
 | DELETE | `/projects/{id}/context/{type}/{name}` | Remove context item |
 | POST | `/projects/{id}/context/import` | Import from workspace project |
 
-**Two-Phase Generation:**
+**Recommendations (v4.0):**
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/projects/{id}/plan` | Generate plan (SSE streaming) |
+| POST | `/projects/{id}/recommendations` | Generate recommendations (SSE streaming) |
+| GET | `/projects/{id}/recommendations` | Get latest recommendations |
+| PUT | `/projects/{id}/recommendations/{rec_id}` | Update user selections |
+
+**Plan Generation:**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/projects/{id}/plan` | Generate plan with research (SSE, uses --continue) |
 | GET | `/projects/{id}/plans` | List plans |
 | GET | `/projects/{id}/plans/{plan_id}` | Get plan details |
 | PUT | `/projects/{id}/plans/{plan_id}` | Update plan (user edits) |
@@ -267,22 +288,26 @@ Legacy Data Studio API using headless Claude Code. See V2 for new implementation
 
 | Module | Purpose |
 |--------|---------|
-| `video_studio_generator.py` | Two-phase Claude generation with context |
+| `video_studio_generator.py` | Recommendations + Plan + Script generation with --continue |
 | `video_factory_manager.py` | Project CRUD |
 
 **Skill File:**
-`~/.claude/skills/remotion-video-generator/skill.md` - Comprehensive Remotion documentation for Claude
+`~/.claude/skills/remotion-video-generator/skill.md` - Comprehensive Remotion documentation for Claude (updated with v4.0 workflow)
 
 **Storage:**
 ```
 /data/video-factory/project-data/{project_id}/
-├── .claude/CLAUDE.md      # Dynamic context + task
+├── .claude/
+│   ├── CLAUDE.md          # Dynamic context + task
+│   └── session_id.txt     # Session ID for --continue
 ├── context/               # User-uploaded context
 │   ├── images/            # Context images
 │   ├── files/             # Data files
 │   ├── notes.md           # User notes
 │   └── references.json    # Workspace refs
-├── .plans/                # Video plans
+├── .recommendations/      # Recommendations from Claude (v4.0)
+│   └── {rec_id}.json
+├── .plans/                # Video plans with image_suggestions
 ├── scripts/               # EnhancedVideoProps JSON
 ├── images/                # Scene images
 └── renders/               # MP4 outputs

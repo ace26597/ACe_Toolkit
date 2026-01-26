@@ -1248,9 +1248,37 @@ export default function WorkspacePage() {
     setImportUrls(newUrls);
   };
 
+  // Check if we're on local network (for large file uploads)
+  const isLocalNetwork = () => {
+    const hostname = window.location.hostname;
+    return hostname === 'localhost' ||
+           hostname === '127.0.0.1' ||
+           hostname.startsWith('192.168.') ||
+           hostname.startsWith('10.') ||
+           hostname.startsWith('172.16.') ||
+           hostname.startsWith('172.17.') ||
+           hostname.startsWith('172.18.') ||
+           hostname.startsWith('172.19.') ||
+           hostname.startsWith('172.2') ||
+           hostname.startsWith('172.30.') ||
+           hostname.startsWith('172.31.');
+  };
+
   // Upload files to terminal session
   const handleTerminalUpload = async (files: File[], targetPath: string) => {
     if (!terminalSessionId) return;
+
+    // Calculate total size
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB
+
+    // Use local upload endpoint for large files on local network
+    const useLocalUpload = totalSize > SIZE_THRESHOLD && isLocalNetwork();
+    const endpoint = useLocalUpload ? 'upload-local' : 'upload';
+
+    if (useLocalUpload) {
+      console.log(`Large upload (${(totalSize / 1024 / 1024).toFixed(0)}MB) - using local network endpoint`);
+    }
 
     const formData = new FormData();
     files.forEach(file => {
@@ -1259,13 +1287,28 @@ export default function WorkspacePage() {
     formData.append('target_path', targetPath || 'data');
 
     try {
-      const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/upload`, {
+      const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/${endpoint}`, {
         method: 'POST',
         body: formData,
       });
 
       if (!res.ok) {
         const error = await res.json().catch(() => ({ detail: 'Upload failed' }));
+        // If local upload fails due to IP check, fall back to regular upload
+        if (useLocalUpload && error.detail?.includes('local network')) {
+          console.log('Falling back to regular upload (not on local network)');
+          const fallbackRes = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/upload`, {
+            method: 'POST',
+            body: formData,
+          });
+          if (!fallbackRes.ok) {
+            const fallbackError = await fallbackRes.json().catch(() => ({ detail: 'Upload failed' }));
+            throw new Error(fallbackError.detail || 'Failed to upload files');
+          }
+          const result = await fallbackRes.json();
+          showToast(`Uploaded ${result.uploaded_files?.length || files.length} file(s)`, 'success');
+          return;
+        }
         throw new Error(error.detail || 'Failed to upload files');
       }
 

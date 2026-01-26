@@ -212,33 +212,42 @@ Uses `dataStudioV2Api` from `lib/api.ts`:
 └── .claude/               # Claude config
 ```
 
-### Video Studio (`/video-factory`) - v3.0 ENHANCED
+### Video Studio (`/video-factory`) - v4.0 INTERACTIVE WORKFLOW
 
-**AI-powered video script generation** with plan review, scene editing, and Remotion rendering.
+**AI-powered video script generation** with interactive recommendations, visual preview, and Remotion rendering.
 
-**Workflow:** Context → Plan → Edit → Render
+**Workflow:** Idea → Options → Plan → Preview → Render
 
-**Features:**
-- **Plan Mode First**: Claude researches and plans before generating scripts
+**v4.0 Features:**
+- **Recommendations Agent**: Claude suggests genre, style, animations, and hooks before planning
+- **Research Integration**: Web research for facts/stats during planning phase
+- **Visual Preview**: Scene cards with gradient previews and image thumbnails
+- **Session Continuity**: Uses `--continue` flag to maintain Claude context across steps
+- **Compact Video Popup**: Small draggable player instead of full-screen modal
+- **Step Indicator**: Visual progress tracker showing 5 workflow steps
 - **Rich Context Input**: Text notes, image upload/paste, files, workspace references
-- **Draft Review**: Scene-by-scene preview and editing before render
-- **Two-Phase Generation**: Plan phase (SSE streaming) → Script generation (SSE streaming)
 - **Scene Editing**: Full modal with tabs for Content, Style, Animation, Media
 - **Background Presets**: 11 gradient presets (purpleNight, deepOcean, sunset, etc.)
 - **Lottie Animations**: robot, brain, rocket, success, chart, medical, science
 - **Drawing Paths**: check, cross, arrows, lightbulb, star, heart, brain, rocket, chart
 - **Remotion Rendering**: EnhancedVideo composition with 10 scene types
 
-**Views:**
-1. **Context View**: Add idea, upload context files/images, import from Workspace
-2. **Plan View**: Review AI-generated plan, edit scenes/hook/CTA inline
-3. **Edit View**: Full scene editor, duration controls, background/animation/media settings
-4. **Render View**: Video playback, download, render status
+**Views (View States):**
+1. **Idea**: Enter video idea + upload context files/images
+2. **Recommendations**: Claude's suggestions for genre, style, animation, hooks
+3. **Planning**: Research + plan generation (SSE streaming with log)
+4. **Preview**: Visual scene cards with gradient previews
+5. **Edit**: Full scene editor, duration controls, background/animation/media settings
+6. **Render**: Video playback, compact popup player, download
 
 **Components (`components/video-studio/`):**
 | Component | Purpose |
 |-----------|---------|
 | `ContextPanel.tsx` | File upload, paste images, notes, workspace import |
+| `RecommendationsPanel.tsx` | Genre/style/animation selection with visual cards |
+| `VisualPreview.tsx` | Scene cards with gradient previews and thumbnails |
+| `VideoPopup.tsx` | Compact draggable video player with minimize/position controls |
+| `StepIndicator.tsx` | 5-step progress indicator with navigation |
 | `PlanPreview.tsx` | Editable plan preview with collapsible sections |
 | `SceneEditor.tsx` | Full scene modal with Content/Style/Animation/Media tabs |
 | `index.ts` | Exports all video-studio components |
@@ -478,11 +487,12 @@ npm run start
 
 | Date | Change |
 |------|--------|
-| 2026-01-24 | **Video Studio v3.0:** Full implementation - Plan → Edit → Render workflow |
-| 2026-01-24 | **Video Studio:** New components - ContextPanel, PlanPreview, SceneEditor |
-| 2026-01-24 | **Video Studio:** SSE streaming for plan and script generation |
-| 2026-01-24 | **Video Studio:** Scene editing with Content/Style/Animation/Media tabs |
-| 2026-01-24 | **Video Studio:** 11 gradient presets, Lottie animations, drawing paths |
+| 2026-01-24 | **Video Studio v4.0:** Interactive workflow - Idea → Options → Plan → Preview → Render |
+| 2026-01-24 | **Video Studio:** RecommendationsPanel - Claude suggests genre, style, animations, hooks |
+| 2026-01-24 | **Video Studio:** VisualPreview - Scene cards with gradient previews and thumbnails |
+| 2026-01-24 | **Video Studio:** VideoPopup - Compact draggable player with minimize/position controls |
+| 2026-01-24 | **Video Studio:** StepIndicator - 5-step progress tracker with navigation |
+| 2026-01-24 | **Video Studio:** Session continuity via `--continue` flag |
 | 2026-01-23 | **Data Studio:** Fix empty stat cards - support alternate field names (value/stat_value) |
 | 2026-01-23 | **Data Studio:** Fix [Object] display - properly stringify result objects |
 | 2026-01-23 | **Data Studio:** Remove redundant "Starting Claude Code session" message |

@@ -135,7 +135,9 @@
       "Bash(/dev/null -exec cat {} ;)",
       "Bash(# Restart backend cd /home/ace/dev/ACe_Toolkit/apps/api && source .venv/bin/activate && fuser -k 8000/tcp sleep 1 nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 2>&1 & # Restart frontend fuser -k 3000/tcp sleep 1 nohup npm run start 2>&1 & sleep 4 echo \"\"Checking services...\"\" curl -s http://localhost:8000/health)",
       "mcp__filesystem__list_directory",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "mcp__playwright__browser_install",
+      "Bash(kaggle:*)"
     ]
   }
 }

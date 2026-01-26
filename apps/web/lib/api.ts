@@ -9,7 +9,7 @@ export const getApiUrl = (): string => {
   const protocol = window.location.protocol;
 
   // Map frontend domains to API domains
-  if (hostname === 'orpheuscore.uk' || hostname === 'www.orpheuscore.uk') {
+  if (hostname === 'orpheuscore.uk' || hostname === 'www.orpheuscore.uk' || hostname === 'clawd.orpheuscore.uk') {
     return `${protocol}//api.orpheuscore.uk`;
   }
   if (hostname === 'ai.ultronsolar.in') {
@@ -17,6 +17,13 @@ export const getApiUrl = (): string => {
   }
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return 'http://localhost:8000';
+  }
+
+  // Check if hostname is an IP address (local network access)
+  const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipPattern.test(hostname)) {
+    // For IP addresses, use port 8000 instead of api subdomain
+    return `${protocol}//${hostname}:8000`;
   }
 
   // Fallback: try api subdomain of current host
@@ -354,12 +361,33 @@ export const workspaceApi = {
         const results = [];
         const fileArray = Array.from(files);
 
+        // Check if we're on local network for large file uploads
+        const isLocalNetwork = () => {
+            if (typeof window === 'undefined') return false;
+            const hostname = window.location.hostname;
+            return hostname === 'localhost' ||
+                   hostname === '127.0.0.1' ||
+                   hostname.startsWith('192.168.') ||
+                   hostname.startsWith('10.') ||
+                   /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname);
+        };
+
+        const SIZE_THRESHOLD = 50 * 1024 * 1024; // 50MB
+
         for (const file of fileArray) {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('path', path);
 
-            const res = await fetch(`${getApiUrl()}/workspace/projects/${encodeURIComponent(project)}/data/upload`, {
+            // Use local upload endpoint for large files on local network
+            const useLocalUpload = file.size > SIZE_THRESHOLD && isLocalNetwork();
+            const endpoint = useLocalUpload ? 'upload-local' : 'upload';
+
+            if (useLocalUpload) {
+                console.log(`Large file (${(file.size / 1024 / 1024).toFixed(0)}MB) - using local network endpoint`);
+            }
+
+            const res = await fetch(`${getApiUrl()}/workspace/projects/${encodeURIComponent(project)}/data/${endpoint}`, {
                 method: 'POST',
                 credentials: 'include',
                 body: formData,

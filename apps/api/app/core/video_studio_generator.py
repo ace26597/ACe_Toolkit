@@ -22,18 +22,113 @@ logger = logging.getLogger(__name__)
 
 class VideoStudioGenerator:
     """
-    Two-phase video script generation with context management.
+    Multi-phase video script generation with context management and session continuity.
 
     Features:
     - Context management (images, files, notes, workspace refs)
-    - Plan phase: Claude researches and outlines the video
+    - Recommendations phase: Claude suggests options for the video
+    - Plan phase: Claude researches and outlines the video with image suggestions
     - Generate phase: Claude creates full script from approved plan
+    - Session continuity via --continue flag
     - Script editing support
     """
 
     def __init__(self):
         self.base_dir = Path("/data/video-factory/project-data")
         self.base_dir.mkdir(parents=True, exist_ok=True)
+
+    # ==================== Session Management ====================
+
+    def _get_session_id(self, project_dir: Path) -> Optional[str]:
+        """Read session ID from file if exists."""
+        session_file = project_dir / ".claude" / "session_id.txt"
+        if session_file.exists():
+            session_id = session_file.read_text().strip()
+            if session_id:
+                return session_id
+        return None
+
+    def _save_session_id(self, project_dir: Path, session_id: str) -> None:
+        """Save session ID for --continue."""
+        session_file = project_dir / ".claude" / "session_id.txt"
+        session_file.write_text(session_id)
+        logger.info(f"Saved session ID: {session_id} to {session_file}")
+
+    def _clear_session(self, project_dir: Path) -> None:
+        """Clear session ID to start fresh."""
+        session_file = project_dir / ".claude" / "session_id.txt"
+        if session_file.exists():
+            session_file.unlink()
+            logger.info(f"Cleared session ID at {session_file}")
+
+    def get_session(self, project_id: str) -> Optional[Dict]:
+        """Get current session info for a project."""
+        project_dir = self._get_project_dir(project_id)
+        session_id = self._get_session_id(project_dir)
+        if session_id:
+            return {
+                "session_id": session_id,
+                "project_id": project_id
+            }
+        return None
+
+    def reset_session(self, project_id: str) -> bool:
+        """Reset session to start fresh."""
+        project_dir = self._get_project_dir(project_id)
+        self._clear_session(project_dir)
+        return True
+
+    async def _spawn_claude(
+        self,
+        project_dir: Path,
+        prompt: str,
+        use_continue: bool = False
+    ) -> asyncio.subprocess.Process:
+        """
+        Spawn Claude Code with optional --continue for session continuity.
+
+        Args:
+            project_dir: Working directory for Claude
+            prompt: The prompt to send
+            use_continue: Whether to continue from previous session
+        """
+        cmd = ["claude"]
+
+        if use_continue:
+            session_id = self._get_session_id(project_dir)
+            if session_id:
+                cmd.extend(["--continue", session_id])
+                logger.info(f"Continuing session: {session_id}")
+
+        cmd.extend([
+            "-p", prompt,
+            "--output-format", "stream-json",
+            "--verbose",
+            "--permission-mode", "bypassPermissions"
+        ])
+
+        logger.info(f"Spawning Claude: {' '.join(cmd[:6])}...")
+
+        return await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=str(project_dir)
+        )
+
+    def _extract_session_id_from_output(self, output_line: str) -> Optional[str]:
+        """Extract session ID from Claude's stream-json output."""
+        try:
+            event = json.loads(output_line)
+            # Session ID is typically in the 'session' or 'result' event
+            if event.get("type") == "system" and event.get("subtype") == "init":
+                return event.get("session_id")
+            # Also check for session info in result events
+            if "session_id" in event:
+                return event.get("session_id")
+        except json.JSONDecodeError:
+            pass
+        return None
 
     def _get_project_dir(self, project_id: str) -> Path:
         """Get or create project data directory."""
@@ -43,10 +138,12 @@ class VideoStudioGenerator:
         (project_dir / ".claude").mkdir(parents=True, exist_ok=True)
         (project_dir / "context" / "images").mkdir(parents=True, exist_ok=True)
         (project_dir / "context" / "files").mkdir(parents=True, exist_ok=True)
+        (project_dir / ".recommendations").mkdir(parents=True, exist_ok=True)
         (project_dir / ".plans").mkdir(parents=True, exist_ok=True)
         (project_dir / "scripts").mkdir(parents=True, exist_ok=True)
         (project_dir / "images" / "uploaded").mkdir(parents=True, exist_ok=True)
         (project_dir / "images" / "generated").mkdir(parents=True, exist_ok=True)
+        (project_dir / "images" / "thumbnails").mkdir(parents=True, exist_ok=True)
         (project_dir / "renders").mkdir(parents=True, exist_ok=True)
 
         return project_dir
@@ -199,6 +296,147 @@ class VideoStudioGenerator:
 
     # ==================== CLAUDE.md Generation ====================
 
+    def _write_recommendations_claude_md(
+        self,
+        project_dir: Path,
+        project_name: str,
+        niche: str,
+        idea: str,
+        rec_id: str
+    ) -> None:
+        """Write CLAUDE.md for recommendations phase."""
+        context_section = self._build_context_section(project_dir.name)
+
+        claude_md = f"""# Video Studio - Recommendations Phase
+
+## Project
+- **Name:** {project_name}
+- **Niche:** {niche}
+- **Recommendations ID:** {rec_id}
+
+## Video Idea
+{idea}
+
+{context_section}
+
+## CRITICAL: Use Available Skills and Tools
+
+**BEFORE generating recommendations, run these commands:**
+
+1. **Load Remotion Skill** (required for understanding video capabilities):
+   ```
+   /remotion-best-practices
+   ```
+   This skill contains the complete EnhancedVideoProps schema, scene types, animations, and best practices.
+
+2. **For Research** (use agent-browser for web research):
+   Use the `agent-browser` skill or MCP tools to search for:
+   - Current trends related to the topic
+   - Statistics and facts
+   - Expert opinions
+
+## Your Task: Generate Video Recommendations
+
+Analyze the video idea and suggest options for the user to choose from. DO NOT create a full plan yet.
+
+### What to Recommend
+
+1. **Genre/Style** - Suggest 3 genre options that would work for this topic:
+   - educational: Clear explanations with examples
+   - entertaining: Hook-heavy with humor/surprise
+   - motivational: Inspirational tone, success stories
+   - storytelling: Narrative arc, character-driven
+   - listicle: Numbered points, rapid-fire facts
+
+2. **Visual Style** - Suggest 3 visual styles with gradient presets:
+   - minimalist: Clean text, subtle animations (gradient: midnight)
+   - vibrant: Bold colors, energetic transitions (gradient: neonPink)
+   - professional: Corporate feel, clean data viz (gradient: deepOcean)
+   - cinematic: Image-heavy, moody overlays (gradient: purpleNight)
+   - playful: Colorful, animated icons (gradient: sunset)
+
+3. **Animation Presets** - Suggest 2-3 animation combinations:
+   - smooth: fadeIn, slideUp (timing: spring) - Subtle, professional
+   - dynamic: scale, bounce (timing: spring) - Energetic, attention-grabbing
+   - typewriter: typewriter, draw (timing: linear) - Text-focused, documentary
+   - cinematic: blur, fade (timing: easing) - Film-like transitions
+
+4. **Research Sources** - Identify 2-3 web searches that would find useful facts:
+   - What statistics or facts would strengthen this video?
+   - What expert opinions or quotes would add credibility?
+   - What images would enhance the visual appeal?
+
+5. **Hook Suggestions** - Provide 2-3 hook ideas:
+   - question: "What if you could...?"
+   - statistic: "87% of people..."
+   - bold-claim: "This changed everything..."
+   - curiosity-gap: "The one thing that..."
+   - controversy: "Everyone gets this wrong..."
+
+6. **Scene Structure** - Outline a typical scene flow (don't write content yet):
+   - How many scenes? (typically 5-8 for 45-60s video)
+   - What scene types in what order?
+   - Rough duration per section
+
+### Output Format
+Save your recommendations as JSON to: `.recommendations/{rec_id}.json`
+
+```json
+{{
+  "rec_id": "{rec_id}",
+  "idea": "{idea}",
+  "generated_at": "ISO timestamp",
+
+  "genres": [
+    {{"id": "educational", "label": "Educational", "description": "Clear explanations with examples", "selected": false}},
+    {{"id": "entertaining", "label": "Entertaining", "description": "Hook-heavy with humor/surprise", "selected": false}},
+    {{"id": "motivational", "label": "Motivational", "description": "Inspirational tone, success stories", "selected": false}}
+  ],
+
+  "styles": [
+    {{"id": "minimalist", "label": "Minimalist", "description": "Clean text, subtle animations", "gradient": "midnight"}},
+    {{"id": "vibrant", "label": "Vibrant", "description": "Bold colors, energetic transitions", "gradient": "neonPink"}},
+    {{"id": "professional", "label": "Professional", "description": "Corporate feel, clean data viz", "gradient": "deepOcean"}}
+  ],
+
+  "animation_presets": [
+    {{"id": "smooth", "animations": ["fadeIn", "slideUp"], "timing": "spring", "description": "Subtle, professional"}},
+    {{"id": "dynamic", "animations": ["scale", "bounce"], "timing": "spring", "description": "Energetic, attention-grabbing"}}
+  ],
+
+  "research_sources": [
+    {{"type": "web", "query": "topic statistics 2026", "reason": "Find recent stats"}},
+    {{"type": "web", "query": "topic expert quotes", "reason": "Expert credibility"}},
+    {{"type": "images", "query": "topic visual aesthetic", "reason": "Background images"}}
+  ],
+
+  "hook_suggestions": [
+    {{"type": "question", "text": "What if you could...?"}},
+    {{"type": "statistic", "text": "87% of professionals..."}},
+    {{"type": "bold-claim", "text": "These 5 tips changed everything..."}}
+  ],
+
+  "scene_structure": [
+    {{"type": "hook", "concept": "Attention-grabbing opening", "duration": "3-5s"}},
+    {{"type": "content", "concept": "Main point 1", "duration": "8-12s"}},
+    {{"type": "content", "concept": "Main point 2", "duration": "8-12s"}},
+    {{"type": "bullet-list", "concept": "Quick summary", "duration": "6-8s"}},
+    {{"type": "cta", "concept": "Subscribe + link", "duration": "3-4s"}}
+  ]
+}}
+```
+
+### Important
+- Tailor recommendations to the specific idea and niche
+- Consider the target audience for this type of content
+- Be specific in your suggestions (not generic)
+- Include reasoning for why each option fits
+"""
+
+        claude_md_path = project_dir / ".claude" / "CLAUDE.md"
+        with open(claude_md_path, "w") as f:
+            f.write(claude_md)
+
     def _build_context_section(self, project_id: str) -> str:
         """Build context section for CLAUDE.md."""
         context = self.get_context(project_id)
@@ -244,12 +482,34 @@ You can read files from these projects for additional context.
         project_name: str,
         niche: str,
         idea: str,
-        plan_id: str
+        plan_id: str,
+        recommendations: Optional[Dict] = None
     ) -> None:
-        """Write CLAUDE.md for plan phase."""
+        """Write CLAUDE.md for plan phase with optional recommendations context."""
         context_section = self._build_context_section(project_dir.name)
 
-        claude_md = f"""# Video Studio - Plan Phase
+        # Build recommendations context if available
+        rec_context = ""
+        if recommendations:
+            selected = recommendations.get("selected_options", {})
+            rec_context = f"""
+## User's Selected Options
+
+Based on recommendations, the user has selected:
+- **Genre:** {selected.get('genre', 'Not specified')}
+- **Visual Style:** {selected.get('style', 'Not specified')}
+- **Animation Preset:** {selected.get('animation_preset', 'Not specified')}
+- **Hook Type:** {selected.get('hook_type', 'Not specified')}
+
+### Research Sources to Use
+"""
+            for source in recommendations.get("research_sources", []):
+                if source.get("selected", True):
+                    rec_context += f"- Search: \"{source.get('query', '')}\" ({source.get('reason', '')})\n"
+
+            rec_context += "\nUse these selections to guide your planning.\n"
+
+        claude_md = f"""# Video Studio - Plan Phase (with Research + Image Suggestions)
 
 ## Project
 - **Name:** {project_name}
@@ -259,24 +519,49 @@ You can read files from these projects for additional context.
 ## Video Idea
 {idea}
 
+{rec_context}
 {context_section}
 
-## Your Task: Create a Video Plan
+## CRITICAL: Use Available Skills and Tools
 
-Research the topic and create a detailed video outline. DO NOT generate the full script yet.
+**BEFORE creating the plan, run these commands:**
+
+1. **Load Remotion Skill** (required for video schema knowledge):
+   ```
+   /remotion-best-practices
+   ```
+   This provides complete EnhancedVideoProps schema, all scene types, animation options, and visual elements.
+
+2. **Web Research** (use agent-browser or WebSearch):
+   - Search for statistics and facts about the topic
+   - Find expert quotes and citations
+   - Look for trending angles
+
+3. **Image Search** (for scene backgrounds):
+   - Use Unsplash source URLs for stock images
+   - Consider AI image generation prompts
+
+## Your Task: Research and Create a Detailed Video Plan
+
+Research the topic and create a detailed video outline with image suggestions. DO NOT generate the full script yet.
 
 ### Steps
 1. **Research** - Use web search to find:
-   - Interesting facts and statistics
+   - Interesting facts and statistics (cite sources)
    - Current trends or news related to the topic
-   - Common questions people have
-   - Unique angles or hooks
+   - Expert opinions or quotes
+   - Unique angles that fit the selected genre/style
 
-2. **Plan the Structure** - Create an outline with:
-   - Hook concept (what will grab attention in the first 3 seconds)
-   - 3-5 main points or scenes
-   - Visual ideas for each scene (background type, animations)
-   - Call to action
+2. **Plan Each Scene** - For each scene include:
+   - Scene type and concept
+   - Specific background (gradient preset or image suggestion)
+   - Animation choice from the selected preset
+   - Image suggestions (Unsplash keywords or AI generation prompts)
+   - Exact duration in seconds
+
+3. **Image Suggestions** - For visual scenes, suggest:
+   - Unsplash search query: "https://source.unsplash.com/1080x1920/?keywords"
+   - OR AI generation prompt: "Describe what to generate"
 
 ### Output Format
 Save your plan as JSON to: `.plans/{plan_id}.json`
@@ -284,35 +569,103 @@ Save your plan as JSON to: `.plans/{plan_id}.json`
 ```json
 {{
   "plan_id": "{plan_id}",
-  "idea": "The original idea",
-  "research_summary": "Key findings from your research",
-  "hook": {{
-    "concept": "What the hook will show/say",
-    "type": "How it grabs attention (surprise, question, bold claim, etc.)"
+  "idea": "{idea}",
+  "created_at": "ISO timestamp",
+
+  "research_findings": [
+    {{"source": "web search", "fact": "85% of workers report...", "citation": "Forbes 2026"}},
+    {{"source": "web search", "fact": "Average time saved: 12.4 hours/week", "citation": "McKinsey Report"}}
+  ],
+
+  "selected_options": {{
+    "genre": "educational",
+    "style": "minimalist",
+    "animation_preset": "smooth",
+    "hook_type": "statistic"
   }},
+
+  "hook": {{
+    "concept": "Attention-grabbing statistic about time wasted",
+    "type": "statistic",
+    "text": "The average worker wastes 12 hours per week on tasks AI can do in seconds."
+  }},
+
   "scenes": [
     {{
       "order": 1,
-      "type": "hook | content | bullet-list | stats | whiteboard | quote | cta",
-      "concept": "What this scene covers",
-      "visual_idea": "Background type, animation style, any creative elements",
-      "duration_estimate": "3-5 seconds"
+      "type": "hook",
+      "concept": "Statistic hook about time wasted",
+      "text": "The average worker wastes 12 hours per week...",
+      "background": {{
+        "type": "gradient",
+        "preset": "purpleNight"
+      }},
+      "animation": "fadeIn",
+      "duration_seconds": 4,
+      "image_suggestions": [
+        {{"type": "unsplash", "query": "clock time dark", "url": "https://source.unsplash.com/1080x1920/?clock,time,dark"}},
+        {{"type": "generate", "prompt": "Digital clock melting, surreal, purple gradient background"}}
+      ]
+    }},
+    {{
+      "order": 2,
+      "type": "content",
+      "title": "Tool #1: ChatGPT",
+      "concept": "Email drafting and summarization",
+      "text": "Draft professional emails in seconds. Summarize long documents instantly.",
+      "background": {{
+        "type": "gradient",
+        "preset": "deepOcean"
+      }},
+      "animation": "slideUp",
+      "duration_seconds": 10,
+      "lottie": {{"preset": "robot", "position": "right"}},
+      "image_suggestions": [
+        {{"type": "unsplash", "query": "AI robot assistant", "url": "https://source.unsplash.com/1080x1920/?ai,robot"}}
+      ]
     }}
   ],
+
   "cta": {{
-    "message": "What the call to action says",
-    "style": "How it's presented"
+    "message": "Subscribe for more AI tips!",
+    "style": "bounce animation with particles",
+    "background": {{
+      "type": "gradient",
+      "preset": "neonPink"
+    }}
   }},
-  "total_duration_estimate": "45-60 seconds",
-  "notes": "Any additional notes or alternatives"
+
+  "total_duration_seconds": 56,
+  "notes": "Research found strong data on AI productivity. Using minimalist style with purple gradients for tech feel."
 }}
 ```
 
+### Background Presets Available
+| Preset | Description | Best For |
+|--------|-------------|----------|
+| purpleNight | Dark purple gradient | Tech, professional |
+| deepOcean | Blue-teal gradient | Calm, business |
+| sunset | Orange-pink gradient | Warm, creative |
+| neonPink | Pink-purple gradient | Trendy, youth |
+| midnight | Dark blue gradient | Serious, finance |
+| fire | Red-orange gradient | Urgent, action |
+| aurora | Blue to purple | Tech, innovation |
+| cyber | Cyan to blue | Futuristic |
+| matrix | Green on black | Hacker, tech |
+| electric | Purple-blue | Energy, dynamic |
+
+### Image Suggestion Guidelines
+- Use Unsplash Source URLs: `https://source.unsplash.com/1080x1920/?keyword1,keyword2`
+- Use dark/abstract keywords for backgrounds (text readability)
+- Include 1-2 suggestions per scene that needs visual variety
+- For AI generation prompts, be specific about style, colors, mood
+
 ### Important
-- Focus on PLANNING, not scripting
-- Include specific facts/stats from your research
-- Each scene should have a clear purpose
-- Consider visual variety (mix scene types, backgrounds)
+- Research FIRST, then plan based on findings
+- Include specific facts with citations
+- Each scene should have image_suggestions if visually relevant
+- Match backgrounds to the selected style
+- Use animations from the selected preset
 """
 
         claude_md_path = project_dir / ".claude" / "CLAUDE.md"
@@ -369,6 +722,21 @@ Save your plan as JSON to: `.plans/{plan_id}.json`
 {plan_summary}
 
 {context_section}
+
+## CRITICAL: Load Remotion Skill First
+
+**BEFORE generating the script, run this command:**
+```
+/remotion-best-practices
+```
+
+This skill contains the complete EnhancedVideoProps schema with:
+- All 10 scene types and their properties
+- Animation options and timing configurations
+- Background presets and visual elements
+- Lottie animation presets
+- Drawing path presets
+- Best practices for engaging videos
 
 ## Your Task: Generate Full Video Script
 
@@ -480,6 +848,185 @@ Make the video VISUALLY ENGAGING with:
         with open(claude_md_path, "w") as f:
             f.write(claude_md)
 
+    # ==================== Recommendations Phase ====================
+
+    async def generate_recommendations(
+        self,
+        project_id: str,
+        project_name: str,
+        niche: str,
+        idea: str,
+        rec_id: Optional[str] = None
+    ) -> AsyncGenerator[Dict, None]:
+        """
+        Step 1: Generate video recommendations using Claude Code.
+
+        Claude will analyze the idea and suggest options for genre, style,
+        animations, research sources, and scene structure.
+        """
+        rec_id = rec_id or f"rec_{uuid.uuid4().hex[:8]}"
+        project_dir = self._get_project_dir(project_id)
+
+        # Clear any existing session to start fresh for recommendations
+        self._clear_session(project_dir)
+
+        # Write CLAUDE.md for recommendations phase
+        self._write_recommendations_claude_md(project_dir, project_name, niche, idea, rec_id)
+
+        yield {
+            "type": "status",
+            "message": "Starting recommendations generation...",
+            "rec_id": rec_id
+        }
+
+        # Spawn Claude (fresh session)
+        prompt = f"Analyze this video idea and generate recommendations: {idea}"
+
+        try:
+            process = await self._spawn_claude(project_dir, prompt, use_continue=False)
+
+            yield {
+                "type": "status",
+                "message": "Claude is analyzing the video idea..."
+            }
+
+            # Stream output and capture session ID
+            buffer = ""
+            session_captured = False
+            async for line in process.stdout:
+                line_text = line.decode('utf-8', errors='replace')
+                buffer += line_text
+
+                while '\n' in buffer:
+                    json_line, buffer = buffer.split('\n', 1)
+                    json_line = json_line.strip()
+                    if not json_line:
+                        continue
+
+                    # Try to extract session ID
+                    if not session_captured:
+                        session_id = self._extract_session_id_from_output(json_line)
+                        if session_id:
+                            self._save_session_id(project_dir, session_id)
+                            session_captured = True
+
+                    try:
+                        event = json.loads(json_line)
+                        event_type = event.get("type", "")
+
+                        # Also check for session ID in init events
+                        if event_type == "system" and not session_captured:
+                            if "session_id" in event:
+                                self._save_session_id(project_dir, event["session_id"])
+                                session_captured = True
+
+                        if event_type == "assistant":
+                            message = event.get("message", {})
+                            content = message.get("content", [])
+                            for block in content:
+                                if block.get("type") == "text":
+                                    yield {
+                                        "type": "text",
+                                        "content": block.get("text", "")
+                                    }
+                                elif block.get("type") == "tool_use":
+                                    yield {
+                                        "type": "tool",
+                                        "tool": block.get("name", ""),
+                                        "input": str(block.get("input", {}))[:200]
+                                    }
+
+                        elif event_type == "result":
+                            yield {
+                                "type": "result",
+                                "content": event.get("result", "")
+                            }
+
+                    except json.JSONDecodeError:
+                        pass
+
+            await process.wait()
+
+            # Check if recommendations were generated
+            rec_path = project_dir / ".recommendations" / f"{rec_id}.json"
+            if rec_path.exists():
+                with open(rec_path) as f:
+                    rec_data = json.load(f)
+
+                yield {
+                    "type": "complete",
+                    "success": True,
+                    "rec_id": rec_id,
+                    "recommendations": rec_data
+                }
+            else:
+                yield {
+                    "type": "complete",
+                    "success": False,
+                    "error": "Recommendations file was not generated",
+                    "rec_id": rec_id
+                }
+
+        except Exception as e:
+            logger.error(f"Recommendations generation failed: {e}")
+            yield {
+                "type": "error",
+                "error": str(e),
+                "rec_id": rec_id
+            }
+
+    def get_recommendations(self, project_id: str, rec_id: Optional[str] = None) -> Optional[Dict]:
+        """Get recommendations by ID, or the latest if no ID specified."""
+        project_dir = self._get_project_dir(project_id)
+        recs_dir = project_dir / ".recommendations"
+
+        if rec_id:
+            rec_path = recs_dir / f"{rec_id}.json"
+            if rec_path.exists():
+                with open(rec_path) as f:
+                    return json.load(f)
+        else:
+            # Get the latest recommendations
+            if recs_dir.exists():
+                rec_files = list(recs_dir.glob("*.json"))
+                if rec_files:
+                    latest = max(rec_files, key=lambda f: f.stat().st_mtime)
+                    with open(latest) as f:
+                        return json.load(f)
+        return None
+
+    def update_recommendations(self, project_id: str, rec_id: str, selections: Dict) -> Optional[Dict]:
+        """Update recommendations with user selections."""
+        project_dir = self._get_project_dir(project_id)
+        rec_path = project_dir / ".recommendations" / f"{rec_id}.json"
+
+        if not rec_path.exists():
+            return None
+
+        with open(rec_path) as f:
+            rec_data = json.load(f)
+
+        # Update selected options
+        rec_data["selected_options"] = selections
+
+        # Mark individual items as selected
+        if "genre" in selections:
+            for genre in rec_data.get("genres", []):
+                genre["selected"] = genre["id"] == selections["genre"]
+
+        if "style" in selections:
+            for style in rec_data.get("styles", []):
+                style["selected"] = style["id"] == selections["style"]
+
+        if "animation_preset" in selections:
+            for preset in rec_data.get("animation_presets", []):
+                preset["selected"] = preset["id"] == selections["animation_preset"]
+
+        with open(rec_path, "w") as f:
+            json.dump(rec_data, f, indent=2)
+
+        return rec_data
+
     # ==================== Plan Phase ====================
 
     async def generate_plan(
@@ -488,41 +1035,50 @@ Make the video VISUALLY ENGAGING with:
         project_name: str,
         niche: str,
         idea: str,
-        plan_id: Optional[str] = None
+        plan_id: Optional[str] = None,
+        recommendations: Optional[Dict] = None,
+        use_continue: bool = True
     ) -> AsyncGenerator[Dict, None]:
         """
-        Phase 1: Generate a video plan using Claude Code.
+        Step 2: Generate a video plan using Claude Code with optional session continuity.
 
-        Claude will research the topic and create a structured outline.
+        Claude will research the topic and create a structured outline with image suggestions.
+        Uses --continue if a previous session exists (e.g., from recommendations phase).
         """
         plan_id = plan_id or f"plan_{uuid.uuid4().hex[:8]}"
         project_dir = self._get_project_dir(project_id)
 
-        # Write CLAUDE.md for plan phase
-        self._write_plan_claude_md(project_dir, project_name, niche, idea, plan_id)
+        # If no recommendations provided, try to get the latest
+        if recommendations is None:
+            recommendations = self.get_recommendations(project_id)
+
+        # Write CLAUDE.md for plan phase with recommendations context
+        self._write_plan_claude_md(project_dir, project_name, niche, idea, plan_id, recommendations)
 
         yield {
             "type": "status",
-            "message": "Starting plan generation...",
+            "message": "Starting plan generation with research...",
             "plan_id": plan_id
         }
 
-        # Run Claude Code
-        cmd = [
-            "claude",
-            "-p", f"Research and create a video plan for: {idea}",
-            "--output-format", "stream-json",
-            "--verbose",
-            "--permission-mode", "bypassPermissions"
-        ]
+        # Build prompt based on whether we have recommendations
+        if recommendations and recommendations.get("selected_options"):
+            selected = recommendations["selected_options"]
+            prompt = f"""Create a detailed video plan for: {idea}
+
+Use the selected options:
+- Genre: {selected.get('genre', 'educational')}
+- Style: {selected.get('style', 'professional')}
+- Animation: {selected.get('animation_preset', 'smooth')}
+- Hook type: {selected.get('hook_type', 'statistic')}
+
+Research the topic first, then create the plan with image suggestions."""
+        else:
+            prompt = f"Research and create a detailed video plan with image suggestions for: {idea}"
 
         try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(project_dir)
-            )
+            # Use --continue if we have a previous session
+            process = await self._spawn_claude(project_dir, prompt, use_continue=use_continue)
 
             yield {
                 "type": "status",
@@ -663,10 +1219,13 @@ Make the video VISUALLY ENGAGING with:
         project_name: str,
         niche: str,
         plan_id: str,
-        script_id: Optional[str] = None
+        script_id: Optional[str] = None,
+        use_continue: bool = True
     ) -> AsyncGenerator[Dict, None]:
         """
-        Phase 2: Generate full script from an approved plan.
+        Step 3: Generate full script from an approved plan.
+
+        Uses --continue to maintain session context from recommendations and planning.
         """
         script_id = script_id or f"script_{uuid.uuid4().hex[:8]}"
         project_dir = self._get_project_dir(project_id)
@@ -689,22 +1248,11 @@ Make the video VISUALLY ENGAGING with:
             "script_id": script_id
         }
 
-        # Run Claude Code
-        cmd = [
-            "claude",
-            "-p", "Generate the full EnhancedVideoProps script from the approved plan.",
-            "--output-format", "stream-json",
-            "--verbose",
-            "--permission-mode", "bypassPermissions"
-        ]
+        prompt = "Generate the full EnhancedVideoProps script from the approved plan. Use the backgrounds, animations, and image suggestions from the plan."
 
         try:
-            process = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=str(project_dir)
-            )
+            # Use --continue to maintain context
+            process = await self._spawn_claude(project_dir, prompt, use_continue=use_continue)
 
             yield {
                 "type": "status",

@@ -8,7 +8,6 @@ interface EnhancedTextProps {
   animation: "fadeIn" | "slideUp" | "slideDown" | "slideLeft" | "slideRight" | "scale" | "typewriter" | "bounce" | "blur";
   timing: TimingConfig;
   delay?: number;
-  className?: string;
   style?: React.CSSProperties;
   accentColor?: string;
 }
@@ -19,7 +18,6 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
   animation,
   timing,
   delay = 0,
-  className = "",
   style = {},
   accentColor = "#8b5cf6",
 }) => {
@@ -156,7 +154,7 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
   if (animation === "typewriter") {
     const visibleChars = Math.floor(progress * text.length);
     return (
-      <span className={className} style={style}>
+      <span style={{ display: "block", ...style }}>
         {renderTextWithEmphasis(text.slice(0, visibleChars))}
         <span style={{ opacity: 0 }}>{text.slice(visibleChars)}</span>
       </span>
@@ -164,7 +162,7 @@ export const EnhancedText: React.FC<EnhancedTextProps> = ({
   }
 
   return (
-    <span className={className} style={{ ...getAnimationStyle(), ...style }}>
+    <span style={{ display: "block", ...getAnimationStyle(), ...style }}>
       {renderTextWithEmphasis(text)}
     </span>
   );

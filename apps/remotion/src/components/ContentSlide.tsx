@@ -22,16 +22,20 @@ export const ContentSlide: React.FC<ContentSlideProps> = ({
 
   return (
     <AbsoluteFill
-      style={{ backgroundColor }}
-      className="flex flex-col justify-center p-16"
+      style={{
+        backgroundColor,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        padding: 64,
+      }}
     >
       {title && (
         <AnimatedText
           text={title}
           animation="slideUp"
           duration={15}
-          className="text-4xl font-bold mb-8"
-          style={{ color: accentColor }}
+          style={{ color: accentColor, fontSize: 48, fontWeight: 700, marginBottom: 32 }}
         />
       )}
 
@@ -40,17 +44,19 @@ export const ContentSlide: React.FC<ContentSlideProps> = ({
         animation="fadeIn"
         delay={0.3}
         duration={20}
-        className="text-3xl leading-relaxed mb-8"
-        style={{ color: textColor }}
+        style={{ color: textColor, fontSize: 36, lineHeight: 1.6, marginBottom: 32 }}
       />
 
       {bulletPoints && bulletPoints.length > 0 && (
-        <ul className="space-y-4">
+        <ul style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {bulletPoints.map((point, index) => (
             <li
               key={index}
-              className="flex items-start gap-4 text-2xl"
               style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 16,
+                fontSize: 28,
                 opacity: interpolate(
                   frame,
                   [20 + index * 15, 35 + index * 15],
