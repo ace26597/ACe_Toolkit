@@ -1,308 +1,341 @@
-# ACe_Toolkit
+# 🧪 C3 Researcher — Turn Any Device Into Your Personal AI Research Lab
 
-A comprehensive AI-powered research platform featuring **C3 Researcher Workspace**, **C3 Data Studio**, and **Remotion Video Studio**. Built for scientists, researchers, and developers who need powerful AI tools for data analysis, literature review, and content creation.
+<p align="center">
+  <strong>Deploy Claude Code with 145+ scientific skills on a Raspberry Pi or old laptop.<br/>
+  Access your AI researcher from anywhere. Share with family. Pay pennies.</strong>
+</p>
 
-## 🌐 Live Platform
-
-| Service | URL | Status |
-|---------|-----|--------|
-| **Platform** | https://orpheuscore.uk | ✅ Live |
-| **API** | https://api.orpheuscore.uk | ✅ Live |
-| **API Docs** | https://api.orpheuscore.uk/docs | ✅ Live |
-
-> **Deployment:** Self-hosted on Raspberry Pi 5 with Cloudflare Tunnel for secure global access.
+<p align="center">
+  <a href="https://orpheuscore.uk">Live Demo</a> •
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-why-self-host">Why Self-Host?</a> •
+  <a href="#-hardware-guide">Hardware Guide</a>
+</p>
 
 ---
 
-## ✨ Applications
+## 🎯 What Is This?
 
-### 🔬 C3 Researcher Workspace
+**C3 Researcher** (Claude Code Custom Researcher) is a self-hosted AI research platform that gives you:
 
-**Claude Code Custom Researcher** - A fully-featured AI research terminal with unprecedented access to scientific tools and databases.
+- **Full Claude Code Terminal** — Not a wrapper, the real thing with all capabilities
+- **145+ Scientific Skills** — PubMed, ChEMBL, RDKit, PyTorch, clinical trials, and more
+- **26 MCP Servers** — Direct access to scientific databases and utilities
+- **Access From Anywhere** — Cloudflare Tunnel = free HTTPS, no port forwarding
+- **Mobile Support** — Works on iPhone, Android, tablets
+- **Multi-User** — Share with family/friends, everyone gets isolated storage
 
-| Feature | Details |
+### The Problem It Solves
+
+Claude Code is powerful, but:
+- Running it locally ties up your main machine
+- API costs add up fast for heavy research use
+- No easy way to share access with others
+- Mobile access is limited
+
+### The Solution
+
+Run C3 Researcher on a **$80 Raspberry Pi** (or any old laptop):
+- 24/7 availability without tying up your computer
+- Share a single Anthropic API key across trusted users
+- Access from any device, anywhere
+- All the Claude Code skills, pre-configured
+
+---
+
+## 💡 Why Self-Host?
+
+| Benefit | Details |
 |---------|---------|
-| **Skills** | 145+ scientific skills (PubMed, UniProt, RDKit, PyTorch, etc.) |
-| **MCP Servers** | 26 active servers (11 scientific, 2 AI, 13 utility) |
-| **Plugins** | 14 specialized plugins |
-| **Databases** | 30+ accessible databases including AACT (566K+ clinical trials) |
+| **Cost Sharing** | One API key, multiple users. Split costs with family/research group |
+| **Always On** | Pi runs 24/7 for ~$5/year electricity. Your laptop stays free |
+| **Access Anywhere** | Cloudflare Tunnel gives you free HTTPS from any device |
+| **Data Control** | Your research stays on your hardware, not in the cloud |
+| **No Rate Limits** | Use your own API key at your own pace |
+| **Mobile Research** | Full terminal access from your phone |
 
-**Key Features:**
-- 📱 **Mobile Responsive** - Works on iPhone, Android, iPad
-- 🖥️ **Full Terminal** - Claude Code with all capabilities
-- 📝 **Markdown Notes** - With live preview, Mermaid diagrams
-- 📁 **File Browser** - Upload, preview, manage files
-- 🔄 **Session Persistence** - Resume where you left off
+### Cost Breakdown
 
-**Scientific Capabilities:**
-- Literature search (PubMed, bioRxiv, Semantic Scholar)
-- Drug discovery (ChEMBL, RDKit, DeepChem)
-- Clinical trials (ClinicalTrials.gov API, AACT SQL)
-- Genomics (BioPython, Scanpy, scvi-tools)
-- Medical coding (ICD-10, NPI Registry, CMS Coverage)
+| Item | Cost | Notes |
+|------|------|-------|
+| Raspberry Pi 5 (8GB) | ~$80 | Or use an old laptop for $0 |
+| MicroSD / SSD | ~$20 | 128GB+ recommended |
+| Power + Case | ~$15 | Optional but recommended |
+| Cloudflare Tunnel | **Free** | No monthly fees |
+| Domain (optional) | ~$10/year | Or use free .tk/.ml domains |
+| Electricity | ~$5/year | Pi uses 5-15W |
+| **Total** | **~$115** | One-time cost (or $0 with old laptop) |
 
-### 📊 C3 Data Studio
-
-**AI-Powered Data Analysis** - Upload files and get auto-generated dashboards with natural language editing.
-
-**Workflow:**
-1. Create project & upload data (CSV, JSON, Excel, Parquet)
-2. AI analyzes data patterns and relationships
-3. Auto-generates 5-10 interactive Plotly widgets
-4. Customize with natural language ("Add a pie chart for categories")
-
-**Features:**
-- Multi-file analysis (combined or separate modes)
-- Live terminal output during analysis
-- NLP-based widget editing
-- Stat cards, histograms, bar/line/pie charts, scatter plots
-
-### 🎬 Remotion Video Studio
-
-**AI Video Creation** - Real Claude Code terminal with Remotion for video production.
-
-**Workflow:**
-1. Create project (auto-scaffolds npm + Remotion)
-2. Enter video idea
-3. Watch Claude research, plan, build, and render
-4. Download finished MP4
-
-**Features:**
-- Full PTY terminal (not headless)
-- Per-user isolated npm projects
-- All Claude Code capabilities available
-- Video gallery sidebar
-
----
-
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| **Frontend** | Next.js 16, React 19, TypeScript 5, Tailwind CSS 4 |
-| **Backend** | FastAPI, Python 3.13, SQLAlchemy 2.0, Pydantic |
-| **Terminal** | xterm.js 5.5, WebSocket PTY |
-| **Charts** | Plotly.js, react-plotly.js |
-| **Video** | Remotion |
-| **Auth** | JWT + HTTPOnly cookies |
-| **Hosting** | Raspberry Pi 5 + Cloudflare Tunnel |
-
----
-
-## 📁 Project Structure
-
-```
-ACe_Toolkit/
-├── apps/
-│   ├── web/                    # Next.js Frontend
-│   │   ├── app/                # App Router pages
-│   │   │   ├── workspace/      # C3 Researcher Workspace
-│   │   │   ├── data-studio/    # C3 Data Studio
-│   │   │   ├── video-studio/   # Remotion Video Studio
-│   │   │   └── ccresearch/     # Tips, use-cases, shares
-│   │   ├── components/         # React components
-│   │   ├── data/               # JSON data files
-│   │   └── lib/                # API client
-│   │
-│   └── api/                    # FastAPI Backend
-│       ├── app/
-│       │   ├── routers/        # API endpoints
-│       │   ├── core/           # Managers, config
-│       │   └── models/         # SQLAlchemy models
-│       └── requirements.txt
-│
-├── infra/scripts/              # Deployment scripts
-├── logs/                       # Application logs
-├── CLAUDE.md                   # Developer documentation
-└── README.md                   # This file
-```
+Then just share your Anthropic API key costs across users.
 
 ---
 
 ## 🚀 Quick Start
 
-### Prerequisites
-- Node.js 18+
-- Python 3.11+
-- npm or yarn
-
-### Setup
+### Option 1: Raspberry Pi (Recommended)
 
 ```bash
-# Clone repository
+# 1. Flash Raspberry Pi OS (64-bit) to SD card
+# 2. Enable SSH, connect to network
+
+# 3. SSH into your Pi
+ssh pi@raspberrypi.local
+
+# 4. Clone and setup
 git clone https://github.com/ace26597/ACe_Toolkit.git
 cd ACe_Toolkit
 
-# Backend setup
-cd apps/api
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env  # Edit with your API keys
+# 5. Run the installer (sets up Python, Node, deps)
+./infra/scripts/setup.sh
 
-# Frontend setup
+# 6. Configure API keys
+cp apps/api/.env.example apps/api/.env
+nano apps/api/.env  # Add your ANTHROPIC_API_KEY
+
+# 7. Start services
+./infra/scripts/start_all.sh
+
+# 8. Access locally
+# http://raspberrypi.local:3000
+```
+
+### Option 2: Old Laptop / Desktop
+
+```bash
+# Works on any Linux/macOS/WSL machine with:
+# - Python 3.11+
+# - Node.js 18+
+# - 4GB+ RAM
+
+git clone https://github.com/ace26597/ACe_Toolkit.git
+cd ACe_Toolkit
+
+# Backend
+cd apps/api
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env  # Add your API keys
+
+# Frontend
 cd ../web
 npm install
-echo "NEXT_PUBLIC_API_BASE_URL=http://localhost:8000" > .env.local
 
-# Start services
+# Start
 cd ../..
 ./infra/scripts/start_all.sh
 ```
 
-**Access:**
-- Frontend: http://localhost:3000
-- Backend: http://localhost:8000
-- API Docs: http://localhost:8000/docs
+### Option 3: Docker (Coming Soon)
+
+```bash
+# One-liner deployment
+docker-compose up -d
+```
 
 ---
 
-## 🔬 C3 Researcher Capabilities
+## 🌐 Access From Anywhere (Cloudflare Tunnel)
 
-### MCP Servers (26 Active)
+**Free, secure, no port forwarding required.**
 
-**Scientific (11):**
-- PubMed, bioRxiv/medRxiv, ChEMBL, ClinicalTrials.gov, AACT
-- CMS Medicare Coverage, NPI Registry, ICD-10 Codes
-- HuggingFace Hub, Open Targets, Medidata
+```bash
+# 1. Install cloudflared
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 -o /usr/local/bin/cloudflared
+chmod +x /usr/local/bin/cloudflared
 
-**Utility (13):**
-- Memory, Context7, Filesystem, Git, SQLite
-- Playwright, Fetch, Time, Sequential Thinking
-- MotherDuck, Cloudflare, Bitly, Mercury
+# 2. Login (opens browser)
+cloudflared tunnel login
 
-### Plugins (14)
+# 3. Create tunnel
+cloudflared tunnel create c3researcher
 
-| Plugin | Description |
-|--------|-------------|
-| Scientific Skills | 145+ scientific tools |
-| Document Skills | PDF, Excel, Word processing |
-| HuggingFace Skills | Model/dataset integration |
-| Feature Dev | Guided implementation |
-| Code Simplifier | Refactoring tools |
-| Plugin Dev | Plugin creation |
-| Agent SDK Dev | Agent development |
-| Frontend Design | UI/UX components |
-| AI/Backend Skills | Development utilities |
-| Context7 | Library documentation |
-| Ralph Loop | Iterative refinement |
-| AACT Clinical Trials | 566K+ trials SQL access |
+# 4. Configure (edit with your domain)
+cat > ~/.cloudflared/config.yml << EOF
+tunnel: YOUR-TUNNEL-ID
+credentials-file: /home/pi/.cloudflared/YOUR-TUNNEL-ID.json
 
-### Example Prompts
+ingress:
+  - hostname: research.yourdomain.com
+    service: http://localhost:3000
+  - hostname: api.yourdomain.com
+    service: http://localhost:8000
+  - service: http_status:404
+EOF
 
+# 5. Route DNS
+cloudflared tunnel route dns c3researcher research.yourdomain.com
+cloudflared tunnel route dns c3researcher api.yourdomain.com
+
+# 6. Run as service (auto-starts on boot)
+sudo cloudflared service install
+sudo systemctl enable cloudflared
+sudo systemctl start cloudflared
 ```
-# Literature Review
-Search PubMed for CRISPR-Cas9 papers from 2024-2025. Summarize top 5.
 
-# Drug Discovery
-Search ChEMBL for EGFR inhibitors with IC50 < 100nM.
+**Result:** `https://research.yourdomain.com` works from anywhere!
 
-# Clinical Trials
-Query AACT: Find Phase 3 oncology trials from last 5 years.
+---
 
-# Medical Coding
-Look up ICD-10 codes for Type 2 Diabetes with complications.
+## 🔬 What's Included
 
-# Data Analysis
-Run /exploratory-data-analysis on my uploaded CSV file.
-```
+### Scientific Skills (145+)
+
+| Category | Examples |
+|----------|----------|
+| **Literature** | PubMed, bioRxiv, Semantic Scholar, arXiv |
+| **Drug Discovery** | ChEMBL, RDKit, DeepChem, PubChem |
+| **Clinical Trials** | ClinicalTrials.gov, AACT (566K+ trials) |
+| **Genomics** | BioPython, Scanpy, UniProt, Ensembl |
+| **Medical Coding** | ICD-10, NPI Registry, CMS Coverage |
+| **Data Science** | Pandas, Plotly, scikit-learn, PyTorch |
+| **Document Generation** | PDF, DOCX, XLSX, PPTX, LaTeX |
+
+### MCP Servers (26)
+
+- **Scientific:** PubMed, bioRxiv, ChEMBL, ClinicalTrials.gov, AACT, CMS Coverage, NPI Registry, ICD-10, HuggingFace
+- **Utility:** Memory, Filesystem, Git, SQLite, Playwright, Sequential Thinking
+
+### Applications
+
+| App | Description |
+|-----|-------------|
+| **C3 Researcher Workspace** | Full Claude Code terminal with notes, files, and project management |
+| **C3 Data Studio** | Upload data → AI analysis → Auto-generated dashboards |
+| **Remotion Video Studio** | Describe a video → Claude builds and renders it |
 
 ---
 
 ## 📱 Mobile Support
 
-C3 Researcher Workspace is fully responsive:
+C3 Researcher is fully responsive:
 
-- **Bottom Navigation** - Terminal, Notes, Data, Files tabs
-- **Drawer Sidebar** - Project selection via hamburger menu
-- **Mobile Terminal Input** - Soft keyboard support with quick actions
-- **Touch Optimized** - Large tap targets, swipe gestures
-- **Minimum Width** - 390px (iPhone 12+)
-
----
-
-## 🔒 Authentication
-
-| User Type | Access | Duration |
-|-----------|--------|----------|
-| Trial | Full access | 24 hours |
-| Approved | Full access | 30 days |
-| Admin | Full + user management | 30 days |
-
-All data is isolated per user at `/data/users/{user-id}/`.
+- Bottom navigation for easy thumb access
+- Mobile keyboard input for terminal
+- Touch-optimized file browser
+- Works on iPhone 12+ / Android
 
 ---
 
-## 📡 API Overview
+## 👥 Multi-User Setup
 
-### Workspace
-```
-GET  /workspace/projects           # List projects
-POST /workspace/projects           # Create project
-GET  /workspace/projects/{name}/data  # List files
-POST /workspace/projects/{name}/data  # Upload files
-```
+Each user gets isolated storage:
 
-### CCResearch Terminal
 ```
-POST /ccresearch/sessions          # Start session
-WS   /ccresearch/terminal/{id}     # WebSocket PTY
-GET  /ccresearch/sessions/{id}     # Session status
+/data/users/
+├── user-1-uuid/
+│   └── projects/
+├── user-2-uuid/
+│   └── projects/
+└── user-3-uuid/
+    └── projects/
 ```
 
-### Data Studio
-```
-POST /data-studio/projects         # Create project
-POST /data-studio/analyze          # Run analysis
-GET  /data-studio/dashboard/{id}   # Get dashboard
-POST /data-studio/nlp-edit         # NLP widget edit
-```
-
-### Video Studio
-```
-POST /video-studio/projects        # Create project
-POST /video-studio/session         # Start Claude session
-WS   /video-studio/terminal/{name} # Terminal WebSocket
-GET  /video-studio/videos/{name}   # List videos
-```
-
-Full API documentation at `/docs`.
+**User types:**
+- **Trial** — 24-hour full access (for testing)
+- **Approved** — Full access (admin approves)
+- **Admin** — Full access + user management
 
 ---
 
-## 🔧 Configuration
+## 🛠️ Installing Skills
 
-### Backend (`apps/api/.env`)
-```env
-SECRET_KEY=your-secret-key
-ANTHROPIC_API_KEY=sk-ant-...
-OPENAI_API_KEY=sk-...
-ALLOWED_ORIGINS=["http://localhost:3000","https://orpheuscore.uk"]
-```
-
-### Frontend (`apps/web/.env.local`)
-```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-```
-
----
-
-## 📋 Management
+Skills are pre-configured in `.claude/skills/`. To add new ones:
 
 ```bash
-# Start all services
-./infra/scripts/start_all.sh
+# 1. Browse community skills
+# https://github.com/anthropics/claude-code-skills
 
-# Stop all services
-./infra/scripts/stop_all.sh
+# 2. Clone skill to your installation
+cd ~/.claude/skills
+git clone https://github.com/someone/new-skill.git
 
-# Check status
-./infra/scripts/status.sh
-
-# View logs
-tail -f logs/backend-*.log
-tail -f logs/frontend-*.log
+# 3. Restart terminal session
+# Skill is now available
 ```
+
+### Creating Custom Skills
+
+```bash
+mkdir -p .claude/skills/my-skill
+cat > .claude/skills/my-skill/SKILL.md << 'EOF'
+# My Custom Skill
+
+Description of what this skill does.
+
+## Commands
+
+- `/my-command` - Does something useful
+
+## Usage
+
+```
+/my-command arg1 arg2
+```
+EOF
+```
+
+---
+
+## 📊 Hardware Recommendations
+
+### Minimum (Raspberry Pi 4, 4GB)
+- Works for 1-2 users
+- Slower cold starts
+- Fine for light research
+
+### Recommended (Raspberry Pi 5, 8GB)
+- Fast, responsive
+- 3-5 concurrent users
+- Good for heavy research
+- **This is what we run**
+
+### Power User (Old Laptop/Mini PC)
+- 16GB+ RAM
+- SSD storage
+- Best performance
+- Many concurrent users
+
+### Storage
+
+- **128GB minimum** — OS + apps + some projects
+- **512GB+ recommended** — Large datasets, video projects
+- **External SSD** — Expand anytime via USB
+
+---
+
+## 🔒 Security Notes
+
+- All traffic encrypted via Cloudflare Tunnel (HTTPS)
+- JWT authentication with HTTP-only cookies
+- Per-user data isolation
+- No data leaves your hardware (except API calls to Anthropic)
+
+**Important:** This is designed for trusted users (family, close colleagues). Don't expose to the public internet without additional hardening.
+
+---
+
+## 🗺️ Roadmap
+
+### Now (Free)
+- [x] Full Claude Code terminal
+- [x] 145+ scientific skills
+- [x] Multi-user support
+- [x] Mobile responsive
+- [x] Data Studio dashboards
+- [x] Video Studio
+
+### Coming Soon
+- [ ] Docker one-liner deployment
+- [ ] Team workspaces
+- [ ] Usage analytics
+- [ ] Plugin marketplace
+- [ ] Hosted option (for those who don't want to self-host)
+
+### Future (Pro Tier)
+- [ ] Priority support
+- [ ] Custom skill development
+- [ ] Enterprise features
+- [ ] SLA guarantees
 
 ---
 
@@ -310,38 +343,41 @@ tail -f logs/frontend-*.log
 
 | Document | Description |
 |----------|-------------|
-| [CLAUDE.md](./CLAUDE.md) | Developer guide, API reference |
+| [CLAUDE.md](./CLAUDE.md) | Developer guide, full API reference |
 | [apps/web/CLAUDE.md](./apps/web/CLAUDE.md) | Frontend documentation |
 | [apps/api/CLAUDE.md](./apps/api/CLAUDE.md) | Backend documentation |
+| [docs/PI_SETUP_MANUAL.md](./docs/PI_SETUP_MANUAL.md) | Detailed Pi setup guide |
 
 ---
 
 ## 🤝 Contributing
 
-1. Read `CLAUDE.md` for conventions
-2. Create branch: `claude/<description>-<session-id>`
-3. Make changes and test locally
-4. Submit pull request
+1. Fork the repo
+2. Create a branch: `git checkout -b feature/amazing-thing`
+3. Make changes
+4. Test locally
+5. Submit PR
 
 ---
 
 ## 📄 License
 
-MIT License - see LICENSE file.
+MIT License — Use it however you want.
 
 ---
 
-## 🙏 Acknowledgments
+## 🙏 Built With
 
-- **Anthropic Claude** - AI backbone
-- **Remotion** - Video rendering
-- **xterm.js** - Terminal emulation
-- **Plotly** - Interactive charts
-- **Next.js / FastAPI** - Frameworks
-- **Cloudflare** - Secure tunneling
+- [Claude Code](https://claude.ai/claude-code) by Anthropic
+- [Next.js](https://nextjs.org) / [FastAPI](https://fastapi.tiangolo.com)
+- [Remotion](https://remotion.dev) for video
+- [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/)
+- [xterm.js](https://xtermjs.org)
 
 ---
 
-**Built with ❤️ for researchers and scientists**
-
-**Live at:** https://orpheuscore.uk
+<p align="center">
+  <strong>Turn your old hardware into an AI research powerhouse.</strong><br/>
+  <a href="https://orpheuscore.uk">Try the Demo</a> •
+  <a href="https://github.com/ace26597/ACe_Toolkit">Star on GitHub</a>
+</p>
