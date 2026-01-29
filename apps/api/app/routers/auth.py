@@ -192,31 +192,21 @@ async def login(response: Response, user_in: UserLogin, db: AsyncSession = Depen
 
     # Set cookies with different durations based on user status
     # Trial users: 1 day, Approved/admin users: 30 days
-    is_secure = False  # Set to True when using HTTPS in production
     cookie_days = APPROVED_USER_COOKIE_DAYS if (user.is_admin or user.is_approved) else TRIAL_USER_COOKIE_DAYS
     cookie_seconds = cookie_days * 24 * 60 * 60
 
-    # Access token duration matches cookie duration for seamless experience
-    # (refresh mechanism still available as backup)
-    access_token_seconds = cookie_seconds
-
+    cookie_kwargs = get_cookie_kwargs()
     response.set_cookie(
         key="access_token",
         value=access_token,
-        httponly=True,
-        secure=is_secure,
-        samesite="lax",
-        path="/",  # Ensure cookie works across all routes
-        max_age=access_token_seconds
+        max_age=cookie_seconds,
+        **cookie_kwargs
     )
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
-        httponly=True,
-        secure=is_secure,
-        samesite="lax",
-        path="/",  # Ensure cookie works across all routes
-        max_age=cookie_seconds
+        max_age=cookie_seconds,
+        **cookie_kwargs
     )
 
     # Return user info and trial status
@@ -233,11 +223,35 @@ async def login(response: Response, user_in: UserLogin, db: AsyncSession = Depen
     }
 
 
+def get_cookie_kwargs():
+    """Get cookie kwargs based on environment (production vs development)."""
+    is_production = settings.ADMIN_EMAIL == "ace.tech.gg@gmail.com"
+    if is_production:
+        return {
+            "httponly": True,
+            "path": "/",
+            "secure": True,
+            "samesite": "none",
+            "domain": ".orpheuscore.uk"
+        }
+    else:
+        return {
+            "httponly": True,
+            "path": "/",
+            "secure": False,
+            "samesite": "lax"
+        }
+
+
 @router.post("/logout")
 async def logout(response: Response, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Logout and clear cookies."""
-    response.delete_cookie("access_token", path="/")
-    response.delete_cookie("refresh_token", path="/")
+    is_production = settings.ADMIN_EMAIL == "ace.tech.gg@gmail.com"
+    delete_kwargs = {"path": "/"}
+    if is_production:
+        delete_kwargs["domain"] = ".orpheuscore.uk"
+    response.delete_cookie("access_token", **delete_kwargs)
+    response.delete_cookie("refresh_token", **delete_kwargs)
     return {"message": "Logged out"}
 
 
@@ -271,15 +285,12 @@ async def refresh(request: Request, response: Response, db: AsyncSession = Depen
     access_token = create_access_token(subject=stored_token.user_id, expires_delta=timedelta(days=token_days))
     cookie_seconds = token_days * 24 * 60 * 60
 
-    is_secure = False  # Set to True when using HTTPS in production
+    cookie_kwargs = get_cookie_kwargs()
     response.set_cookie(
         key="access_token",
         value=access_token,
-        httponly=True,
-        secure=is_secure,
-        samesite="lax",
-        path="/",  # Ensure cookie works across all routes
-        max_age=cookie_seconds
+        max_age=cookie_seconds,
+        **cookie_kwargs
     )
 
     return {"message": "Token refreshed", "trial": trial_info}
