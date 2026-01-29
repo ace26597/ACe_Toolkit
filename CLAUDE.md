@@ -257,6 +257,8 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
+| 2026-01-29 | **FIX: Admin Dashboard** - Cross-subdomain cookie support (domain=.orpheuscore.uk, samesite=none) |
+| 2026-01-29 | **FIX: Frontend API URL** - Changed to https://api.orpheuscore.uk for production builds |
 | 2026-01-29 | **MIGRATION: User Scope Extensions** - All MCP, skills, agents, plugins moved to ~/.claude/ for global access |
 | 2026-01-29 | **Cleanup:** Removed project-scope duplicates (.mcp.json, .claude/skills/, .claude/agents/) |
 | 2026-01-28 | **NEW: Remotion Video Studio** - Real PTY terminal for video creation with full Claude access |

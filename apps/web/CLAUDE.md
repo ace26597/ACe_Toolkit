@@ -423,9 +423,14 @@ apps/web/data/ccresearch/
 **File:** `apps/web/.env.local`
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-# Production: https://api.orpheuscore.uk
+# Production (deployed on Raspberry Pi via Cloudflare tunnel)
+NEXT_PUBLIC_API_BASE_URL=https://api.orpheuscore.uk
+
+# Development (local only - change when testing locally)
+# NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 ```
+
+**IMPORTANT:** This URL is baked into the Next.js build. After changing, you must rebuild (`npm run build`).
 
 ---
 

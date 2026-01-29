@@ -566,7 +566,11 @@ The following modules were removed during cleanup:
 
 - All authenticated endpoints require `credentials: 'include'` in fetch
 - Cookies are HTTP-only (not JS accessible)
-- Access tokens expire in 15 minutes, refresh handles renewal
+- **Cookie Configuration (Production vs Development):**
+  - Production: `secure=True`, `samesite=none`, `domain=.orpheuscore.uk`
+  - Development: `secure=False`, `samesite=lax`, no domain
+  - Cross-subdomain support: orpheuscore.uk ↔ api.orpheuscore.uk
+- Access tokens expire based on user type (30 days approved, 1 day trial)
 - AACT passwords with special chars need `quote_plus()` encoding
 - Session rename updates DB only, not filesystem (preserves `--continue`)
 - Project names sanitized with hyphens (not spaces) for directory compatibility
