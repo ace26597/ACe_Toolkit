@@ -102,8 +102,8 @@ export default function Home() {
               </span>
             </h1>
             <p className="text-lg text-slate-400 mb-6 max-w-2xl">
-              Full terminal access to scientific research tools, MCP servers, and plugins.
-              Drug discovery, clinical trials, genomics, and more.
+              Full terminal access to research tools, MCP servers, and plugins.
+              Data analysis, document generation, web research, and more.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               {user ? (
@@ -147,8 +147,8 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-2">
               <Database className="w-4 h-4 text-amber-400" />
-              <span className="text-white font-medium">566K+</span>
-              <span className="text-slate-500">Clinical Trials</span>
+              <span className="text-white font-medium">30+</span>
+              <span className="text-slate-500">Databases</span>
             </div>
             <Link href="/directory" className="text-blue-400 hover:text-blue-300 ml-auto hidden md:flex items-center gap-1">
               Browse all <ChevronRight className="w-4 h-4" />
@@ -216,15 +216,15 @@ export default function Home() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-2">
             {[
-              { icon: '🔬', name: 'PubMed', desc: 'Biomedical literature' },
-              { icon: '💊', name: 'ChEMBL', desc: '2.4M+ compounds' },
-              { icon: '🏥', name: 'Clinical Trials', desc: '566K+ studies' },
-              { icon: '🧬', name: 'UniProt', desc: 'Protein sequences' },
-              { icon: '📋', name: 'ICD-10', desc: 'Medical codes' },
+              { icon: '📊', name: 'Data Analysis', desc: 'Pandas, Plotly, stats' },
+              { icon: '📄', name: 'Document Gen', desc: 'DOCX, PDF, PPTX, XLSX' },
+              { icon: '🔍', name: 'Web Search', desc: 'Research & citations' },
               { icon: '🤗', name: 'HuggingFace', desc: 'ML models & datasets' },
-              { icon: '📄', name: 'Document Gen', desc: 'DOCX, PDF, PPTX' },
-              { icon: '📊', name: 'Data Analysis', desc: 'Pandas, Plotly' },
-              { icon: '🎬', name: 'Remotion', desc: 'Video creation' },
+              { icon: '🎬', name: 'Remotion', desc: 'Video generation' },
+              { icon: '💻', name: 'Code Tools', desc: 'Git, npm, testing' },
+              { icon: '🔬', name: 'Scientific DBs', desc: 'PubMed, ChEMBL, more' },
+              { icon: '🏥', name: 'Clinical Data', desc: 'Trials, NPI, ICD-10' },
+              { icon: '🧠', name: 'AI Agents', desc: 'Custom workflows' },
             ].map((item, i) => (
               <div key={i} className="flex items-center gap-3 py-2 border-b border-slate-800/50 last:border-0">
                 <span className="text-lg">{item.icon}</span>
@@ -253,9 +253,9 @@ export default function Home() {
 
           <div className="space-y-2">
             {[
-              { icon: <Video className="w-4 h-4 text-violet-400" />, title: 'AI-Generated Explainer Videos', tag: 'Remotion', desc: 'Claude researched, scripted, and rendered videos' },
-              { icon: <Database className="w-4 h-4 text-amber-400" />, title: 'Clinical Trials Analysis', tag: 'AACT', desc: '917 Parkinson\'s trials analyzed' },
-              { icon: <FileText className="w-4 h-4 text-cyan-400" />, title: 'Deep Research Dossier', tag: 'Research', desc: '100KB+ comprehensive analysis' },
+              { icon: <Video className="w-4 h-4 text-violet-400" />, title: 'AI-Generated Explainer Videos', tag: 'Video', desc: 'Claude researched, scripted, and rendered' },
+              { icon: <FileText className="w-4 h-4 text-cyan-400" />, title: 'Automated Data Reports', tag: 'Analysis', desc: 'CSV to insights in minutes' },
+              { icon: <Sparkles className="w-4 h-4 text-amber-400" />, title: 'Research Documents', tag: 'Docs', desc: 'DOCX, PDF with citations' },
             ].map((item, i) => (
               <Link key={i} href="/showcase" className="flex items-center gap-4 p-3 rounded-lg hover:bg-slate-900/50 transition-colors group">
                 <div className="w-8 h-8 rounded-md bg-slate-800 flex items-center justify-center flex-shrink-0">
