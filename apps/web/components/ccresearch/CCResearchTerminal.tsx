@@ -344,7 +344,7 @@ export default function CCResearchTerminal({
       <div className="absolute top-2 right-2 z-10">
         <div className="flex items-center gap-2 bg-black/70 px-3 py-1 rounded-md text-xs">
           <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-          <span className="text-gray-300">
+          <span className="text-slate-300">
             {connected ? 'Connected' : 'Disconnected'}
           </span>
         </div>

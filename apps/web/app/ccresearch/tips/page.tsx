@@ -45,13 +45,13 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
   return (
     <button
       onClick={handleCopy}
-      className="p-1.5 rounded hover:bg-gray-700 transition-colors"
+      className="p-1.5 rounded hover:bg-slate-700 transition-colors"
       title="Copy"
     >
       {copied ? (
         <Check className="w-4 h-4 text-green-400" />
       ) : (
-        <Copy className="w-4 h-4 text-gray-400" />
+        <Copy className="w-4 h-4 text-slate-400" />
       )}
     </button>
   );
@@ -59,7 +59,7 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
 
 // Code block component
 const CodeBlock: React.FC<{ code: string; language?: string }> = ({ code, language = 'bash' }) => (
-  <div className="bg-gray-900 rounded-lg p-3 font-mono text-sm my-3">
+  <div className="bg-slate-900 rounded-lg p-3 font-mono text-sm my-3">
     <div className="flex items-start justify-between gap-2">
       <code className="text-green-400 whitespace-pre-wrap break-words flex-1">
         {code}
@@ -95,7 +95,7 @@ const TipCard: React.FC<{
         </div>
         <div className="flex-1">
           <h4 className="font-semibold text-white mb-2">{title}</h4>
-          <div className="text-gray-300 text-sm space-y-2">
+          <div className="text-slate-300 text-sm space-y-2">
             {children}
           </div>
         </div>
@@ -115,18 +115,18 @@ const Section: React.FC<{
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl overflow-hidden">
+    <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl overflow-hidden">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full p-4 flex items-center justify-between hover:bg-gray-800/50 transition-colors"
+        className="w-full p-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className={`p-2 bg-gray-700/50 rounded-lg ${iconColor}`}>
+          <div className={`p-2 bg-slate-700/50 rounded-lg ${iconColor}`}>
             {icon}
           </div>
           <h3 className="text-lg font-semibold text-white">{title}</h3>
         </div>
-        {isOpen ? <ChevronDown className="w-5 h-5 text-gray-400" /> : <ChevronRight className="w-5 h-5 text-gray-400" />}
+        {isOpen ? <ChevronDown className="w-5 h-5 text-slate-400" /> : <ChevronRight className="w-5 h-5 text-slate-400" />}
       </button>
       {isOpen && (
         <div className="p-4 pt-0 space-y-4">
@@ -140,24 +140,24 @@ const Section: React.FC<{
 // Main page component
 export default function TipsPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
                 href="/workspace"
-                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
               >
-                <ArrowLeft className="w-5 h-5 text-gray-400" />
+                <ArrowLeft className="w-5 h-5 text-slate-400" />
               </Link>
               <div>
                 <h1 className="text-xl font-bold text-white flex items-center gap-2">
                   <BookOpen className="w-6 h-6 text-amber-400" />
                   C3 Researcher Workspace Tips
                 </h1>
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-slate-400">
                   Get the most out of Claude Code with these prompting tips
                 </p>
               </div>
@@ -175,7 +175,7 @@ export default function TipsPage() {
             <Terminal className="w-6 h-6 text-blue-400" />
             How Claude Code Works
           </h2>
-          <div className="text-gray-300 space-y-3">
+          <div className="text-slate-300 space-y-3">
             <p>
               Claude Code is an <strong>agentic coding assistant</strong> that runs in your terminal. Unlike chat interfaces,
               it can <strong>read files, execute commands, search code, and make changes</strong> directly in your workspace.
@@ -189,7 +189,7 @@ export default function TipsPage() {
               <li>Execute actions (edit files, run commands)</li>
               <li>Verify results and iterate if needed</li>
             </ol>
-            <p className="text-sm text-gray-400 mt-3">
+            <p className="text-sm text-slate-400 mt-3">
               In CCResearch sessions, Claude has access to 145+ scientific skills, 34 MCP servers, and 14 plugins.
             </p>
           </div>
@@ -215,10 +215,10 @@ export default function TipsPage() {
           <TipCard title="Use Thinking Keywords for Complex Tasks" icon={<Brain className="w-5 h-5" />}>
             <p>For complex problems, use keywords to allocate more computational resources:</p>
             <ul className="list-disc list-inside mt-2 space-y-1">
-              <li><code className="bg-gray-800 px-1.5 rounded text-amber-300">think</code> - Standard analysis</li>
-              <li><code className="bg-gray-800 px-1.5 rounded text-amber-300">think hard</code> - Deeper reasoning</li>
-              <li><code className="bg-gray-800 px-1.5 rounded text-amber-300">think harder</code> - Extended analysis</li>
-              <li><code className="bg-gray-800 px-1.5 rounded text-amber-300">ultrathink</code> - Maximum reasoning effort</li>
+              <li><code className="bg-slate-800 px-1.5 rounded text-amber-300">think</code> - Standard analysis</li>
+              <li><code className="bg-slate-800 px-1.5 rounded text-amber-300">think hard</code> - Deeper reasoning</li>
+              <li><code className="bg-slate-800 px-1.5 rounded text-amber-300">think harder</code> - Extended analysis</li>
+              <li><code className="bg-slate-800 px-1.5 rounded text-amber-300">ultrathink</code> - Maximum reasoning effort</li>
             </ul>
             <CodeBlock code="Think hard about the best architecture for a real-time data pipeline that needs to handle 10k events/second" />
           </TipCard>
@@ -257,8 +257,8 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
             <CodeBlock code="/pubmed search for CRISPR gene editing papers from 2024" />
             <CodeBlock code="/chembl find compounds that target EGFR with IC50 &lt; 100nM" />
             <CodeBlock code="/aact query clinical trials for pembrolizumab in lung cancer" />
-            <p className="text-gray-400 text-xs mt-2">
-              Type <code className="bg-gray-800 px-1 rounded">/</code> to see available skills, or ask Claude what skills are available.
+            <p className="text-slate-400 text-xs mt-2">
+              Type <code className="bg-slate-800 px-1 rounded">/</code> to see available skills, or ask Claude what skills are available.
             </p>
           </TipCard>
 
@@ -313,7 +313,7 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
               Context is like milk - it's best served fresh. As conversations get longer, performance can degrade.
             </p>
             <ul className="list-disc list-inside mt-2 space-y-1">
-              <li>Use <code className="bg-gray-800 px-1.5 rounded text-cyan-300">/clear</code> to start fresh between unrelated tasks</li>
+              <li>Use <code className="bg-slate-800 px-1.5 rounded text-cyan-300">/clear</code> to start fresh between unrelated tasks</li>
               <li>Create handoff notes before switching topics</li>
               <li>Keep conversations focused on one goal</li>
             </ul>
@@ -322,7 +322,7 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
           <TipCard title="Let Claude Read Files First" icon={<FileText className="w-5 h-5" />}>
             <p>Before asking Claude to modify code, let it understand the context:</p>
             <CodeBlock code="Read the files in src/auth/ and understand how authentication works before making any changes" />
-            <p className="text-gray-400 text-xs mt-2">
+            <p className="text-slate-400 text-xs mt-2">
               This prevents Claude from making assumptions and improves the quality of changes.
             </p>
           </TipCard>
@@ -347,9 +347,9 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
             <p>Vague prompts lead to misunderstandings and wasted iterations:</p>
             <div className="mt-2 space-y-1">
               <p className="text-red-400 text-xs">AVOID:</p>
-              <p className="text-gray-400 italic">"Fix the bug"</p>
-              <p className="text-gray-400 italic">"Make it better"</p>
-              <p className="text-gray-400 italic">"Add some tests"</p>
+              <p className="text-slate-400 italic">"Fix the bug"</p>
+              <p className="text-slate-400 italic">"Make it better"</p>
+              <p className="text-slate-400 italic">"Add some tests"</p>
             </div>
             <p className="mt-2">Instead, describe what bug, what aspect to improve, or what tests to add.</p>
           </TipCard>
@@ -357,7 +357,7 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
           <TipCard title="Don't Skip File Specification" type="warning" icon={<AlertTriangle className="w-5 h-5" />}>
             <p>Explicitly mention which files Claude should work with:</p>
             <CodeBlock code="Edit src/components/UserProfile.tsx to add a loading state" />
-            <p className="text-gray-400 text-xs mt-2">
+            <p className="text-slate-400 text-xs mt-2">
               Without file paths, Claude may work on the wrong files.
             </p>
           </TipCard>
@@ -365,8 +365,8 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
           <TipCard title="Don't Let Context Bloat" type="warning" icon={<AlertTriangle className="w-5 h-5" />}>
             <p>Long conversations accumulate irrelevant context that can degrade performance:</p>
             <ul className="list-disc list-inside mt-2 space-y-1">
-              <li>Use <code className="bg-gray-800 px-1.5 rounded">/clear</code> between tasks</li>
-              <li>Use <code className="bg-gray-800 px-1.5 rounded">/compact</code> to summarize and reduce context</li>
+              <li>Use <code className="bg-slate-800 px-1.5 rounded">/clear</code> between tasks</li>
+              <li>Use <code className="bg-slate-800 px-1.5 rounded">/compact</code> to summarize and reduce context</li>
               <li>Start new sessions for unrelated work</li>
             </ul>
           </TipCard>
@@ -390,37 +390,37 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
           iconColor="text-blue-400"
         >
           <div className="grid md:grid-cols-2 gap-3">
-            <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="bg-slate-900/50 rounded-lg p-3">
               <code className="text-cyan-400">/help</code>
-              <p className="text-gray-400 text-xs mt-1">Show all available commands</p>
+              <p className="text-slate-400 text-xs mt-1">Show all available commands</p>
             </div>
-            <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="bg-slate-900/50 rounded-lg p-3">
               <code className="text-cyan-400">/clear</code>
-              <p className="text-gray-400 text-xs mt-1">Clear conversation history</p>
+              <p className="text-slate-400 text-xs mt-1">Clear conversation history</p>
             </div>
-            <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="bg-slate-900/50 rounded-lg p-3">
               <code className="text-cyan-400">/compact</code>
-              <p className="text-gray-400 text-xs mt-1">Summarize and reduce context</p>
+              <p className="text-slate-400 text-xs mt-1">Summarize and reduce context</p>
             </div>
-            <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="bg-slate-900/50 rounded-lg p-3">
               <code className="text-cyan-400">/mcp</code>
-              <p className="text-gray-400 text-xs mt-1">List MCP servers and tools</p>
+              <p className="text-slate-400 text-xs mt-1">List MCP servers and tools</p>
             </div>
-            <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="bg-slate-900/50 rounded-lg p-3">
               <code className="text-cyan-400">/skills</code>
-              <p className="text-gray-400 text-xs mt-1">List available skills</p>
+              <p className="text-slate-400 text-xs mt-1">List available skills</p>
             </div>
-            <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="bg-slate-900/50 rounded-lg p-3">
               <code className="text-cyan-400">/usage</code>
-              <p className="text-gray-400 text-xs mt-1">Check token usage and limits</p>
+              <p className="text-slate-400 text-xs mt-1">Check token usage and limits</p>
             </div>
-            <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="bg-slate-900/50 rounded-lg p-3">
               <code className="text-cyan-400">/doctor</code>
-              <p className="text-gray-400 text-xs mt-1">Diagnose configuration issues</p>
+              <p className="text-slate-400 text-xs mt-1">Diagnose configuration issues</p>
             </div>
-            <div className="bg-gray-900/50 rounded-lg p-3">
+            <div className="bg-slate-900/50 rounded-lg p-3">
               <code className="text-cyan-400">Escape key</code>
-              <p className="text-gray-400 text-xs mt-1">Interrupt Claude's current action</p>
+              <p className="text-slate-400 text-xs mt-1">Interrupt Claude's current action</p>
             </div>
           </div>
         </Section>
@@ -429,7 +429,7 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
         <Section
           title="Using on Mobile Devices"
           icon={<Smartphone className="w-5 h-5" />}
-          iconColor="text-emerald-400"
+          iconColor="text-blue-400"
         >
           <TipCard title="Mobile Navigation" icon={<Menu className="w-5 h-5" />}>
             <p>C3 Researcher Workspace is fully responsive for iPhone, Android, and iPad:</p>
@@ -469,7 +469,7 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
               <li>Terminal mode (Claude Code or SSH)</li>
               <li>File browser visibility</li>
             </ul>
-            <p className="text-gray-400 text-xs mt-2">
+            <p className="text-slate-400 text-xs mt-2">
               Switching tabs keeps the terminal connected - no need to restart sessions.
             </p>
           </TipCard>
@@ -482,35 +482,35 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
           iconColor="text-pink-400"
         >
           <div className="space-y-3">
-            <div className="bg-gray-900/50 rounded-lg p-4">
-              <p className="text-sm text-gray-400 mb-2">Scientific Literature Review</p>
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <p className="text-sm text-slate-400 mb-2">Scientific Literature Review</p>
               <CodeBlock code="Search PubMed for recent papers on CRISPR base editing. Summarize the top 5 papers, extract key methods, and create a comparison table." />
             </div>
 
-            <div className="bg-gray-900/50 rounded-lg p-4">
-              <p className="text-sm text-gray-400 mb-2">Drug Discovery Research</p>
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <p className="text-sm text-slate-400 mb-2">Drug Discovery Research</p>
               <CodeBlock code="Use ChEMBL to find all known inhibitors of JAK2. Filter for IC50 < 100nM, then analyze their structural features and create a summary report." />
             </div>
 
-            <div className="bg-gray-900/50 rounded-lg p-4">
-              <p className="text-sm text-gray-400 mb-2">Clinical Trials Analysis</p>
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <p className="text-sm text-slate-400 mb-2">Clinical Trials Analysis</p>
               <CodeBlock code="Query ClinicalTrials.gov for Phase 3 trials of checkpoint inhibitors in melanoma. Create a table comparing primary endpoints, enrollment status, and sponsors." />
             </div>
 
-            <div className="bg-gray-900/50 rounded-lg p-4">
-              <p className="text-sm text-gray-400 mb-2">Data Analysis</p>
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <p className="text-sm text-slate-400 mb-2">Data Analysis</p>
               <CodeBlock code="Read the CSV file I uploaded. Perform exploratory data analysis, identify correlations, and create visualizations. Save the report as analysis_report.md." />
             </div>
 
-            <div className="bg-gray-900/50 rounded-lg p-4">
-              <p className="text-sm text-gray-400 mb-2">Code Generation</p>
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <p className="text-sm text-slate-400 mb-2">Code Generation</p>
               <CodeBlock code="Create a Python script that processes the protein sequences in sequences.fasta, calculates molecular weights, and outputs results to a CSV file." />
             </div>
           </div>
         </Section>
 
         {/* Footer */}
-        <div className="mt-12 text-center text-gray-500 text-sm">
+        <div className="mt-12 text-center text-slate-500 text-sm">
           <p>
             These tips are compiled from Anthropic's official best practices and community experience.
           </p>

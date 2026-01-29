@@ -63,7 +63,7 @@ const getFileIcon = (name: string, isDir: boolean) => {
     case 'md':
     case 'txt':
     case 'log':
-      return <FileText className="w-4 h-4 text-gray-400" />;
+      return <FileText className="w-4 h-4 text-slate-400" />;
     case 'png':
     case 'jpg':
     case 'jpeg':
@@ -78,7 +78,7 @@ const getFileIcon = (name: string, isDir: boolean) => {
     case 'pdf':
       return <File className="w-4 h-4 text-red-400" />;
     default:
-      return <File className="w-4 h-4 text-gray-400" />;
+      return <File className="w-4 h-4 text-slate-400" />;
   }
 };
 
@@ -276,12 +276,12 @@ export default function FileBrowser({
   const breadcrumbs = currentPath ? currentPath.split('/') : [];
 
   return (
-    <div className="h-full flex flex-col bg-gray-900/50 rounded-lg border border-gray-700">
+    <div className="h-full flex flex-col bg-slate-900/50 rounded-lg border border-slate-700">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700 bg-gray-800/50">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-slate-700 bg-slate-800/50">
         <div className="flex items-center gap-2 text-sm">
           <Folder className="w-4 h-4 text-yellow-400" />
-          <span className="text-gray-300 font-medium">Files</span>
+          <span className="text-slate-300 font-medium">Files</span>
           {isAutoRefreshing && (
             <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" title="Auto-refreshing" />
           )}
@@ -290,16 +290,16 @@ export default function FileBrowser({
           {onCloneRepo && (
             <button
               onClick={() => setShowCloneModal(true)}
-              className="p-1 hover:bg-gray-700/50 rounded transition-colors"
+              className="p-1 hover:bg-slate-700/50 rounded transition-colors"
               title="Clone GitHub repo"
             >
-              <Github className="w-4 h-4 text-gray-400 hover:text-white" />
+              <Github className="w-4 h-4 text-slate-400 hover:text-white" />
             </button>
           )}
           {onUpload && (
             <button
               onClick={() => setShowUploadModal(true)}
-              className="p-1 hover:bg-gray-700/50 rounded transition-colors"
+              className="p-1 hover:bg-slate-700/50 rounded transition-colors"
               title="Upload files"
             >
               <Upload className="w-4 h-4 text-blue-400" />
@@ -307,28 +307,28 @@ export default function FileBrowser({
           )}
           <button
             onClick={() => loadFiles(currentPath)}
-            className="p-1 hover:bg-gray-700/50 rounded transition-colors"
+            className="p-1 hover:bg-slate-700/50 rounded transition-colors"
             title="Refresh"
           >
-            <RefreshCw className={`w-4 h-4 text-gray-400 ${isLoading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-4 h-4 text-slate-400 ${isLoading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
       {/* Breadcrumb Navigation */}
-      <div className="flex items-center gap-1 px-3 py-2 text-xs bg-gray-800/30 border-b border-gray-700/50 overflow-x-auto">
+      <div className="flex items-center gap-1 px-3 py-2 text-xs bg-slate-800/30 border-b border-slate-700/50 overflow-x-auto">
         <button
           onClick={() => loadFiles('')}
-          className="flex items-center gap-1 px-2 py-1 hover:bg-gray-700/50 rounded transition-colors text-gray-400 hover:text-gray-200"
+          className="flex items-center gap-1 px-2 py-1 hover:bg-slate-700/50 rounded transition-colors text-slate-400 hover:text-gray-200"
         >
           <Home className="w-3 h-3" />
         </button>
         {breadcrumbs.map((part, idx) => (
           <React.Fragment key={idx}>
-            <ChevronRight className="w-3 h-3 text-gray-600" />
+            <ChevronRight className="w-3 h-3 text-slate-600" />
             <button
               onClick={() => loadFiles(breadcrumbs.slice(0, idx + 1).join('/'))}
-              className="px-2 py-1 hover:bg-gray-700/50 rounded transition-colors text-gray-400 hover:text-gray-200 truncate max-w-[100px]"
+              className="px-2 py-1 hover:bg-slate-700/50 rounded transition-colors text-slate-400 hover:text-gray-200 truncate max-w-[100px]"
               title={part}
             >
               {part}
@@ -338,7 +338,7 @@ export default function FileBrowser({
         {currentPath && (
           <button
             onClick={navigateUp}
-            className="ml-auto flex items-center gap-1 px-2 py-1 hover:bg-gray-700/50 rounded transition-colors text-gray-400 hover:text-gray-200"
+            className="ml-auto flex items-center gap-1 px-2 py-1 hover:bg-slate-700/50 rounded transition-colors text-slate-400 hover:text-gray-200"
             title="Go up"
           >
             <ArrowUp className="w-3 h-3" />
@@ -350,7 +350,7 @@ export default function FileBrowser({
       <div className="flex-1 overflow-auto">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
-            <RefreshCw className="w-5 h-5 animate-spin text-gray-400" />
+            <RefreshCw className="w-5 h-5 animate-spin text-slate-400" />
           </div>
         ) : error ? (
           <div className="text-center py-8 text-red-400 text-sm">
@@ -363,17 +363,17 @@ export default function FileBrowser({
             </button>
           </div>
         ) : files.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 text-sm">
+          <div className="text-center py-8 text-slate-500 text-sm">
             <File className="w-8 h-8 mx-auto mb-2 opacity-50" />
             <p>No files yet</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-800/50">
+          <div className="divide-y divide-slate-800/50">
             {files.map((file) => (
               <div
                 key={file.path}
                 onClick={() => handleFileClick(file)}
-                className={`flex items-center gap-3 px-3 py-2 hover:bg-gray-800/50 transition-colors ${
+                className={`flex items-center gap-3 px-3 py-2 hover:bg-slate-800/50 transition-colors ${
                   file.is_dir ? 'cursor-pointer' : ''
                 }`}
               >
@@ -384,7 +384,7 @@ export default function FileBrowser({
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-slate-500">
                     {formatSize(file.size)}
                   </span>
                   {!file.is_dir && (
@@ -392,18 +392,18 @@ export default function FileBrowser({
                       {isPreviewable(file.name) && (
                         <button
                           onClick={(e) => previewFile(file, e)}
-                          className="p-1 hover:bg-gray-700 rounded transition-colors"
+                          className="p-1 hover:bg-slate-700 rounded transition-colors"
                           title="Preview"
                         >
-                          <Eye className="w-3.5 h-3.5 text-gray-400 hover:text-blue-400" />
+                          <Eye className="w-3.5 h-3.5 text-slate-400 hover:text-blue-400" />
                         </button>
                       )}
                       <button
                         onClick={(e) => downloadFile(file, e)}
-                        className="p-1 hover:bg-gray-700 rounded transition-colors"
+                        className="p-1 hover:bg-slate-700 rounded transition-colors"
                         title="Download"
                       >
-                        <Download className="w-3.5 h-3.5 text-gray-400 hover:text-green-400" />
+                        <Download className="w-3.5 h-3.5 text-slate-400 hover:text-green-400" />
                       </button>
                     </div>
                   )}
@@ -417,21 +417,21 @@ export default function FileBrowser({
       {/* Preview Modal */}
       {previewContent && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-gray-900 rounded-lg border border-gray-700 w-[90%] max-w-4xl max-h-[80vh] flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+          <div className="bg-slate-900 rounded-lg border border-slate-700 w-[90%] max-w-4xl max-h-[80vh] flex flex-col shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
               <div className="flex items-center gap-2">
                 {getFileIcon(previewContent.name, false)}
                 <span className="text-sm font-medium text-gray-200">{previewContent.name}</span>
               </div>
               <button
                 onClick={() => setPreviewContent(null)}
-                className="p-1 hover:bg-gray-700 rounded transition-colors"
+                className="p-1 hover:bg-slate-700 rounded transition-colors"
               >
-                <X className="w-5 h-5 text-gray-400" />
+                <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
             <div className="flex-1 overflow-auto p-4">
-              <pre className="text-sm text-gray-300 font-mono whitespace-pre-wrap break-words">
+              <pre className="text-sm text-slate-300 font-mono whitespace-pre-wrap break-words">
                 {previewContent.content}
               </pre>
             </div>
@@ -449,8 +449,8 @@ export default function FileBrowser({
       {/* Upload Modal */}
       {showUploadModal && onUpload && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-gray-900 rounded-lg border border-gray-700 w-[90%] max-w-lg shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+          <div className="bg-slate-900 rounded-lg border border-slate-700 w-[90%] max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
               <div className="flex items-center gap-2">
                 <Upload className="w-5 h-5 text-blue-400" />
                 <span className="font-medium text-gray-200">
@@ -463,9 +463,9 @@ export default function FileBrowser({
                   setSelectedFiles([]);
                   setUploadError(null);
                 }}
-                className="p-1 hover:bg-gray-700 rounded transition-colors"
+                className="p-1 hover:bg-slate-700 rounded transition-colors"
               >
-                <X className="w-5 h-5 text-gray-400" />
+                <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
 
@@ -478,7 +478,7 @@ export default function FileBrowser({
                   className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                     uploadMode === 'files'
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                   }`}
                 >
                   <File className="w-4 h-4" />
@@ -490,7 +490,7 @@ export default function FileBrowser({
                   className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                     uploadMode === 'directory'
                       ? 'bg-blue-600 text-white'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
                   }`}
                 >
                   <Folder className="w-4 h-4" />
@@ -499,7 +499,7 @@ export default function FileBrowser({
               </div>
 
               {/* Drop Zone */}
-              <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
+              <div className="border-2 border-dashed border-slate-700 rounded-lg p-6 text-center hover:border-blue-500 transition-colors">
                 {uploadMode === 'files' ? (
                   <>
                     <input
@@ -510,9 +510,9 @@ export default function FileBrowser({
                       id="fb-file-upload"
                     />
                     <label htmlFor="fb-file-upload" className="cursor-pointer">
-                      <Upload className="w-8 h-8 mx-auto text-gray-500 mb-2" />
-                      <p className="text-sm text-gray-300">Click to select files</p>
-                      <p className="text-xs text-gray-500 mt-1">ZIP files will be auto-extracted</p>
+                      <Upload className="w-8 h-8 mx-auto text-slate-500 mb-2" />
+                      <p className="text-sm text-slate-300">Click to select files</p>
+                      <p className="text-xs text-slate-500 mt-1">ZIP files will be auto-extracted</p>
                     </label>
                   </>
                 ) : (
@@ -525,9 +525,9 @@ export default function FileBrowser({
                       id="fb-directory-upload"
                     />
                     <label htmlFor="fb-directory-upload" className="cursor-pointer">
-                      <FolderOpen className="w-8 h-8 mx-auto text-gray-500 mb-2" />
-                      <p className="text-sm text-gray-300">Click to select directory</p>
-                      <p className="text-xs text-gray-500 mt-1">All files will be uploaded</p>
+                      <FolderOpen className="w-8 h-8 mx-auto text-slate-500 mb-2" />
+                      <p className="text-sm text-slate-300">Click to select directory</p>
+                      <p className="text-xs text-slate-500 mt-1">All files will be uploaded</p>
                     </label>
                   </>
                 )}
@@ -537,23 +537,23 @@ export default function FileBrowser({
               {selectedFiles.length > 0 && (
                 <div className="space-y-2 max-h-32 overflow-y-auto">
                   {selectedFiles.map((file, index) => (
-                    <div key={index} className="flex items-center justify-between bg-gray-800 px-3 py-2 rounded-lg">
+                    <div key={index} className="flex items-center justify-between bg-slate-800 px-3 py-2 rounded-lg">
                       <div className="flex items-center gap-2 min-w-0">
                         {file.name.toLowerCase().endsWith('.zip') ? (
                           <Archive className="w-4 h-4 text-amber-400 flex-shrink-0" />
                         ) : (
                           <File className="w-4 h-4 text-blue-400 flex-shrink-0" />
                         )}
-                        <span className="text-sm text-gray-300 truncate">
+                        <span className="text-sm text-slate-300 truncate">
                           {(file as any).webkitRelativePath || file.name}
                         </span>
-                        <span className="text-xs text-gray-500 flex-shrink-0">
+                        <span className="text-xs text-slate-500 flex-shrink-0">
                           ({(file.size / 1024).toFixed(1)} KB)
                         </span>
                       </div>
                       <button
                         onClick={() => removeSelectedFile(index)}
-                        className="p-1 hover:bg-gray-700 rounded flex-shrink-0"
+                        className="p-1 hover:bg-slate-700 rounded flex-shrink-0"
                       >
                         <X className="w-3.5 h-3.5 text-red-400" />
                       </button>
@@ -571,21 +571,21 @@ export default function FileBrowser({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-700">
+            <div className="flex justify-end gap-2 px-4 py-3 border-t border-slate-700">
               <button
                 onClick={() => {
                   setShowUploadModal(false);
                   setSelectedFiles([]);
                   setUploadError(null);
                 }}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleUpload}
                 disabled={selectedFiles.length === 0 || isUploading}
-                className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg transition-colors flex items-center gap-2"
+                className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg transition-colors flex items-center gap-2"
               >
                 {isUploading ? (
                   <>
@@ -607,8 +607,8 @@ export default function FileBrowser({
       {/* Clone Repo Modal */}
       {showCloneModal && onCloneRepo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-gray-900 rounded-lg border border-gray-700 w-[90%] max-w-md shadow-2xl">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+          <div className="bg-slate-900 rounded-lg border border-slate-700 w-[90%] max-w-md shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-700">
               <div className="flex items-center gap-2">
                 <Github className="w-5 h-5 text-white" />
                 <span className="font-medium text-gray-200">Clone GitHub Repository</span>
@@ -620,22 +620,22 @@ export default function FileBrowser({
                   setCloneBranch('');
                   setCloneError(null);
                 }}
-                className="p-1 hover:bg-gray-700 rounded transition-colors"
+                className="p-1 hover:bg-slate-700 rounded transition-colors"
               >
-                <X className="w-5 h-5 text-gray-400" />
+                <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
 
             <div className="p-4 space-y-4">
               {/* Target path info */}
-              <div className="text-xs text-gray-400 flex items-center gap-2">
+              <div className="text-xs text-slate-400 flex items-center gap-2">
                 <Folder className="w-3.5 h-3.5" />
-                Cloning to: <span className="text-gray-300">/{currentPath || 'data'}/</span>
+                Cloning to: <span className="text-slate-300">/{currentPath || 'data'}/</span>
               </div>
 
               {/* Repo URL */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
                   Repository URL
                 </label>
                 <input
@@ -643,14 +643,14 @@ export default function FileBrowser({
                   value={cloneRepoUrl}
                   onChange={(e) => setCloneRepoUrl(e.target.value)}
                   placeholder="https://github.com/user/repo"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   autoFocus
                 />
               </div>
 
               {/* Branch */}
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center gap-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2 flex items-center gap-2">
                   <GitBranch className="w-4 h-4" />
                   Branch (optional)
                 </label>
@@ -659,7 +659,7 @@ export default function FileBrowser({
                   value={cloneBranch}
                   onChange={(e) => setCloneBranch(e.target.value)}
                   placeholder="main (default)"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
 
@@ -672,7 +672,7 @@ export default function FileBrowser({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end gap-2 px-4 py-3 border-t border-gray-700">
+            <div className="flex justify-end gap-2 px-4 py-3 border-t border-slate-700">
               <button
                 onClick={() => {
                   setShowCloneModal(false);
@@ -680,14 +680,14 @@ export default function FileBrowser({
                   setCloneBranch('');
                   setCloneError(null);
                 }}
-                className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+                className="px-4 py-2 text-sm text-slate-400 hover:text-white transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleClone}
                 disabled={!cloneRepoUrl.trim() || isCloning}
-                className="px-4 py-2 text-sm bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:text-gray-500 text-white rounded-lg transition-colors flex items-center gap-2"
+                className="px-4 py-2 text-sm bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg transition-colors flex items-center gap-2"
               >
                 {isCloning ? (
                   <>

@@ -507,20 +507,20 @@ export default function DirectoryPage() {
   const mcpCategories = [...new Set(mcpServers.map(s => s.category))];
 
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="min-h-screen bg-slate-950">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-40">
+      <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-gray-400 hover:text-white transition-colors">
+            <Link href="/" className="text-slate-400 hover:text-white transition-colors">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <div className="flex items-center gap-2">
-              <BookOpen className="w-6 h-6 text-emerald-500" />
+              <BookOpen className="w-6 h-6 text-blue-500" />
               <span className="text-lg font-bold text-white">Directory</span>
             </div>
           </div>
-          <div className="text-sm text-gray-400">
+          <div className="text-sm text-slate-400">
             {mcpServers.length} MCP Servers • {plugins.length} Plugins • 145+ Skills
           </div>
         </div>
@@ -532,21 +532,21 @@ export default function DirectoryPage() {
           <h1 className="text-3xl font-bold text-white mb-3">
             MCP Servers, Plugins & Skills Directory
           </h1>
-          <p className="text-gray-400 max-w-2xl mx-auto">
+          <p className="text-slate-400 max-w-2xl mx-auto">
             Complete list of everything installed on C3 Researcher with source links and installation commands.
-            Copy configs directly to your <code className="text-emerald-400">claude_desktop_config.json</code>.
+            Copy configs directly to your <code className="text-blue-400">claude_desktop_config.json</code>.
           </p>
         </div>
 
         {/* Search */}
         <div className="relative mb-6">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
           <input
             type="text"
             placeholder="Search MCP servers, plugins, or skills..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-gray-900 border border-gray-800 rounded-lg pl-12 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500"
+            className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-12 pr-4 py-3 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
           />
         </div>
 
@@ -556,8 +556,8 @@ export default function DirectoryPage() {
             onClick={() => setActiveTab('mcp')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
               activeTab === 'mcp'
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                : 'bg-gray-900 text-gray-400 border border-gray-800 hover:border-gray-700'
+                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                : 'bg-slate-900 text-slate-400 border border-slate-800 hover:border-slate-700'
             }`}
           >
             <Server className="w-4 h-4" />
@@ -568,7 +568,7 @@ export default function DirectoryPage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
               activeTab === 'plugins'
                 ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                : 'bg-gray-900 text-gray-400 border border-gray-800 hover:border-gray-700'
+                : 'bg-slate-900 text-slate-400 border border-slate-800 hover:border-slate-700'
             }`}
           >
             <Puzzle className="w-4 h-4" />
@@ -579,7 +579,7 @@ export default function DirectoryPage() {
             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
               activeTab === 'skills'
                 ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                : 'bg-gray-900 text-gray-400 border border-gray-800 hover:border-gray-700'
+                : 'bg-slate-900 text-slate-400 border border-slate-800 hover:border-slate-700'
             }`}
           >
             <Zap className="w-4 h-4" />
@@ -596,8 +596,8 @@ export default function DirectoryPage() {
                 onClick={() => setCategoryFilter('all')}
                 className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
                   categoryFilter === 'all'
-                    ? 'bg-emerald-500/20 text-emerald-400'
-                    : 'bg-gray-800 text-gray-400 hover:text-white'
+                    ? 'bg-blue-500/20 text-blue-400'
+                    : 'bg-slate-800 text-slate-400 hover:text-white'
                 }`}
               >
                 All
@@ -608,8 +608,8 @@ export default function DirectoryPage() {
                   onClick={() => setCategoryFilter(cat)}
                   className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
                     categoryFilter === cat
-                      ? 'bg-emerald-500/20 text-emerald-400'
-                      : 'bg-gray-800 text-gray-400 hover:text-white'
+                      ? 'bg-blue-500/20 text-blue-400'
+                      : 'bg-slate-800 text-slate-400 hover:text-white'
                   }`}
                 >
                   {cat}
@@ -619,7 +619,7 @@ export default function DirectoryPage() {
 
             <div className="grid gap-4">
               {filteredMcpServers.map(server => (
-                <div key={server.id} className="bg-gray-900 border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors">
+                <div key={server.id} className="bg-slate-900 border border-slate-800 rounded-lg p-4 hover:border-slate-700 transition-colors">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -630,40 +630,40 @@ export default function DirectoryPage() {
                           server.category === 'Development' ? 'bg-blue-500/20 text-blue-400' :
                           server.category === 'Research' ? 'bg-amber-500/20 text-amber-400' :
                           server.category === 'Finance' ? 'bg-green-500/20 text-green-400' :
-                          'bg-gray-500/20 text-gray-400'
+                          'bg-slate-500/20 text-slate-400'
                         }`}>
                           {server.category}
                         </span>
-                        <span className="text-xs text-gray-500">by {server.provider}</span>
+                        <span className="text-xs text-slate-500">by {server.provider}</span>
                       </div>
-                      <p className="text-gray-400 text-sm mb-3">{server.description}</p>
+                      <p className="text-slate-400 text-sm mb-3">{server.description}</p>
 
                       <div className="flex flex-wrap gap-1 mb-3">
                         {server.tools.slice(0, 5).map(tool => (
-                          <span key={tool} className="px-2 py-0.5 bg-gray-800 text-gray-300 rounded text-xs font-mono">
+                          <span key={tool} className="px-2 py-0.5 bg-slate-800 text-slate-300 rounded text-xs font-mono">
                             {tool}
                           </span>
                         ))}
                         {server.tools.length > 5 && (
-                          <span className="px-2 py-0.5 text-gray-500 text-xs">
+                          <span className="px-2 py-0.5 text-slate-500 text-xs">
                             +{server.tools.length - 5} more
                           </span>
                         )}
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <code className="flex-1 bg-gray-800 px-3 py-1.5 rounded text-sm text-emerald-400 font-mono overflow-x-auto">
+                        <code className="flex-1 bg-slate-800 px-3 py-1.5 rounded text-sm text-blue-400 font-mono overflow-x-auto">
                           {server.install}
                         </code>
                         <button
                           onClick={() => copyToClipboard(server.install, server.id)}
-                          className="p-2 bg-gray-800 hover:bg-gray-700 rounded transition-colors"
+                          className="p-2 bg-slate-800 hover:bg-slate-700 rounded transition-colors"
                           title="Copy install command"
                         >
                           {copiedId === server.id ? (
-                            <Check className="w-4 h-4 text-emerald-400" />
+                            <Check className="w-4 h-4 text-blue-400" />
                           ) : (
-                            <Copy className="w-4 h-4 text-gray-400" />
+                            <Copy className="w-4 h-4 text-slate-400" />
                           )}
                         </button>
                       </div>
@@ -672,10 +672,10 @@ export default function DirectoryPage() {
                       href={server.source}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-2 bg-gray-800 hover:bg-gray-700 rounded transition-colors flex-shrink-0"
+                      className="p-2 bg-slate-800 hover:bg-slate-700 rounded transition-colors flex-shrink-0"
                       title="View source"
                     >
-                      <ExternalLink className="w-4 h-4 text-gray-400" />
+                      <ExternalLink className="w-4 h-4 text-slate-400" />
                     </a>
                   </div>
                 </div>
@@ -688,33 +688,33 @@ export default function DirectoryPage() {
         {activeTab === 'plugins' && (
           <div className="grid gap-4">
             {filteredPlugins.map(plugin => (
-              <div key={plugin.id} className="bg-gray-900 border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors">
+              <div key={plugin.id} className="bg-slate-900 border border-slate-800 rounded-lg p-4 hover:border-slate-700 transition-colors">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="text-lg font-semibold text-white">{plugin.name}</h3>
                       {plugin.skillsCount && (
-                        <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded text-xs">
+                        <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">
                           {plugin.skillsCount}+ skills
                         </span>
                       )}
-                      <span className="text-xs text-gray-500">by {plugin.provider}</span>
+                      <span className="text-xs text-slate-500">by {plugin.provider}</span>
                     </div>
-                    <p className="text-gray-400 text-sm mb-3">{plugin.description}</p>
+                    <p className="text-slate-400 text-sm mb-3">{plugin.description}</p>
 
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 bg-gray-800 px-3 py-1.5 rounded text-sm text-purple-400 font-mono overflow-x-auto">
+                      <code className="flex-1 bg-slate-800 px-3 py-1.5 rounded text-sm text-purple-400 font-mono overflow-x-auto">
                         {plugin.install}
                       </code>
                       <button
                         onClick={() => copyToClipboard(plugin.install, plugin.id)}
-                        className="p-2 bg-gray-800 hover:bg-gray-700 rounded transition-colors"
+                        className="p-2 bg-slate-800 hover:bg-slate-700 rounded transition-colors"
                         title="Copy install command"
                       >
                         {copiedId === plugin.id ? (
-                          <Check className="w-4 h-4 text-emerald-400" />
+                          <Check className="w-4 h-4 text-blue-400" />
                         ) : (
-                          <Copy className="w-4 h-4 text-gray-400" />
+                          <Copy className="w-4 h-4 text-slate-400" />
                         )}
                       </button>
                     </div>
@@ -723,10 +723,10 @@ export default function DirectoryPage() {
                     href={plugin.source}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="p-2 bg-gray-800 hover:bg-gray-700 rounded transition-colors flex-shrink-0"
+                    className="p-2 bg-slate-800 hover:bg-slate-700 rounded transition-colors flex-shrink-0"
                     title="View source"
                   >
-                    <ExternalLink className="w-4 h-4 text-gray-400" />
+                    <ExternalLink className="w-4 h-4 text-slate-400" />
                   </a>
                 </div>
               </div>
@@ -737,16 +737,16 @@ export default function DirectoryPage() {
         {/* Skills Tab */}
         {activeTab === 'skills' && (
           <div className="space-y-4">
-            <p className="text-gray-400 text-sm mb-4">
-              Skills are included via the <span className="text-emerald-400">scientific-skills</span> plugin.
+            <p className="text-slate-400 text-sm mb-4">
+              Skills are included via the <span className="text-blue-400">scientific-skills</span> plugin.
               Use <code className="text-purple-400">/skill-name</code> in Claude Code to invoke them.
             </p>
 
             {skillCategories.map(category => (
-              <div key={category.id} className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+              <div key={category.id} className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
                 <button
                   onClick={() => setExpandedCategory(expandedCategory === category.id ? null : category.id)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-gray-800/50 transition-colors"
+                  className="w-full flex items-center justify-between p-4 hover:bg-slate-800/50 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center text-blue-400">
@@ -754,23 +754,23 @@ export default function DirectoryPage() {
                     </div>
                     <div className="text-left">
                       <h3 className="font-semibold text-white">{category.name}</h3>
-                      <p className="text-sm text-gray-400">{category.count} skills</p>
+                      <p className="text-sm text-slate-400">{category.count} skills</p>
                     </div>
                   </div>
                   {expandedCategory === category.id ? (
-                    <ChevronDown className="w-5 h-5 text-gray-400" />
+                    <ChevronDown className="w-5 h-5 text-slate-400" />
                   ) : (
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                    <ChevronRight className="w-5 h-5 text-slate-400" />
                   )}
                 </button>
 
                 {expandedCategory === category.id && (
-                  <div className="border-t border-gray-800 p-4">
+                  <div className="border-t border-slate-800 p-4">
                     <div className="grid sm:grid-cols-2 gap-2">
                       {category.skills.map(skill => (
-                        <div key={skill.name} className="flex items-center gap-2 p-2 bg-gray-800/50 rounded">
+                        <div key={skill.name} className="flex items-center gap-2 p-2 bg-slate-800/50 rounded">
                           <code className="text-blue-400 text-sm font-mono">/{skill.name}</code>
-                          <span className="text-gray-400 text-sm">- {skill.description}</span>
+                          <span className="text-slate-400 text-sm">- {skill.description}</span>
                         </div>
                       ))}
                     </div>
@@ -782,16 +782,16 @@ export default function DirectoryPage() {
         )}
 
         {/* Config Example */}
-        <div className="mt-12 bg-gray-900 border border-gray-800 rounded-lg p-6">
+        <div className="mt-12 bg-slate-900 border border-slate-800 rounded-lg p-6">
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-            <Terminal className="w-5 h-5 text-emerald-400" />
+            <Terminal className="w-5 h-5 text-blue-400" />
             Example Configuration
           </h2>
-          <p className="text-gray-400 text-sm mb-4">
-            Add MCP servers to your <code className="text-emerald-400">~/.claude.json</code> or project settings:
+          <p className="text-slate-400 text-sm mb-4">
+            Add MCP servers to your <code className="text-blue-400">~/.claude.json</code> or project settings:
           </p>
-          <pre className="bg-gray-800 p-4 rounded-lg overflow-x-auto text-sm">
-            <code className="text-gray-300">{`{
+          <pre className="bg-slate-800 p-4 rounded-lg overflow-x-auto text-sm">
+            <code className="text-slate-300">{`{
   "mcpServers": {
     "biorxiv": {
       "type": "http",
@@ -827,7 +827,7 @@ export default function DirectoryPage() {
     }
   }
 }`, 'config-example')}
-            className="mt-4 flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-lg hover:bg-emerald-500/30 transition-colors"
+            className="mt-4 flex items-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-400 rounded-lg hover:bg-blue-500/30 transition-colors"
           >
             {copiedId === 'config-example' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             Copy Configuration
@@ -840,28 +840,28 @@ export default function DirectoryPage() {
             href="https://github.com/punkpeye/awesome-mcp-servers"
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-gray-900 border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors group"
+            className="bg-slate-900 border border-slate-800 rounded-lg p-4 hover:border-slate-700 transition-colors group"
           >
-            <h3 className="font-semibold text-white group-hover:text-emerald-400 transition-colors">Awesome MCP Servers</h3>
-            <p className="text-sm text-gray-400">Community curated list</p>
+            <h3 className="font-semibold text-white group-hover:text-blue-400 transition-colors">Awesome MCP Servers</h3>
+            <p className="text-sm text-slate-400">Community curated list</p>
           </a>
           <a
             href="https://docs.mcp.deepsense.ai/"
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-gray-900 border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors group"
+            className="bg-slate-900 border border-slate-800 rounded-lg p-4 hover:border-slate-700 transition-colors group"
           >
-            <h3 className="font-semibold text-white group-hover:text-emerald-400 transition-colors">deepsense.ai MCP Docs</h3>
-            <p className="text-sm text-gray-400">Healthcare & Life Sciences</p>
+            <h3 className="font-semibold text-white group-hover:text-blue-400 transition-colors">deepsense.ai MCP Docs</h3>
+            <p className="text-sm text-slate-400">Healthcare & Life Sciences</p>
           </a>
           <a
             href="https://github.com/anthropics/mcp-servers"
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-gray-900 border border-gray-800 rounded-lg p-4 hover:border-gray-700 transition-colors group"
+            className="bg-slate-900 border border-slate-800 rounded-lg p-4 hover:border-slate-700 transition-colors group"
           >
-            <h3 className="font-semibold text-white group-hover:text-emerald-400 transition-colors">Anthropic MCP Servers</h3>
-            <p className="text-sm text-gray-400">Official reference implementations</p>
+            <h3 className="font-semibold text-white group-hover:text-blue-400 transition-colors">Anthropic MCP Servers</h3>
+            <p className="text-sm text-slate-400">Official reference implementations</p>
           </a>
         </div>
       </main>

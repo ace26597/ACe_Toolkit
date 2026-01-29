@@ -241,32 +241,32 @@ export default function ShowcasePage() {
   const selected = showcaseProjects.find(p => p.id === selectedProject);
 
   return (
-    <div className="min-h-screen bg-gray-950">
+    <div className="min-h-screen bg-slate-950">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-950/80 backdrop-blur-sm sticky top-0 z-40">
+      <header className="border-b border-slate-800 bg-slate-950/80 backdrop-blur-sm sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-lg flex items-center justify-center">
               <Cpu className="w-5 h-5 text-white" />
             </div>
             <span className="text-lg font-bold text-white">C3 Researcher</span>
           </Link>
 
           <div className="flex items-center gap-4">
-            <Link href="/" className="text-gray-400 hover:text-white text-sm">
+            <Link href="/" className="text-slate-400 hover:text-white text-sm">
               Home
             </Link>
             {user ? (
               <Link
                 href="/workspace"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
               >
                 Open Workspace
               </Link>
             ) : (
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
               >
                 Try Free
               </button>
@@ -276,16 +276,16 @@ export default function ShowcasePage() {
       </header>
 
       {/* Hero */}
-      <section className="py-12 sm:py-16 border-b border-gray-800">
+      <section className="py-12 sm:py-16 border-b border-slate-800">
         <div className="max-w-6xl mx-auto px-4 text-center">
-          <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-4 py-1.5 mb-6">
-            <Star className="w-4 h-4 text-emerald-400" />
-            <span className="text-emerald-400 text-sm font-medium">Real Projects Built with C3 Researcher</span>
+          <div className="inline-flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 rounded-full px-4 py-1.5 mb-6">
+            <Star className="w-4 h-4 text-blue-400" />
+            <span className="text-blue-400 text-sm font-medium">Real Projects Built with C3 Researcher</span>
           </div>
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4">
             Showcase
           </h1>
-          <p className="text-lg text-gray-400 max-w-2xl mx-auto">
+          <p className="text-lg text-slate-400 max-w-2xl mx-auto">
             See what's possible when Claude Code has access to 145+ skills, 34 MCP servers, and 14 plugins.
             These are real projects created using C3 Researcher.
           </p>
@@ -299,7 +299,7 @@ export default function ShowcasePage() {
           <div>
             <button
               onClick={() => setSelectedProject(null)}
-              className="flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition-colors"
+              className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors"
             >
               <ChevronLeft className="w-4 h-4" />
               Back to all projects
@@ -320,17 +320,17 @@ export default function ShowcasePage() {
                   </div>
                 </div>
 
-                <p className="text-gray-300 text-lg leading-relaxed">
+                <p className="text-slate-300 text-lg leading-relaxed">
                   {selected.longDescription}
                 </p>
 
                 {/* Highlights */}
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-white mb-4">Key Highlights</h3>
                   <ul className="space-y-3">
                     {selected.highlights.map((highlight, i) => (
-                      <li key={i} className="flex items-start gap-3 text-gray-300">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mt-2 flex-shrink-0" />
+                      <li key={i} className="flex items-start gap-3 text-slate-300">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-2 flex-shrink-0" />
                         {highlight}
                       </li>
                     ))}
@@ -338,19 +338,19 @@ export default function ShowcasePage() {
                 </div>
 
                 {/* Outputs */}
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
                   <h3 className="text-lg font-semibold text-white mb-4">Generated Outputs</h3>
                   <div className="space-y-2">
                     {selected.outputs.map((output, i) => (
-                      <div key={i} className="flex items-center justify-between py-2 px-3 bg-gray-800 rounded-lg">
+                      <div key={i} className="flex items-center justify-between py-2 px-3 bg-slate-800 rounded-lg">
                         <div className="flex items-center gap-3">
-                          <FileText className="w-4 h-4 text-gray-500" />
-                          <span className="text-gray-300">{output.name}</span>
+                          <FileText className="w-4 h-4 text-slate-500" />
+                          <span className="text-slate-300">{output.name}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs text-gray-500">{output.type}</span>
+                          <span className="text-xs text-slate-500">{output.type}</span>
                           {output.size && (
-                            <span className="text-xs text-gray-600">{output.size}</span>
+                            <span className="text-xs text-slate-600">{output.size}</span>
                           )}
                         </div>
                       </div>
@@ -363,12 +363,12 @@ export default function ShowcasePage() {
               <div className="space-y-6">
                 {/* Stats */}
                 {selected.stats && (
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                    <h3 className="text-sm font-medium text-gray-400 mb-4">Project Stats</h3>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                    <h3 className="text-sm font-medium text-slate-400 mb-4">Project Stats</h3>
                     <div className="space-y-4">
                       {selected.stats.map((stat, i) => (
                         <div key={i} className="flex justify-between items-center">
-                          <span className="text-gray-400">{stat.label}</span>
+                          <span className="text-slate-400">{stat.label}</span>
                           <span className="text-white font-semibold">{stat.value}</span>
                         </div>
                       ))}
@@ -377,11 +377,11 @@ export default function ShowcasePage() {
                 )}
 
                 {/* Skills Used */}
-                <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                  <h3 className="text-sm font-medium text-gray-400 mb-4">Skills & Tools Used</h3>
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                  <h3 className="text-sm font-medium text-slate-400 mb-4">Skills & Tools Used</h3>
                   <div className="flex flex-wrap gap-2">
                     {selected.skillsUsed.map((skill, i) => (
-                      <span key={i} className="px-2 py-1 bg-emerald-500/10 text-emerald-400 text-xs rounded-lg border border-emerald-500/30">
+                      <span key={i} className="px-2 py-1 bg-blue-500/10 text-blue-400 text-xs rounded-lg border border-blue-500/30">
                         {skill}
                       </span>
                     ))}
@@ -390,11 +390,11 @@ export default function ShowcasePage() {
 
                 {/* MCP Servers */}
                 {selected.mcpServers && selected.mcpServers.length > 0 && (
-                  <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
-                    <h3 className="text-sm font-medium text-gray-400 mb-4">MCP Servers Used</h3>
+                  <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+                    <h3 className="text-sm font-medium text-slate-400 mb-4">MCP Servers Used</h3>
                     <div className="flex flex-wrap gap-2">
                       {selected.mcpServers.map((server, i) => (
-                        <span key={i} className="px-2 py-1 bg-teal-500/10 text-teal-400 text-xs rounded-lg border border-teal-500/30">
+                        <span key={i} className="px-2 py-1 bg-cyan-500/10 text-cyan-400 text-xs rounded-lg border border-cyan-500/30">
                           {server}
                         </span>
                       ))}
@@ -403,22 +403,22 @@ export default function ShowcasePage() {
                 )}
 
                 {/* CTA */}
-                <div className="bg-gradient-to-br from-emerald-900/30 to-teal-900/30 border border-emerald-500/30 rounded-xl p-6 text-center">
+                <div className="bg-gradient-to-br from-blue-900/30 to-cyan-900/30 border border-blue-500/30 rounded-xl p-6 text-center">
                   <h3 className="text-white font-semibold mb-2">Want to build something similar?</h3>
-                  <p className="text-gray-400 text-sm mb-4">
+                  <p className="text-slate-400 text-sm mb-4">
                     Get access to all skills, MCP servers, and plugins.
                   </p>
                   {user ? (
                     <Link
                       href="/workspace"
-                      className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg transition-colors"
+                      className="block w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors"
                     >
                       Open Workspace
                     </Link>
                   ) : (
                     <button
                       onClick={() => setShowLoginModal(true)}
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2 rounded-lg transition-colors"
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition-colors"
                     >
                       Try Free
                     </button>
@@ -434,7 +434,7 @@ export default function ShowcasePage() {
               <button
                 key={project.id}
                 onClick={() => setSelectedProject(project.id)}
-                className="group bg-gray-900 border border-gray-800 rounded-xl p-6 text-left hover:border-gray-700 transition-all hover:scale-[1.02]"
+                className="group bg-slate-900 border border-slate-800 rounded-xl p-6 text-left hover:border-slate-700 transition-all hover:scale-[1.02]"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${iconColors[project.categoryColor]}`}>
@@ -445,11 +445,11 @@ export default function ShowcasePage() {
                   </span>
                 </div>
 
-                <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-emerald-400 transition-colors">
+                <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-blue-400 transition-colors">
                   {project.title}
                 </h3>
 
-                <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                <p className="text-slate-400 text-sm mb-4 line-clamp-2">
                   {project.description}
                 </p>
 
@@ -457,14 +457,14 @@ export default function ShowcasePage() {
                   <div className="flex flex-wrap gap-x-4 gap-y-1 mb-4">
                     {project.stats.slice(0, 2).map((stat, i) => (
                       <div key={i} className="text-xs">
-                        <span className="text-gray-500">{stat.label}: </span>
+                        <span className="text-slate-500">{stat.label}: </span>
                         <span className="text-white font-medium">{stat.value}</span>
                       </div>
                     ))}
                   </div>
                 )}
 
-                <div className="flex items-center text-emerald-400 text-sm">
+                <div className="flex items-center text-blue-400 text-sm">
                   <span>View details</span>
                   <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
                 </div>
@@ -475,12 +475,12 @@ export default function ShowcasePage() {
       </div>
 
       {/* Bottom CTA */}
-      <section className="py-16 border-t border-gray-800 bg-gray-900/30">
+      <section className="py-16 border-t border-slate-800 bg-slate-900/30">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">
             Ready to Build Your Own Projects?
           </h2>
-          <p className="text-gray-400 mb-8 max-w-2xl mx-auto">
+          <p className="text-slate-400 mb-8 max-w-2xl mx-auto">
             All these projects were built using C3 Researcher with Claude Code.
             Get access to the same skills, MCP servers, and plugins for free.
           </p>
@@ -488,7 +488,7 @@ export default function ShowcasePage() {
             {user ? (
               <Link
                 href="/workspace"
-                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 Open Workspace
                 <ChevronRight className="w-5 h-5" />
@@ -496,7 +496,7 @@ export default function ShowcasePage() {
             ) : (
               <button
                 onClick={() => setShowLoginModal(true)}
-                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 Try Free
                 <ChevronRight className="w-5 h-5" />
@@ -504,7 +504,7 @@ export default function ShowcasePage() {
             )}
             <Link
               href="/"
-              className="w-full sm:w-auto border border-gray-700 hover:border-gray-600 text-white font-medium px-8 py-3 rounded-lg transition-colors"
+              className="w-full sm:w-auto border border-slate-700 hover:border-slate-600 text-white font-medium px-8 py-3 rounded-lg transition-colors"
             >
               Learn More
             </Link>
@@ -513,16 +513,16 @@ export default function ShowcasePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-gray-800 py-8">
+      <footer className="border-t border-slate-800 py-8">
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-gradient-to-br from-emerald-500 to-teal-600 rounded flex items-center justify-center">
+              <div className="w-6 h-6 bg-gradient-to-br from-blue-500 to-cyan-600 rounded flex items-center justify-center">
                 <Cpu className="w-4 h-4 text-white" />
               </div>
-              <span className="text-sm text-gray-400">C3 Researcher</span>
+              <span className="text-sm text-slate-400">C3 Researcher</span>
             </div>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-slate-500">
               Real projects. Real capabilities. Try it free.
             </div>
           </div>

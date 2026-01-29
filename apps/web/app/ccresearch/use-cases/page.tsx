@@ -81,7 +81,7 @@ const colorMap: Record<string, string> = {
   cyan: 'text-cyan-400',
   yellow: 'text-yellow-400',
   red: 'text-red-400',
-  emerald: 'text-emerald-400',
+  emerald: 'text-blue-400',
 };
 
 // Copy button component
@@ -97,13 +97,13 @@ const CopyButton: React.FC<{ text: string }> = ({ text }) => {
   return (
     <button
       onClick={handleCopy}
-      className="p-1.5 rounded hover:bg-gray-700 transition-colors"
+      className="p-1.5 rounded hover:bg-slate-700 transition-colors"
       title="Copy prompt"
     >
       {copied ? (
         <Check className="w-4 h-4 text-green-400" />
       ) : (
-        <Copy className="w-4 h-4 text-gray-400" />
+        <Copy className="w-4 h-4 text-slate-400" />
       )}
     </button>
   );
@@ -114,7 +114,7 @@ const ExampleCard: React.FC<{ example: UseCaseExample }> = ({ example }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="bg-gray-800/50 border border-gray-700 rounded-lg overflow-hidden hover:border-blue-500/50 transition-colors">
+    <div className="bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden hover:border-blue-500/50 transition-colors">
       <div className="p-4">
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
@@ -126,7 +126,7 @@ const ExampleCard: React.FC<{ example: UseCaseExample }> = ({ example }) => {
                 </span>
               )}
             </div>
-            <p className="text-sm text-gray-400 mb-3">{example.description}</p>
+            <p className="text-sm text-slate-400 mb-3">{example.description}</p>
 
             {/* Tags */}
             <div className="flex flex-wrap gap-1.5 mb-3">
@@ -146,7 +146,7 @@ const ExampleCard: React.FC<{ example: UseCaseExample }> = ({ example }) => {
                 </span>
               )}
               {example.tags.map(tag => (
-                <span key={tag} className="px-2 py-0.5 text-xs bg-gray-600/50 text-gray-300 rounded">
+                <span key={tag} className="px-2 py-0.5 text-xs bg-slate-600/50 text-slate-300 rounded">
                   {tag}
                 </span>
               ))}
@@ -155,7 +155,7 @@ const ExampleCard: React.FC<{ example: UseCaseExample }> = ({ example }) => {
         </div>
 
         {/* Prompt box */}
-        <div className="bg-gray-900 rounded-lg p-3 font-mono text-sm">
+        <div className="bg-slate-900 rounded-lg p-3 font-mono text-sm">
           <div className="flex items-start justify-between gap-2">
             <code className="text-green-400 whitespace-pre-wrap break-words flex-1">
               {example.prompt}
@@ -169,13 +169,13 @@ const ExampleCard: React.FC<{ example: UseCaseExample }> = ({ example }) => {
           <div className="mt-3">
             <button
               onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors"
+              className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors"
             >
               {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               <span>View example output</span>
             </button>
             {expanded && (
-              <div className="mt-2 bg-gray-900/50 rounded-lg p-3 text-sm text-gray-300 font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
+              <div className="mt-2 bg-slate-900/50 rounded-lg p-3 text-sm text-slate-300 font-mono whitespace-pre-wrap max-h-64 overflow-y-auto">
                 {example.output}
               </div>
             )}
@@ -191,26 +191,26 @@ const CategoryCard: React.FC<{ section: CategorySection; defaultOpen?: boolean }
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   const icon = iconMap[section.icon] || <Database className="w-5 h-5" />;
-  const colorClass = colorMap[section.iconColor] || 'text-gray-400';
+  const colorClass = colorMap[section.iconColor] || 'text-slate-400';
 
   return (
-    <div className="bg-gray-800/30 border border-gray-700/50 rounded-xl overflow-hidden">
+    <div className="bg-slate-800/30 border border-slate-700/50 rounded-xl overflow-hidden">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full p-4 flex items-center justify-between hover:bg-gray-800/50 transition-colors"
+        className="w-full p-4 flex items-center justify-between hover:bg-slate-800/50 transition-colors"
       >
         <div className="flex items-center gap-3">
-          <div className={`p-2 bg-gray-700/50 rounded-lg ${colorClass}`}>
+          <div className={`p-2 bg-slate-700/50 rounded-lg ${colorClass}`}>
             {icon}
           </div>
           <div className="text-left">
             <h3 className="text-lg font-semibold text-white">{section.title}</h3>
-            <p className="text-sm text-gray-400">{section.description}</p>
+            <p className="text-sm text-slate-400">{section.description}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-500">{section.examples.length} examples</span>
-          {isOpen ? <ChevronDown className="w-5 h-5 text-gray-400" /> : <ChevronRight className="w-5 h-5 text-gray-400" />}
+          <span className="text-sm text-slate-500">{section.examples.length} examples</span>
+          {isOpen ? <ChevronDown className="w-5 h-5 text-slate-400" /> : <ChevronRight className="w-5 h-5 text-slate-400" />}
         </div>
       </button>
 
@@ -251,29 +251,29 @@ export default function UseCasesPage() {
   const totalExamples = categories.reduce((sum, cat) => sum + cat.examples.length, 0);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-50">
+      <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
                 href="/workspace"
-                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
               >
-                <ArrowLeft className="w-5 h-5 text-gray-400" />
+                <ArrowLeft className="w-5 h-5 text-slate-400" />
               </Link>
               <div>
                 <h1 className="text-xl font-bold text-white flex items-center gap-2">
                   <Terminal className="w-6 h-6 text-blue-400" />
                   C3 Researcher Use Cases
                 </h1>
-                <p className="text-sm text-gray-400">
+                <p className="text-sm text-slate-400">
                   {totalExamples} example prompts across {categories.length} categories
                 </p>
               </div>
             </div>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-slate-500">
               Updated: {useCasesData.lastUpdated}
             </div>
           </div>
@@ -285,41 +285,41 @@ export default function UseCasesPage() {
         {/* Search Bar */}
         <div className="mb-8">
           <div className="relative max-w-xl">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
             <input
               type="text"
               placeholder="Search examples, skills, MCP servers, plugins..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
+              className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500"
             />
           </div>
         </div>
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-gray-800/30 border border-gray-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center gap-2 text-purple-400 mb-1">
               <Sparkles className="w-4 h-4" />
               <span className="text-sm font-medium">Scientific Skills</span>
             </div>
             <p className="text-2xl font-bold text-white">{stats.totalSkills}+</p>
           </div>
-          <div className="bg-gray-800/30 border border-gray-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center gap-2 text-blue-400 mb-1">
               <Server className="w-4 h-4" />
               <span className="text-sm font-medium">MCP Servers</span>
             </div>
             <p className="text-2xl font-bold text-white">{stats.totalMcpServers}</p>
           </div>
-          <div className="bg-gray-800/30 border border-gray-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center gap-2 text-amber-400 mb-1">
               <Wrench className="w-4 h-4" />
               <span className="text-sm font-medium">Plugins</span>
             </div>
             <p className="text-2xl font-bold text-white">{stats.totalPlugins}</p>
           </div>
-          <div className="bg-gray-800/30 border border-gray-700/50 rounded-lg p-4">
+          <div className="bg-slate-800/30 border border-slate-700/50 rounded-lg p-4">
             <div className="flex items-center gap-2 text-green-400 mb-1">
               <Database className="w-4 h-4" />
               <span className="text-sm font-medium">Databases</span>
@@ -342,14 +342,14 @@ export default function UseCasesPage() {
         {/* No results */}
         {filteredCategories.length === 0 && (
           <div className="text-center py-12">
-            <Search className="w-12 h-12 text-gray-600 mx-auto mb-4" />
+            <Search className="w-12 h-12 text-slate-600 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-white mb-2">No matching examples</h3>
-            <p className="text-gray-400">Try a different search term</p>
+            <p className="text-slate-400">Try a different search term</p>
           </div>
         )}
 
         {/* Footer */}
-        <div className="mt-12 text-center text-gray-500 text-sm">
+        <div className="mt-12 text-center text-slate-500 text-sm">
           <p>
             These examples demonstrate C3 Researcher Workspace capabilities. Copy prompts and use them in the terminal.
           </p>
@@ -357,7 +357,7 @@ export default function UseCasesPage() {
             <span className="text-green-400">Verified</span> examples have been tested and confirmed working.
           </p>
           <p className="mt-4 text-xs">
-            Data source: <code className="bg-gray-800 px-1 rounded">apps/web/data/ccresearch/</code>
+            Data source: <code className="bg-slate-800 px-1 rounded">apps/web/data/ccresearch/</code>
           </p>
         </div>
       </main>
