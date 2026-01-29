@@ -258,7 +258,7 @@ export default function UseCasesPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
-                href="/ccresearch"
+                href="/workspace"
                 className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-400" />
@@ -266,7 +266,7 @@ export default function UseCasesPage() {
               <div>
                 <h1 className="text-xl font-bold text-white flex items-center gap-2">
                   <Terminal className="w-6 h-6 text-blue-400" />
-                  CCResearch Use Cases
+                  C3 Researcher Use Cases
                 </h1>
                 <p className="text-sm text-gray-400">
                   {totalExamples} example prompts across {categories.length} categories
@@ -351,7 +351,7 @@ export default function UseCasesPage() {
         {/* Footer */}
         <div className="mt-12 text-center text-gray-500 text-sm">
           <p>
-            These examples demonstrate CCResearch capabilities. Copy prompts and use them in a CCResearch terminal session.
+            These examples demonstrate C3 Researcher Workspace capabilities. Copy prompts and use them in the terminal.
           </p>
           <p className="mt-2">
             <span className="text-green-400">Verified</span> examples have been tested and confirmed working.

@@ -1,7 +1,7 @@
 # Data Persistence Guide - ACe_Toolkit
 
 **Purpose:** Ensure all user data survives reboots and system restarts
-**Last Updated:** January 13, 2026
+**Last Updated:** January 28, 2026
 
 ---
 
@@ -93,7 +93,7 @@ find /home/ace/dev/ACe_Toolkit/logs -name "*.log" -mtime +30 -delete
 - Rotate keys if exposed
 
 **Current Config:**
-- Domain: `ai.ultronsolar.in` added to CORS
+- Domain: `orpheuscore.uk` added to CORS
 - Database: SQLite (local)
 - Authentication: JWT with refresh tokens
 
@@ -376,6 +376,7 @@ alembic upgrade head
 
 ---
 
-**Last Updated:** January 13, 2026
+**Last Updated:** January 28, 2026
 **Repository:** ACe_Toolkit
 **Deployment:** Raspberry Pi (Local + Cloudflare)
+**Domain:** orpheuscore.uk

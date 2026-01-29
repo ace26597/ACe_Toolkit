@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
 from app.core.config import settings
-from app.routers import auth, ccresearch, workspace, public_api, video_factory, data_studio, data_studio_v2
+from app.routers import auth, ccresearch, workspace, public_api, data_studio, data_studio_v2, video_studio
 from app.core.database import engine
 from app.models.models import Base
 import uuid
@@ -129,8 +129,6 @@ async def create_initial_admin():
             admin_dir.mkdir(parents=True, exist_ok=True)
             # Create projects directory for unified project storage
             (admin_dir / "projects").mkdir(exist_ok=True)
-            # Video Factory still uses its own directory
-            (admin_dir / "video-factory").mkdir(exist_ok=True)
 
             logger.info(f"Admin user created with ID: {admin.id}")
         else:
@@ -233,9 +231,9 @@ app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(ccresearch.router, prefix="/ccresearch", tags=["CCResearch"])
 app.include_router(workspace.router, prefix="/workspace", tags=["Workspace"])
 app.include_router(public_api.router, tags=["Public API"])
-app.include_router(video_factory.router, tags=["Video Factory"])
 app.include_router(data_studio.router, tags=["Data Studio"])
 app.include_router(data_studio_v2.router, tags=["Data Studio V2"])
+app.include_router(video_studio.router, tags=["Video Studio"])
 
 @app.get("/")
 def read_root():

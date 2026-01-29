@@ -85,7 +85,7 @@ df -h | grep T7
 │       │       ├── output/
 │       │       └── .claude/
 │       ├── data-studio-projects/  # Data Studio projects
-│       └── video-factory/
+│       └── video-studio/          # Video Studio projects
 ├── ccresearch-logs/            # Terminal session logs
 └── claude-workspaces/          # Legacy (deprecated)
 ```

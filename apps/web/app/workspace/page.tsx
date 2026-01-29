@@ -1,13 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, ChevronDown, Clock, Download, Terminal, Plus, FileCode, FileJson, Image, Video, Music, FileType, Upload, Table, FileSpreadsheet, Loader2, Lightbulb, Play, Power, Github, Globe, Link as LinkIcon, Key, Database, Server, Sparkles, Wrench, Dna, Pill, Brain, BarChart3, BookOpen, Zap, Copy, Check, ExternalLink, Beaker } from 'lucide-react';
+import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, ChevronDown, Clock, Download, Terminal, Plus, FileCode, FileJson, Image, Video, Music, FileType, Upload, Table, FileSpreadsheet, Loader2, Lightbulb, Play, Power, Github, Globe, Link as LinkIcon, Key, Database, Server, Sparkles, Wrench, Dna, Pill, Brain, BarChart3, BookOpen, Zap, Copy, Check, ExternalLink, Beaker, Menu } from 'lucide-react';
 import Link from 'next/link';
 import { ProtectedRoute, useAuth } from '@/components/auth';
 import ProjectSidebar from '@/components/workspace/ProjectSidebar';
 import DataBrowser from '@/components/workspace/DataBrowser';
 import FileBrowser from '@/components/ccresearch/FileBrowser';
+import { MobileNav, MobileHeader, DrawerOverlay, FileBrowserModal } from '@/components/workspace/MobileNav';
+import { MobileTerminalInput } from '@/components/workspace/MobileTerminalInput';
+import { useIsMobile } from '@/hooks/useWorkspaceState';
 import { workspaceApi, WorkspaceProject, WorkspaceDataItem, getApiUrl } from '@/lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -20,6 +23,9 @@ import mammoth from 'mammoth';
 // Import capabilities data for welcome view
 import capabilitiesData from '@/data/ccresearch/capabilities.json';
 import useCasesData from '@/data/ccresearch/use-cases.json';
+
+// Import handle type for terminal ref
+import type { CCResearchTerminalHandle } from '@/components/ccresearch/CCResearchTerminal';
 
 // Dynamic import for CCResearchTerminal (client-only, xterm.js requires DOM)
 const CCResearchTerminal = dynamic(
@@ -974,6 +980,9 @@ type ViewMode = 'notes' | 'data' | 'terminal';
 const LAST_PROJECT_KEY = 'workspace_last_project';
 
 export default function WorkspacePage() {
+  // Mobile detection
+  const isMobile = useIsMobile(768);
+
   // Projects state
   const [projects, setProjects] = useState<WorkspaceProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
@@ -990,6 +999,10 @@ export default function WorkspacePage() {
   // View mode - default to terminal for quick research start
   const [viewMode, setViewMode] = useState<ViewMode>('terminal');
 
+  // Mobile UI state
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileFileBrowserOpen, setMobileFileBrowserOpen] = useState(false);
+
   // Terminal state
   const { user } = useAuth();
   const [terminalSessionId, setTerminalSessionId] = useState<string | null>(null);
@@ -1000,6 +1013,9 @@ export default function WorkspacePage() {
   const [projectSessions, setProjectSessions] = useState<any[]>([]);
   const [loadingProjectSessions, setLoadingProjectSessions] = useState(false);
   const [showFileBrowser, setShowFileBrowser] = useState(true);
+
+  // Ref for sending input to terminal (for mobile input component)
+  const terminalInputRef = useRef<CCResearchTerminalHandle | null>(null);
 
   // Import data modal state
   const [showImportModal, setShowImportModal] = useState(false);
@@ -1046,6 +1062,70 @@ export default function WorkspacePage() {
       const newId = `ws-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
       localStorage.setItem('workspace-browser-session-id', newId);
       setBrowserSessionId(newId);
+    }
+  }, []);
+
+  // Restore state from localStorage on mount
+  useEffect(() => {
+    const savedProject = localStorage.getItem('workspace_selected_project');
+    const savedViewMode = localStorage.getItem('workspace_view_mode');
+    const savedTerminalMode = localStorage.getItem('workspace_terminal_mode');
+    const savedFileBrowser = localStorage.getItem('workspace_file_browser_open');
+
+    if (savedProject) setSelectedProject(savedProject);
+    if (savedViewMode && ['terminal', 'notes', 'data'].includes(savedViewMode)) {
+      setViewMode(savedViewMode as ViewMode);
+    }
+    if (savedTerminalMode && ['claude', 'ssh'].includes(savedTerminalMode)) {
+      setTerminalMode(savedTerminalMode as 'claude' | 'ssh');
+    }
+    if (savedFileBrowser !== null) {
+      setShowFileBrowser(savedFileBrowser === 'true');
+    }
+  }, []);
+
+  // Persist selected project to localStorage
+  useEffect(() => {
+    if (selectedProject) {
+      localStorage.setItem('workspace_selected_project', selectedProject);
+    } else {
+      localStorage.removeItem('workspace_selected_project');
+    }
+  }, [selectedProject]);
+
+  // Persist view mode to localStorage
+  useEffect(() => {
+    localStorage.setItem('workspace_view_mode', viewMode);
+  }, [viewMode]);
+
+  // Persist terminal mode to localStorage
+  useEffect(() => {
+    localStorage.setItem('workspace_terminal_mode', terminalMode);
+  }, [terminalMode]);
+
+  // Persist file browser state to localStorage
+  useEffect(() => {
+    localStorage.setItem('workspace_file_browser_open', String(showFileBrowser));
+  }, [showFileBrowser]);
+
+  // Close sidebar when project is selected on mobile
+  useEffect(() => {
+    if (isMobile && selectedProject) {
+      setSidebarOpen(false);
+    }
+  }, [selectedProject, isMobile]);
+
+  // Handle mobile terminal input
+  const handleMobileTerminalInput = useCallback((input: string) => {
+    if (terminalInputRef.current) {
+      terminalInputRef.current.sendInput(input);
+    }
+  }, []);
+
+  // Handle mobile terminal control sequences (Ctrl+C, etc)
+  const handleMobileTerminalControl = useCallback((sequence: string) => {
+    if (terminalInputRef.current) {
+      terminalInputRef.current.sendInput(sequence);
     }
   }, []);
 
@@ -1687,8 +1767,14 @@ export default function WorkspacePage() {
         </div>
       )}
 
-      {/* Header */}
-      <header className="bg-slate-800/50 border-b border-slate-700 px-4 py-3">
+      {/* Mobile Header */}
+      <MobileHeader
+        projectName={selectedProject}
+        onToggleSidebar={() => setSidebarOpen(true)}
+      />
+
+      {/* Desktop Header */}
+      <header className="hidden md:block bg-slate-800/50 border-b border-slate-700 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/" className="text-slate-400 hover:text-white transition-colors">
@@ -1773,23 +1859,58 @@ export default function WorkspacePage() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="flex h-[calc(100vh-60px)]">
-        {/* Project Sidebar */}
+      {/* Mobile Drawer Sidebar */}
+      <DrawerOverlay isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)}>
         <ProjectSidebar
           projects={projects}
           selectedProject={selectedProject}
-          onSelectProject={setSelectedProject}
+          onSelectProject={(name) => {
+            setSelectedProject(name);
+            setSidebarOpen(false);
+          }}
           onCreateProject={handleCreateProject}
           onDeleteProject={handleDeleteProject}
           loading={loadingProjects}
         />
+      </DrawerOverlay>
+
+      {/* Mobile File Browser Modal */}
+      <FileBrowserModal
+        isOpen={mobileFileBrowserOpen && isMobile}
+        onClose={() => setMobileFileBrowserOpen(false)}
+      >
+        {terminalSessionId && (
+          <FileBrowser
+            sessionId={terminalSessionId}
+            workspaceDir={terminalWorkspaceDir}
+            autoRefreshInterval={5000}
+            onUpload={handleTerminalUpload}
+            onCloneRepo={handleTerminalCloneRepo}
+          />
+        )}
+      </FileBrowserModal>
+
+      {/* Main Content */}
+      <div className="flex h-[calc(100vh-60px)] md:h-[calc(100vh-60px)] pb-16 md:pb-0">
+        {/* Desktop Project Sidebar */}
+        <div className="hidden md:block">
+          <ProjectSidebar
+            projects={projects}
+            selectedProject={selectedProject}
+            onSelectProject={setSelectedProject}
+            onCreateProject={handleCreateProject}
+            onDeleteProject={handleDeleteProject}
+            loading={loadingProjects}
+          />
+        </div>
 
         {/* Content Area */}
-        <main className="flex-1 overflow-hidden">
-          {!selectedProject ? (
-            <WelcomeContent />
-          ) : viewMode === 'notes' ? (
+        <main className="flex-1 overflow-hidden relative">
+          {/* Welcome Content - shown when no project selected */}
+          {!selectedProject && <WelcomeContent />}
+
+          {/* Notes View */}
+          {selectedProject && viewMode === 'notes' && (
             <div className="h-full flex">
               {/* Text Files List */}
               <div className={`${selectedTextFile ? 'w-1/3 border-r border-slate-700' : 'w-full'} overflow-y-auto`}>
@@ -2152,11 +2273,17 @@ export default function WorkspacePage() {
                 </div>
               )}
             </div>
-          ) : viewMode === 'data' ? (
+          )}
+
+          {/* Data View */}
+          {selectedProject && viewMode === 'data' && (
             <DataBrowser projectName={selectedProject} />
-          ) : (
-            /* Terminal View - Embedded Claude Code Terminal */
-            <div className="h-full flex flex-col">
+          )}
+
+          {/* Terminal View - ALWAYS MOUNTED when project selected, hidden with CSS when not active */}
+          {/* This prevents losing terminal connection when switching tabs */}
+          {selectedProject && (
+            <div className={`h-full flex flex-col absolute inset-0 ${viewMode === 'terminal' ? '' : 'invisible pointer-events-none'}`}>
               {/* Terminal Header */}
               <div className="flex-shrink-0 flex items-center justify-between px-4 py-2 bg-slate-800/50 border-b border-slate-700">
                 <div className="flex items-center gap-3">
@@ -2227,11 +2354,12 @@ export default function WorkspacePage() {
                       <CCResearchTerminal
                         sessionId={terminalSessionId}
                         onStatusChange={(connected) => setTerminalConnected(connected)}
+                        inputRef={terminalInputRef}
                       />
                     </div>
-                    {/* File Browser Sidebar */}
+                    {/* File Browser Sidebar - Desktop only */}
                     {showFileBrowser && (
-                      <div className="w-80 border-l border-slate-700 bg-slate-900/50 flex-shrink-0 overflow-hidden">
+                      <div className="hidden md:block w-80 border-l border-slate-700 bg-slate-900/50 flex-shrink-0 overflow-hidden">
                         <FileBrowser
                           sessionId={terminalSessionId}
                           workspaceDir={terminalWorkspaceDir}
@@ -2422,6 +2550,15 @@ export default function WorkspacePage() {
                   </div>
                 )}
               </div>
+
+              {/* Mobile Terminal Input - Only show when terminal is active */}
+              {terminalSessionId && (
+                <MobileTerminalInput
+                  onSendInput={handleMobileTerminalInput}
+                  onSendControlSequence={handleMobileTerminalControl}
+                  disabled={!terminalConnected}
+                />
+              )}
             </div>
           )}
         </main>
@@ -2652,6 +2789,16 @@ export default function WorkspacePage() {
         </div>
       </div>
     )}
+
+      {/* Mobile Bottom Navigation */}
+      <MobileNav
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onToggleSidebar={() => setSidebarOpen(true)}
+        onToggleFileBrowser={() => setMobileFileBrowserOpen(!mobileFileBrowserOpen)}
+        fileBrowserOpen={mobileFileBrowserOpen}
+        hasProject={!!selectedProject}
+      />
     </ProtectedRoute>
   );
 }

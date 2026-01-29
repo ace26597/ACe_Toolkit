@@ -13,12 +13,19 @@ interface AutomationNotification {
   value: string;
 }
 
+// Interface for imperative handle methods
+export interface CCResearchTerminalHandle {
+  sendInput: (text: string) => void;
+}
+
 interface CCResearchTerminalProps {
   sessionId: string;
   onResize?: (rows: number, cols: number) => void;
   onStatusChange?: (connected: boolean) => void;
   onAutomation?: (notification: AutomationNotification) => void;
   className?: string;
+  // Ref for imperative control (e.g., mobile input)
+  inputRef?: React.MutableRefObject<CCResearchTerminalHandle | null>;
 }
 
 /**
@@ -36,7 +43,8 @@ export default function CCResearchTerminal({
   onResize,
   onStatusChange,
   onAutomation,
-  className = ''
+  className = '',
+  inputRef
 }: CCResearchTerminalProps) {
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
@@ -50,6 +58,26 @@ export default function CCResearchTerminal({
   // Track last dimensions to avoid unnecessary resizes
   const lastDimensions = useRef<{ rows: number; cols: number } | null>(null);
   const resizeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Function to send input to terminal (for mobile input component)
+  const sendInput = useCallback((text: string) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      const encoder = new TextEncoder();
+      wsRef.current.send(encoder.encode(text));
+    }
+  }, []);
+
+  // Expose sendInput function via inputRef
+  useEffect(() => {
+    if (inputRef) {
+      inputRef.current = { sendInput };
+    }
+    return () => {
+      if (inputRef) {
+        inputRef.current = null;
+      }
+    };
+  }, [inputRef, sendInput]);
 
   // Update parent when connection status changes
   useEffect(() => {

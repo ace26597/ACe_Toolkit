@@ -1,96 +1,119 @@
-# BlestLabs
+# ACe_Toolkit
 
-A full-stack productivity platform for AI-powered research, diagram creation, and scientific workflows. Features Research Assistant with LangGraph, CCResearch Terminal with 140+ scientific tools, and Mermaid Studio for diagrams. Running on Raspberry Pi 5 with Cloudflare Tunnel for secure global access.
+A comprehensive AI-powered research platform featuring **C3 Researcher Workspace**, **C3 Data Studio**, and **Remotion Video Studio**. Built for scientists, researchers, and developers who need powerful AI tools for data analysis, literature review, and content creation.
 
-## 🌐 Live App
+## 🌐 Live Platform
 
 | Service | URL | Status |
 |---------|-----|--------|
-| **Frontend** | https://ai.ultronsolar.in | ✅ Live |
-| **Backend API** | https://api.ultronsolar.in | ✅ Live |
-| **API Docs** | https://api.ultronsolar.in/docs | ✅ Live |
+| **Platform** | https://orpheuscore.uk | ✅ Live |
+| **API** | https://api.orpheuscore.uk | ✅ Live |
+| **API Docs** | https://api.orpheuscore.uk/docs | ✅ Live |
 
-> **Deployment:** Hosted on Raspberry Pi 5 (Bookworm, 8GB RAM) with Cloudflare Tunnel for secure external access. Auto-starts on boot via systemd + crontab.
+> **Deployment:** Self-hosted on Raspberry Pi 5 with Cloudflare Tunnel for secure global access.
 
 ---
 
-## ✨ Features
+## ✨ Applications
 
-### Core Functionality
-- 📊 **Document-Based Workflow** - Upload markdown files to auto-extract and organize Mermaid charts
-- 🔄 **Bidirectional Sync** - Chart edits automatically update source markdown files
-- 📁 **Multi-Project Hierarchy** - Organize charts within documents or as standalone diagrams
-- 📝 **Diagram Editions** - Built-in version control for diagram changes with descriptions
-- 🤖 **AI-Powered Generation** - Create, repair, and enhance diagrams using Claude (Anthropic)
-- 💾 **Session-Based Storage** - No authentication required for basic usage
-- 📓 **Notes Application** - Markdown-enabled note-taking with auto-save and project organization
-- 📤 **Export Functionality** - Export diagrams as PNG, SVG, or PDF
-- 🎨 **Multiple Diagram Types** - Flowcharts, sequence, class, state, ER, Gantt, pie, journey, git graph, mindmap, timeline, quadrant, requirement diagrams
+### 🔬 C3 Researcher Workspace
 
-### Technical Features
-- ⚡ **Real-time Auto-save** - Automatic project/chart sync every 2 seconds
-- 🌙 **Monaco Editor** - VSCode-like editing experience with syntax highlighting
-- 🔒 **Secure Deployment** - HTTPS via Cloudflare Tunnel, no exposed ports
-- 🔄 **Auto-start on Reboot** - Services automatically restart after system reboot
-- 💾 **Persistent Storage** - SQLite database survives reboots and updates
+**Claude Code Custom Researcher** - A fully-featured AI research terminal with unprecedented access to scientific tools and databases.
+
+| Feature | Details |
+|---------|---------|
+| **Skills** | 145+ scientific skills (PubMed, UniProt, RDKit, PyTorch, etc.) |
+| **MCP Servers** | 26 active servers (11 scientific, 2 AI, 13 utility) |
+| **Plugins** | 14 specialized plugins |
+| **Databases** | 30+ accessible databases including AACT (566K+ clinical trials) |
+
+**Key Features:**
+- 📱 **Mobile Responsive** - Works on iPhone, Android, iPad
+- 🖥️ **Full Terminal** - Claude Code with all capabilities
+- 📝 **Markdown Notes** - With live preview, Mermaid diagrams
+- 📁 **File Browser** - Upload, preview, manage files
+- 🔄 **Session Persistence** - Resume where you left off
+
+**Scientific Capabilities:**
+- Literature search (PubMed, bioRxiv, Semantic Scholar)
+- Drug discovery (ChEMBL, RDKit, DeepChem)
+- Clinical trials (ClinicalTrials.gov API, AACT SQL)
+- Genomics (BioPython, Scanpy, scvi-tools)
+- Medical coding (ICD-10, NPI Registry, CMS Coverage)
+
+### 📊 C3 Data Studio
+
+**AI-Powered Data Analysis** - Upload files and get auto-generated dashboards with natural language editing.
+
+**Workflow:**
+1. Create project & upload data (CSV, JSON, Excel, Parquet)
+2. AI analyzes data patterns and relationships
+3. Auto-generates 5-10 interactive Plotly widgets
+4. Customize with natural language ("Add a pie chart for categories")
+
+**Features:**
+- Multi-file analysis (combined or separate modes)
+- Live terminal output during analysis
+- NLP-based widget editing
+- Stat cards, histograms, bar/line/pie charts, scatter plots
+
+### 🎬 Remotion Video Studio
+
+**AI Video Creation** - Real Claude Code terminal with Remotion for video production.
+
+**Workflow:**
+1. Create project (auto-scaffolds npm + Remotion)
+2. Enter video idea
+3. Watch Claude research, plan, build, and render
+4. Download finished MP4
+
+**Features:**
+- Full PTY terminal (not headless)
+- Per-user isolated npm projects
+- All Claude Code capabilities available
+- Video gallery sidebar
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Component | Technology | Version |
-|-----------|------------|---------|
-| **Frontend** | Next.js (App Router) | 16.1.1 |
-| | React | 19.2.3 |
-| | TypeScript | 5 |
-| | Tailwind CSS | 4 |
-| **Backend** | FastAPI | 0.109.0 |
-| | Python | 3.11+ (3.13 on Pi) |
-| | SQLAlchemy | 2.0+ |
-| **Code Editor** | Monaco Editor | 4.6.0 |
-| **Diagrams** | Mermaid | 11.12.2 |
-| | ELK.js (graph layout) | 0.11.0 |
-| **Database** | SQLite (dev/prod) | - |
-| **Auth** | JWT + HTTPOnly cookies | - |
-| **AI** | Anthropic Claude API | Sonnet 4.5 |
-| **Hosting** | Raspberry Pi 5 | Bookworm 64-bit |
-| **Tunnel** | Cloudflare Tunnel | - |
+| Layer | Technology |
+|-------|------------|
+| **Frontend** | Next.js 16, React 19, TypeScript 5, Tailwind CSS 4 |
+| **Backend** | FastAPI, Python 3.13, SQLAlchemy 2.0, Pydantic |
+| **Terminal** | xterm.js 5.5, WebSocket PTY |
+| **Charts** | Plotly.js, react-plotly.js |
+| **Video** | Remotion |
+| **Auth** | JWT + HTTPOnly cookies |
+| **Hosting** | Raspberry Pi 5 + Cloudflare Tunnel |
 
 ---
 
 ## 📁 Project Structure
 
 ```
-BlestLabs/
+ACe_Toolkit/
 ├── apps/
-│   ├── web/                    # Next.js 16 Frontend (Turbopack)
+│   ├── web/                    # Next.js Frontend
 │   │   ├── app/                # App Router pages
-│   │   │   ├── page.tsx        # Home page
-│   │   │   ├── mermaid/        # Mermaid diagram editor
-│   │   │   └── notes/          # Notes application
+│   │   │   ├── workspace/      # C3 Researcher Workspace
+│   │   │   ├── data-studio/    # C3 Data Studio
+│   │   │   ├── video-studio/   # Remotion Video Studio
+│   │   │   └── ccresearch/     # Tips, use-cases, shares
 │   │   ├── components/         # React components
-│   │   ├── lib/                # API client & utilities
-│   │   └── public/             # Static assets
+│   │   ├── data/               # JSON data files
+│   │   └── lib/                # API client
 │   │
 │   └── api/                    # FastAPI Backend
 │       ├── app/
-│       │   ├── main.py         # FastAPI entry point
 │       │   ├── routers/        # API endpoints
-│       │   ├── models/         # SQLAlchemy models
-│       │   ├── core/           # Config, database, security
-│       │   └── schemas.py      # Pydantic schemas
+│       │   ├── core/           # Managers, config
+│       │   └── models/         # SQLAlchemy models
 │       └── requirements.txt
 │
-├── infra/
-│   └── scripts/                # Deployment & setup scripts
-│       ├── start_all.sh        # Start backend + frontend
-│       ├── stop_all.sh         # Stop all services
-│       ├── status.sh           # System status dashboard
-│       └── CUSTOM_DOMAIN_SETUP.md  # Cloudflare setup guide
-│
-├── CLAUDE.md                   # Comprehensive dev documentation
-├── DATA_PERSISTENCE.md         # Data storage & backup guide
-├── DEPLOYMENT_SUMMARY.md       # Production deployment info
+├── infra/scripts/              # Deployment scripts
+├── logs/                       # Application logs
+├── CLAUDE.md                   # Developer documentation
 └── README.md                   # This file
 ```
 
@@ -98,266 +121,187 @@ BlestLabs/
 
 ## 🚀 Quick Start
 
-### One-Command Setup (Raspberry Pi)
+### Prerequisites
+- Node.js 18+
+- Python 3.11+
+- npm or yarn
+
+### Setup
 
 ```bash
-# Clone the repository
-git clone https://github.com/ace26597/BlestLabs.git
-cd BlestLabs
+# Clone repository
+git clone https://github.com/ace26597/ACe_Toolkit.git
+cd ACe_Toolkit
 
-# Run automated setup (installs dependencies)
-./infra/scripts/dev_setup.sh
+# Backend setup
+cd apps/api
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env  # Edit with your API keys
 
-# Start all services
+# Frontend setup
+cd ../web
+npm install
+echo "NEXT_PUBLIC_API_BASE_URL=http://localhost:8000" > .env.local
+
+# Start services
+cd ../..
 ./infra/scripts/start_all.sh
 ```
 
-**Access locally:**
+**Access:**
 - Frontend: http://localhost:3000
 - Backend: http://localhost:8000
 - API Docs: http://localhost:8000/docs
 
 ---
 
-## 📋 Prerequisites
+## 🔬 C3 Researcher Capabilities
 
-### Required
-- **Node.js** 18+ (for Frontend)
-- **Python** 3.11+ (3.13 recommended for Raspberry Pi 5)
-- **npm** or **yarn** (package manager)
+### MCP Servers (26 Active)
 
-### Optional (for external access)
-- **Cloudflare Account** (free tier works)
-- **cloudflared** CLI tool
-- **Custom domain** (optional, can use trycloudflare.com)
+**Scientific (11):**
+- PubMed, bioRxiv/medRxiv, ChEMBL, ClinicalTrials.gov, AACT
+- CMS Medicare Coverage, NPI Registry, ICD-10 Codes
+- HuggingFace Hub, Open Targets, Medidata
+
+**Utility (13):**
+- Memory, Context7, Filesystem, Git, SQLite
+- Playwright, Fetch, Time, Sequential Thinking
+- MotherDuck, Cloudflare, Bitly, Mercury
+
+### Plugins (14)
+
+| Plugin | Description |
+|--------|-------------|
+| Scientific Skills | 145+ scientific tools |
+| Document Skills | PDF, Excel, Word processing |
+| HuggingFace Skills | Model/dataset integration |
+| Feature Dev | Guided implementation |
+| Code Simplifier | Refactoring tools |
+| Plugin Dev | Plugin creation |
+| Agent SDK Dev | Agent development |
+| Frontend Design | UI/UX components |
+| AI/Backend Skills | Development utilities |
+| Context7 | Library documentation |
+| Ralph Loop | Iterative refinement |
+| AACT Clinical Trials | 566K+ trials SQL access |
+
+### Example Prompts
+
+```
+# Literature Review
+Search PubMed for CRISPR-Cas9 papers from 2024-2025. Summarize top 5.
+
+# Drug Discovery
+Search ChEMBL for EGFR inhibitors with IC50 < 100nM.
+
+# Clinical Trials
+Query AACT: Find Phase 3 oncology trials from last 5 years.
+
+# Medical Coding
+Look up ICD-10 codes for Type 2 Diabetes with complications.
+
+# Data Analysis
+Run /exploratory-data-analysis on my uploaded CSV file.
+```
 
 ---
 
-## 🔧 Manual Setup
+## 📱 Mobile Support
 
-### Backend Setup
+C3 Researcher Workspace is fully responsive:
 
-```bash
-cd apps/api
-
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create .env file
-cp .env.example .env
-# Edit .env and add your ANTHROPIC_API_KEY
-
-# Run server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-**Backend runs on:** http://localhost:8000
-
-### Frontend Setup
-
-```bash
-cd apps/web
-
-# Install dependencies
-npm install
-
-# Create .env.local file
-echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
-
-# Run development server
-npm run dev
-```
-
-**Frontend runs on:** http://localhost:3000
+- **Bottom Navigation** - Terminal, Notes, Data, Files tabs
+- **Drawer Sidebar** - Project selection via hamburger menu
+- **Mobile Terminal Input** - Soft keyboard support with quick actions
+- **Touch Optimized** - Large tap targets, swipe gestures
+- **Minimum Width** - 390px (iPhone 12+)
 
 ---
 
-## 🌍 Cloudflare Tunnel Setup (External Access)
+## 🔒 Authentication
 
-### Quick Tunnel (Temporary URLs)
+| User Type | Access | Duration |
+|-----------|--------|----------|
+| Trial | Full access | 24 hours |
+| Approved | Full access | 30 days |
+| Admin | Full + user management | 30 days |
 
-```bash
-# Install cloudflared
-curl -L --output /tmp/cloudflared.deb \
-  https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64.deb
-sudo dpkg -i /tmp/cloudflared.deb
-
-# Run quick tunnel (generates temporary URL)
-cloudflared tunnel --url http://localhost:3000  # Frontend
-cloudflared tunnel --url http://localhost:8000  # Backend
-```
-
-### Named Tunnel (Permanent Custom Domain)
-
-For production with custom domain (e.g., `ai.ultronsolar.in`):
-
-```bash
-# 1. Login to Cloudflare
-cloudflared tunnel login
-
-# 2. Create tunnel
-cloudflared tunnel create blestlabs
-
-# 3. Configure tunnel (see infra/scripts/CUSTOM_DOMAIN_SETUP.md)
-nano ~/.cloudflared/config.yml
-
-# 4. Route DNS
-cloudflared tunnel route dns blestlabs ai.ultronsolar.in
-
-# 5. Install as service (auto-start on boot)
-sudo cloudflared service install
-sudo systemctl enable cloudflared
-sudo systemctl start cloudflared
-```
-
-**Full guide:** See `infra/scripts/CUSTOM_DOMAIN_SETUP.md` for complete setup instructions.
+All data is isolated per user at `/data/users/{user-id}/`.
 
 ---
 
-## ⚙️ Configuration
+## 📡 API Overview
 
-### Backend Environment (`apps/api/.env`)
+### Workspace
+```
+GET  /workspace/projects           # List projects
+POST /workspace/projects           # Create project
+GET  /workspace/projects/{name}/data  # List files
+POST /workspace/projects/{name}/data  # Upload files
+```
 
+### CCResearch Terminal
+```
+POST /ccresearch/sessions          # Start session
+WS   /ccresearch/terminal/{id}     # WebSocket PTY
+GET  /ccresearch/sessions/{id}     # Session status
+```
+
+### Data Studio
+```
+POST /data-studio/projects         # Create project
+POST /data-studio/analyze          # Run analysis
+GET  /data-studio/dashboard/{id}   # Get dashboard
+POST /data-studio/nlp-edit         # NLP widget edit
+```
+
+### Video Studio
+```
+POST /video-studio/projects        # Create project
+POST /video-studio/session         # Start Claude session
+WS   /video-studio/terminal/{name} # Terminal WebSocket
+GET  /video-studio/videos/{name}   # List videos
+```
+
+Full API documentation at `/docs`.
+
+---
+
+## 🔧 Configuration
+
+### Backend (`apps/api/.env`)
 ```env
-# Database
-DATABASE_URL=sqlite+aiosqlite:///./app.db
-
-# Security
-SECRET_KEY=your-secure-random-secret-key-here
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=15
-REFRESH_TOKEN_EXPIRE_DAYS=30
-
-# CORS - Update with your domains
-ALLOWED_ORIGINS=["http://localhost:3000","https://ai.ultronsolar.in"]
-
-# AI
-ANTHROPIC_API_KEY=sk-ant-api03-your-key-here
+SECRET_KEY=your-secret-key
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+ALLOWED_ORIGINS=["http://localhost:3000","https://orpheuscore.uk"]
 ```
 
-### Frontend Environment (`apps/web/.env.local`)
-
+### Frontend (`apps/web/.env.local`)
 ```env
-# API URL - Update based on deployment
-NEXT_PUBLIC_API_URL=http://localhost:8000
-
-# For production with custom domain:
-# NEXT_PUBLIC_API_URL=https://api.ultronsolar.in
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 ```
 
 ---
 
-## 📡 API Endpoints
-
-### Projects & Charts
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/projects/` | List all projects |
-| POST | `/projects/` | Create new project |
-| POST | `/projects/sync` | Bulk sync projects |
-| GET | `/charts/{id}` | Get specific chart |
-| POST | `/charts/` | Create new chart |
-| PUT | `/charts/{id}` | Update chart |
-
-### AI Generation
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/ai/generate` | Generate/repair diagrams using Claude |
-
-### Notes
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/session-notes/projects` | List note projects |
-| POST | `/session-notes/note` | Create note |
-| PUT | `/session-notes/note/{id}` | Update note |
-
-### Export
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/export/` | Export diagram to image/PDF |
-
-**Full API documentation:** Visit `/docs` endpoint on backend server
-
----
-
-## 🔒 Security
-
-### Authentication
-- **JWT tokens** with HTTPOnly SameSite=Lax cookies
-- **Refresh tokens** with 30-day expiration
-- **Access tokens** with 15-minute expiration
-
-### Network Security
-- **Cloudflare Tunnel** - No exposed ports on router
-- **HTTPS** - Automatic SSL via Cloudflare
-- **CORS** - Restricted to specific domains only
-- **UFW Firewall** - Only SSH port exposed
-
-### Data Protection
-- All sensitive files protected via `.gitignore`
-- Database files never committed to git
-- Environment variables stored locally only
-- Cloudflare credentials encrypted at rest
-
----
-
-## 💾 Data Persistence
-
-### Database
-- **Location:** `apps/api/mermaid.sqlite`
-- **Contents:** Projects, charts, notes, user data
-- **Backup:** Recommended daily backups (see `DATA_PERSISTENCE.md`)
-
-### Auto-Save
-- Projects auto-sync every 2 seconds
-- Charts save on edit
-- Notes save on change
-- All data survives reboots
-
-**Backup guide:** See `DATA_PERSISTENCE.md` for backup strategies
-
----
-
-## 🛠️ Management Commands
-
-### Start/Stop Services
+## 📋 Management
 
 ```bash
-# Start all (backend + frontend)
+# Start all services
 ./infra/scripts/start_all.sh
 
-# Stop all
+# Stop all services
 ./infra/scripts/stop_all.sh
 
 # Check status
 ./infra/scripts/status.sh
-```
 
-### View Logs
-
-```bash
-# Backend logs
-tail -f logs/backend-$(date +%Y%m%d).log
-
-# Frontend logs
-tail -f logs/frontend-$(date +%Y%m%d).log
-
-# Cloudflare tunnel logs
-sudo journalctl -u cloudflared -f
-```
-
-### Rebuild Frontend
-
-```bash
-cd apps/web
-npm run build
-cd ../..
-./infra/scripts/stop_all.sh
-./infra/scripts/start_all.sh
+# View logs
+tail -f logs/backend-*.log
+tail -f logs/frontend-*.log
 ```
 
 ---
@@ -366,131 +310,38 @@ cd ../..
 
 | Document | Description |
 |----------|-------------|
-| [CLAUDE.md](./CLAUDE.md) | Comprehensive developer guide, API reference, conventions |
-| [DATA_PERSISTENCE.md](./DATA_PERSISTENCE.md) | Data storage locations, backup strategies |
-| [DEPLOYMENT_SUMMARY.md](./DEPLOYMENT_SUMMARY.md) | Production deployment status, troubleshooting |
-| [infra/scripts/CUSTOM_DOMAIN_SETUP.md](./infra/scripts/CUSTOM_DOMAIN_SETUP.md) | Cloudflare Tunnel setup guide |
-
----
-
-## 🐛 Troubleshooting
-
-### Frontend can't connect to backend
-
-**Symptom:** `Failed to fetch` or `net::ERR_CONNECTION_REFUSED` errors
-
-**Solution:**
-1. Check `.env.local` has correct `NEXT_PUBLIC_API_URL`
-2. Verify backend is running: `ps aux | grep uvicorn`
-3. Rebuild frontend: `cd apps/web && npm run build`
-
-### Data not saving
-
-**Check:**
-1. Backend running: `./infra/scripts/status.sh`
-2. CORS configured: Check `apps/api/.env` → `ALLOWED_ORIGINS`
-3. Database writable: `ls -la apps/api/mermaid.sqlite`
-
-### Services don't auto-start on reboot
-
-**Check:**
-1. Crontab configured: `crontab -l`
-2. Cloudflared service enabled: `sudo systemctl status cloudflared`
-3. Logs: `cat logs/startup-$(date +%Y%m%d).log`
-
-**More troubleshooting:** See `DEPLOYMENT_SUMMARY.md`
-
----
-
-## 🎯 Development Workflow
-
-### Git Workflow
-
-All feature branches must follow this pattern:
-```bash
-git checkout -b claude/<description>-<SESSION_ID>
-```
-
-Example: `claude/add-export-feature-ABC123`
-
-**Commit conventions:**
-- `feat:` New feature
-- `fix:` Bug fix
-- `docs:` Documentation
-- `refactor:` Code refactoring
-- `chore:` Maintenance
-
-### Running Tests
-
-```bash
-# Backend (coming soon)
-cd apps/api
-pytest
-
-# Frontend linting
-cd apps/web
-npm run lint
-```
-
----
-
-## 📊 Performance
-
-**Raspberry Pi 5 Stats:**
-- CPU: ARM Cortex-A76 (4 cores @ 2.4GHz)
-- RAM: 8GB LPDDR4X
-- Storage: 256GB microSD
-- Network: Gigabit Ethernet
-
-**Resource Usage:**
-- Backend: ~100 MB RAM
-- Frontend: ~140 MB RAM
-- Database: ~76 KB (grows with usage)
-- Disk: ~12 GB total
-
-**Response Times:**
-- Local: 10-100 ms
-- Via Cloudflare: 200-500 ms
+| [CLAUDE.md](./CLAUDE.md) | Developer guide, API reference |
+| [apps/web/CLAUDE.md](./apps/web/CLAUDE.md) | Frontend documentation |
+| [apps/api/CLAUDE.md](./apps/api/CLAUDE.md) | Backend documentation |
 
 ---
 
 ## 🤝 Contributing
 
-Contributions welcome! Please:
-
-1. Read `CLAUDE.md` for code conventions
-2. Create feature branch: `claude/your-feature-SESSION`
-3. Write clear commit messages
-4. Test changes locally
-5. Submit pull request
+1. Read `CLAUDE.md` for conventions
+2. Create branch: `claude/<description>-<session-id>`
+3. Make changes and test locally
+4. Submit pull request
 
 ---
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
+MIT License - see LICENSE file.
 
 ---
 
 ## 🙏 Acknowledgments
 
-- **Mermaid.js** - Diagram rendering
-- **Monaco Editor** - Code editing
-- **FastAPI** - Backend framework
-- **Next.js** - Frontend framework
-- **Anthropic Claude** - AI-powered generation
+- **Anthropic Claude** - AI backbone
+- **Remotion** - Video rendering
+- **xterm.js** - Terminal emulation
+- **Plotly** - Interactive charts
+- **Next.js / FastAPI** - Frameworks
 - **Cloudflare** - Secure tunneling
 
 ---
 
-## 📞 Support
+**Built with ❤️ for researchers and scientists**
 
-- **Documentation:** See `CLAUDE.md` for detailed guides
-- **Issues:** Open an issue on GitHub
-- **Deployment:** See `DEPLOYMENT_SUMMARY.md`
-
----
-
-**Built with ❤️ on Raspberry Pi 5**
-
-**Live at:** https://ai.ultronsolar.in
+**Live at:** https://orpheuscore.uk

@@ -34,7 +34,8 @@ apps/web/
 │   ├── workspace/page.tsx         # Workspace (Notes, Files, Terminal tabs)
 │   ├── data-studio/               # C3 Data Studio V2 (REDESIGNED)
 │   │   └── page.tsx               # Project selector, import, analysis, dashboard
-│   └── video-factory/page.tsx     # Video Factory
+│   └── video-studio/              # Remotion Video Studio
+│       └── page.tsx               # Project selector, terminal, video gallery
 ├── components/
 │   ├── auth/                      # Authentication
 │   │   ├── AuthProvider.tsx       # React Context
@@ -212,62 +213,72 @@ Uses `dataStudioV2Api` from `lib/api.ts`:
 └── .claude/               # Claude config
 ```
 
-### Video Studio (`/video-factory`) - v4.0 INTERACTIVE WORKFLOW
+### Remotion Video Studio (`/video-studio`)
 
-**AI-powered video script generation** with interactive recommendations, visual preview, and Remotion rendering.
+AI-powered video creation using a real Claude Code PTY terminal with full skill/MCP access.
 
-**Workflow:** Idea → Options → Plan → Preview → Render
+**Features:**
+- Real PTY terminal (not headless) - same as C3 Workspace terminal
+- Per-user isolated npm projects with Remotion setup
+- `--dangerously-skip-permissions` flag for full Claude access
+- Minimal CLAUDE.md - Claude discovers capabilities dynamically
+- Project selector with video gallery sidebar
+- WebSocket terminal with xterm.js
+- Video playback and download
 
-**v4.0 Features:**
-- **Recommendations Agent**: Claude suggests genre, style, animations, and hooks before planning
-- **Research Integration**: Web research for facts/stats during planning phase
-- **Visual Preview**: Scene cards with gradient previews and image thumbnails
-- **Session Continuity**: Uses `--continue` flag to maintain Claude context across steps
-- **Compact Video Popup**: Small draggable player instead of full-screen modal
-- **Step Indicator**: Visual progress tracker showing 5 workflow steps
-- **Rich Context Input**: Text notes, image upload/paste, files, workspace references
-- **Scene Editing**: Full modal with tabs for Content, Style, Animation, Media
-- **Background Presets**: 11 gradient presets (purpleNight, deepOcean, sunset, etc.)
-- **Lottie Animations**: robot, brain, rocket, success, chart, medical, science
-- **Drawing Paths**: check, cross, arrows, lightbulb, star, heart, brain, rocket, chart
-- **Remotion Rendering**: EnhancedVideo composition with 10 scene types
+**Architecture:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Views                                                       │
+│  ┌──────────┐    ┌──────────────────┐    ┌───────────────┐ │
+│  │ Project  │ -> │    Terminal      │ <- │ Video Gallery │ │
+│  │ Selector │    │  (xterm.js)      │    │  (sidebar)    │ │
+│  └──────────┘    └──────────────────┘    └───────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+```
 
-**Views (View States):**
-1. **Idea**: Enter video idea + upload context files/images
-2. **Recommendations**: Claude's suggestions for genre, style, animation, hooks
-3. **Planning**: Research + plan generation (SSE streaming with log)
-4. **Preview**: Visual scene cards with gradient previews
-5. **Edit**: Full scene editor, duration controls, background/animation/media settings
-6. **Render**: Video playback, compact popup player, download
+**User Flow:**
+1. Create/select project (auto-creates npm + Remotion scaffolding)
+2. Install dependencies (npm install - one-time per project)
+3. Enter video idea and start session
+4. Watch Claude work in real-time terminal
+5. Claude researches, plans, builds video composition, renders
+6. Videos appear in sidebar gallery
+7. Play, download, or delete videos
 
-**Components (`components/video-studio/`):**
-| Component | Purpose |
-|-----------|---------|
-| `ContextPanel.tsx` | File upload, paste images, notes, workspace import |
-| `RecommendationsPanel.tsx` | Genre/style/animation selection with visual cards |
-| `VisualPreview.tsx` | Scene cards with gradient previews and thumbnails |
-| `VideoPopup.tsx` | Compact draggable video player with minimize/position controls |
-| `StepIndicator.tsx` | 5-step progress indicator with navigation |
-| `PlanPreview.tsx` | Editable plan preview with collapsible sections |
-| `SceneEditor.tsx` | Full scene modal with Content/Style/Animation/Media tabs |
-| `index.ts` | Exports all video-studio components |
+**Components:**
+- Project selector modal
+- Video idea input with "Start Session" button
+- xterm.js terminal (dynamically imported for SSR)
+- Video gallery sidebar with thumbnails
+- Video player modal
 
-**Scene Types:**
-hook, content, bullet-list, quote, cta, title-card, whiteboard, stats, icon-reveal, split-screen
+**Technical Details:**
+- xterm.js loaded via dynamic import (avoid SSR "self is not defined")
+- CSS loaded via CDN link element
+- WebSocket authenticated via HTTP-only cookie
+- Terminal resize events sent as JSON commands
+- Process lifecycle managed by VideoStudioManager
+
+**API Integration:**
+- `GET /video-studio/projects` - List projects
+- `POST /video-studio/projects` - Create project
+- `POST /video-studio/projects/{name}/install` - npm install
+- `POST /video-studio/projects/{name}/session` - Start Claude session
+- `WS /video-studio/terminal/{name}` - Terminal WebSocket
+- `GET /video-studio/projects/{name}/videos` - List videos
+- `GET /video-studio/projects/{name}/videos/{filename}` - Stream video
 
 **Storage:**
 ```
-/data/video-factory/project-data/{project_id}/
-├── .claude/CLAUDE.md      # Dynamic context + task
-├── context/               # User-uploaded context
-│   ├── images/            # Context images
-│   ├── files/             # Data files
-│   ├── notes.md           # User notes
-│   └── references.json    # Workspace refs
-├── .plans/                # Video plans
-├── scripts/               # EnhancedVideoProps JSON
-├── images/                # Scene images
-└── renders/               # MP4 outputs
+/data/users/{user-id}/video-studio/{project}/
+├── .project.json          # Project metadata
+├── package.json           # npm (Remotion dependencies)
+├── src/                   # Video components
+├── public/                # Assets
+├── out/                   # Rendered MP4 videos
+└── .claude/
+    └── CLAUDE.md          # Minimal instructions
 ```
 
 ---
@@ -314,7 +325,7 @@ Centralized API methods for all backends.
 **Active Exports:**
 - `authApi` - Authentication (login, register, logout, refresh)
 - `workspaceApi` - Projects, notes, files, sessions
-- `dataStudioApi` - Data Studio sessions, dashboards, WebSocket (NEW)
+- `dataStudioApi` - Data Studio sessions, dashboards, WebSocket
 
 **Removed Exports (2026-01-22):**
 - `analystApi` - Data Analyst (app removed)
@@ -466,12 +477,13 @@ npm run start
 
 ---
 
-## Removed Code (2026-01-22)
+## Removed Code
 
-**Components:**
+**2026-01-28:**
+- `app/video-factory/page.tsx` - Video Factory (entire app removed)
+
+**2026-01-22:**
 - `components/analyst/` - Data Analyst UI (entire directory removed)
-
-**Pages:**
 - `app/analyst/page.tsx` - Data Analyst page (removed)
 - `app/notes/page.tsx` - Standalone notes (removed)
 - `app/logs/page.tsx` - Logs viewer (removed)
@@ -487,12 +499,8 @@ npm run start
 
 | Date | Change |
 |------|--------|
-| 2026-01-24 | **Video Studio v4.0:** Interactive workflow - Idea → Options → Plan → Preview → Render |
-| 2026-01-24 | **Video Studio:** RecommendationsPanel - Claude suggests genre, style, animations, hooks |
-| 2026-01-24 | **Video Studio:** VisualPreview - Scene cards with gradient previews and thumbnails |
-| 2026-01-24 | **Video Studio:** VideoPopup - Compact draggable player with minimize/position controls |
-| 2026-01-24 | **Video Studio:** StepIndicator - 5-step progress tracker with navigation |
-| 2026-01-24 | **Video Studio:** Session continuity via `--continue` flag |
+| 2026-01-28 | **NEW: Remotion Video Studio** - Real PTY terminal + Remotion for video creation |
+| 2026-01-28 | **REMOVED: Video Factory** - Old headless approach deleted |
 | 2026-01-23 | **Data Studio:** Fix empty stat cards - support alternate field names (value/stat_value) |
 | 2026-01-23 | **Data Studio:** Fix [Object] display - properly stringify result objects |
 | 2026-01-23 | **Data Studio:** Remove redundant "Starting Claude Code session" message |

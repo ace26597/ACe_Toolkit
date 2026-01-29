@@ -3,8 +3,15 @@ import { NextResponse } from 'next/server';
 export async function GET() {
   // Return CCResearch capabilities - comprehensive list of all MCP servers, plugins, and skills
   return NextResponse.json({
-    version: "2.19.0",
-    lastUpdated: "2026-01-17",
+    version: "2.20.0",
+    lastUpdated: "2026-01-28",
+    platform: {
+      name: "C3 Researcher Workspace",
+      description: "Claude Code Custom Researcher - AI-powered research terminal",
+      mobileSupport: true,
+      minScreenWidth: 390,
+      supportedDevices: ["iPhone 12+", "Android", "iPad", "Desktop"]
+    },
     plugins: {
       installed: [
         { id: "scientific-skills", name: "K-Dense Scientific Skills", version: "955a36ac82d8", status: "active", skills_count: 140, description: "140 scientific research skills" },
@@ -58,25 +65,26 @@ export async function GET() {
       summary: { running: 26, medical: 10, research: 4, utility: 12 }
     },
     scientific_skills: {
-      total: 140,
+      total: 145,
       categories: {
-        databases: 25,
+        databases: 28,
         bioinformatics: 20,
         cheminformatics: 15,
         ml: 25,
-        visualization: 15,
+        visualization: 17,
         medical: 15,
-        integrations: 10,
-        quantum: 4
+        documents: 14,
+        integrations: 10
       }
     },
     stats: {
-      totalSkills: 140,
-      totalPlugins: 12,
+      totalSkills: 145,
+      totalPlugins: 14,
       totalMcpServers: 26,
       medicalMcpServers: 10,
       researchMcpServers: 4,
-      utilityMcpServers: 12
+      utilityMcpServers: 12,
+      totalDatabases: 30
     },
     security: { sandbox_enabled: false, sandbox_type: "none", isolation_features: ["deny_rules", "workspace_isolation"] }
   });

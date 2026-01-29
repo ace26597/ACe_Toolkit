@@ -1,6 +1,6 @@
 # CLAUDE.md - ACe_Toolkit
 
-**Last Updated:** January 24, 2026 | **Status:** Active | **Deployment:** Raspberry Pi + Cloudflare Tunnel
+**Last Updated:** January 28, 2026 | **Status:** Active | **Deployment:** Raspberry Pi + Cloudflare Tunnel
 
 ---
 
@@ -38,8 +38,8 @@ lsof -i :3000 -i :8000  # Check our ports
 | App | Route | Description |
 |-----|-------|-------------|
 | **C3 Researcher Workspace** | `/workspace` | Claude Code Custom Researcher - AI-powered research terminal |
-| **C3 Data Studio** | `/data-studio` | AI-powered data analysis with headless Claude (NEW) |
-| **Video Studio** | `/video-factory` | AI video generation - Idea → Options → Plan → Preview → Render (v4.0) |
+| **C3 Data Studio** | `/data-studio` | AI-powered data analysis with headless Claude |
+| **Remotion Video Studio** | `/video-studio` | AI video creation with Claude Code terminal + Remotion |
 
 **C3 Researcher Workspace Features:**
 - 145+ scientific skills, 26 MCP servers, 14 plugins
@@ -66,18 +66,13 @@ lsof -i :3000 -i :8000  # Check our ports
 4. Auto-generated dashboard with editable widgets
 5. NLP-based customization ("Add a pie chart for categories")
 
-**Video Studio (v4.0 - Interactive Step-by-Step Flow):**
-- **Recommendations Agent**: Claude suggests genre, style, animation presets, hooks before planning
-- **Research Integration**: Web research for facts/stats during planning phase
-- **Visual Preview**: Scene cards with gradient previews and image thumbnails
-- **Session Continuity**: Uses `--continue` flag to maintain Claude context across steps
-- **Compact Video Popup**: Small draggable player instead of full-screen modal
-- **5-Step Workflow**: Idea → Options → Plan → Preview → Render
-- **Rich Context**: Upload images/files, import from Workspace, add notes
-- **Scene Editing**: Full editor with Content/Style/Animation/Media tabs
-- **Skill File**: Comprehensive Remotion documentation at `~/.claude/skills/remotion-video-generator/`
-- **10 Scene Types**: hook, content, bullet-list, quote, cta, title-card, whiteboard, stats, icon-reveal, split-screen
-- **Visual Elements**: 11 gradient presets, Lottie animations, drawing paths, particles
+**Remotion Video Studio Features:**
+- **Real PTY Terminal**: Full Claude Code terminal (like C3 Workspace, not headless)
+- **Per-User Projects**: Each user gets isolated npm projects
+- **`--dangerously-skip-permissions`**: Full access to all skills, MCP servers, plugins
+- **Minimal CLAUDE.md**: Just paths and basics, Claude discovers capabilities dynamically
+- **Workflow**: User inputs idea → Claude researches, plans, builds, renders → View video
+- **Storage**: `/data/users/{user-id}/video-studio/{project-name}/`
 
 **Unified Project Architecture:**
 - Workspace projects: `/data/users/{user-id}/projects/{project-name}/`
@@ -101,7 +96,7 @@ lsof -i :3000 -i :8000  # Check our ports
 | Approved | Full access | 30 days |
 | Trial | Full for 24h | 1 day |
 
-**Protected Routes:** `/workspace`, `/data-studio`, `/video-factory`, `/ccresearch`
+**Protected Routes:** `/workspace`, `/data-studio`, `/video-studio`, `/ccresearch`
 
 **Per-User Data:** `/data/users/{user-uuid}/projects/` (unified project storage)
 
@@ -219,15 +214,22 @@ journalctl -u cloudflared -f
 /data/
 ├── users/              # Per-user data
 │   └── {user-id}/
-│       ├── projects/   # Unified project storage (CCResearch + Workspace + Data Studio)
+│       ├── projects/   # Unified project storage (CCResearch + Workspace)
 │       │   └── {project-name}/
 │       │       ├── .project.json  # Project metadata
 │       │       ├── data/          # User files
 │       │       ├── notes/         # Workspace notes
 │       │       ├── output/        # Generated outputs
-│       │       ├── .claude/       # Workspace Claude config
-│       │       └── .data-studio/  # Data Studio sessions + dashboards
-│       └── video-factory/
+│       │       └── .claude/       # Workspace Claude config
+│       ├── data-studio-projects/  # Data Studio projects
+│       └── video-studio/          # Video Studio projects
+│           └── {project-name}/
+│               ├── .project.json  # Project metadata
+│               ├── package.json   # npm project
+│               ├── src/           # Remotion components
+│               ├── public/        # Assets (images, audio)
+│               ├── out/           # Rendered videos
+│               └── .claude/       # Minimal CLAUDE.md
 ├── ccresearch-logs/    # Session logs
 └── claude-workspaces/  # Legacy (deprecated)
 ```
@@ -240,13 +242,9 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
-| 2026-01-24 | **MAJOR: Video Studio v4.0** - Interactive step-by-step flow with recommendations |
-| 2026-01-24 | **Video Studio:** Recommendations Agent - Claude suggests genre, style, animations, hooks |
-| 2026-01-24 | **Video Studio:** Visual Preview - Scene cards with gradient previews and image thumbnails |
-| 2026-01-24 | **Video Studio:** Session continuity via `--continue` flag across steps |
-| 2026-01-24 | **Video Studio:** Compact video popup player (draggable, minimizable) |
-| 2026-01-24 | **Video Studio:** New components - RecommendationsPanel, VisualPreview, VideoPopup, StepIndicator |
-| 2026-01-24 | **Video Studio:** Enhanced Remotion skill file with v4.0 workflow documentation |
+| 2026-01-28 | **NEW: Remotion Video Studio** - Real PTY terminal for video creation with full Claude access |
+| 2026-01-28 | **Video Studio:** Per-user npm projects, --dangerously-skip-permissions, minimal CLAUDE.md |
+| 2026-01-28 | **REMOVED: Video Factory** - Replaced by Video Studio |
 | 2026-01-23 | **Data Studio:** Fix empty stat cards/charts - support alternate field names |
 | 2026-01-23 | **Data Studio:** Fix [Object] display - properly stringify result objects |
 | 2026-01-23 | **Data Studio:** Multi-file analysis mode selector (combined vs separate) |

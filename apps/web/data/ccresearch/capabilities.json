@@ -1,6 +1,13 @@
 {
-  "version": "2.2.0",
-  "lastUpdated": "2026-01-21",
+  "version": "2.3.0",
+  "lastUpdated": "2026-01-28",
+  "features": {
+    "mobileSupport": true,
+    "minScreenWidth": 390,
+    "supportedDevices": ["iPhone 12+", "Android", "iPad", "Desktop"],
+    "persistentState": true,
+    "sessionResume": true
+  },
   "plugins": [
     {
       "id": "scientific-skills",

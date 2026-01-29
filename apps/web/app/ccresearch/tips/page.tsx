@@ -25,7 +25,11 @@ import {
   RefreshCw,
   Target,
   Wrench,
-  Search
+  Search,
+  Smartphone,
+  Keyboard,
+  History,
+  Menu
 } from 'lucide-react';
 
 // Copy button component
@@ -143,7 +147,7 @@ export default function TipsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
-                href="/ccresearch"
+                href="/workspace"
                 className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
               >
                 <ArrowLeft className="w-5 h-5 text-gray-400" />
@@ -151,7 +155,7 @@ export default function TipsPage() {
               <div>
                 <h1 className="text-xl font-bold text-white flex items-center gap-2">
                   <BookOpen className="w-6 h-6 text-amber-400" />
-                  Tips Before Using CCResearch
+                  C3 Researcher Workspace Tips
                 </h1>
                 <p className="text-sm text-gray-400">
                   Get the most out of Claude Code with these prompting tips
@@ -421,9 +425,59 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
           </div>
         </Section>
 
+        {/* Mobile Usage Section */}
+        <Section
+          title="Using on Mobile Devices"
+          icon={<Smartphone className="w-5 h-5" />}
+          iconColor="text-emerald-400"
+        >
+          <TipCard title="Mobile Navigation" icon={<Menu className="w-5 h-5" />}>
+            <p>C3 Researcher Workspace is fully responsive for iPhone, Android, and iPad:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li><strong>Bottom tabs</strong> - Switch between Terminal, Notes, Data, and Files</li>
+              <li><strong>Hamburger menu</strong> - Tap to open project sidebar drawer</li>
+              <li><strong>Minimum width</strong> - Works on screens 390px+ (iPhone 12 and up)</li>
+            </ul>
+          </TipCard>
+
+          <TipCard title="Mobile Terminal Input" icon={<Keyboard className="w-5 h-5" />}>
+            <p>A special input bar appears below the terminal on mobile devices:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li><strong>Text input</strong> - Type commands using your soft keyboard</li>
+              <li><strong>Ctrl+C button</strong> - Interrupt running processes</li>
+              <li><strong>Tab button</strong> - Autocomplete file/command names</li>
+              <li><strong>Up/Down arrows</strong> - Navigate command history</li>
+              <li><strong>Quick commands</strong> - ls, cd, cat shortcuts</li>
+            </ul>
+          </TipCard>
+
+          <TipCard title="Command History on Mobile" icon={<History className="w-5 h-5" />}>
+            <p>Your command history is saved locally and persists across sessions:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>Tap the <strong>History button</strong> to see recent commands</li>
+              <li>Tap any command to insert it</li>
+              <li>Up to 50 commands are saved</li>
+              <li>Works offline - stored in browser localStorage</li>
+            </ul>
+          </TipCard>
+
+          <TipCard title="State Persistence" icon={<RefreshCw className="w-5 h-5" />}>
+            <p>Your workspace state is remembered across page refreshes:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>Selected project</li>
+              <li>Current view (Terminal, Notes, or Data)</li>
+              <li>Terminal mode (Claude Code or SSH)</li>
+              <li>File browser visibility</li>
+            </ul>
+            <p className="text-gray-400 text-xs mt-2">
+              Switching tabs keeps the terminal connected - no need to restart sessions.
+            </p>
+          </TipCard>
+        </Section>
+
         {/* Example Prompts Section */}
         <Section
-          title="Example Prompts for CCResearch"
+          title="Example Prompts for C3 Researcher"
           icon={<Sparkles className="w-5 h-5" />}
           iconColor="text-pink-400"
         >
@@ -472,11 +526,11 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
           </p>
           <div className="mt-6">
             <Link
-              href="/ccresearch"
+              href="/workspace"
               className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
             >
               <Terminal className="w-4 h-4" />
-              Start a CCResearch Session
+              Open C3 Researcher Workspace
             </Link>
           </div>
         </div>

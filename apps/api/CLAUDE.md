@@ -34,7 +34,7 @@ apps/api/
 │   │   ├── workspace.py           # Workspace API
 │   │   ├── data_studio.py         # C3 Data Studio (Legacy)
 │   │   ├── data_studio_v2.py      # C3 Data Studio V2 (REDESIGNED)
-│   │   ├── video_factory.py       # Video Factory (minimal - channel management)
+│   │   ├── video_studio.py        # Remotion Video Studio
 │   │   └── public_api.py          # Public endpoints
 │   └── core/
 │       ├── config.py              # Settings (Pydantic)
@@ -42,12 +42,12 @@ apps/api/
 │       ├── security.py            # JWT, passwords
 │       ├── ccresearch_manager.py  # CCResearch PTY manager
 │       ├── claude_runner.py       # Headless Claude Code for Data Studio V2
+│       ├── video_studio_manager.py # Video Studio PTY manager
 │       ├── project_manager.py     # Unified project manager
 │       ├── workspace_manager.py   # Workspace file manager
 │       ├── session_manager.py     # Session management
 │       ├── notifications.py       # Discord/ntfy alerts
-│       ├── user_access.py         # Per-user data access
-│       └── video_factory_manager.py # Video Factory project management
+│       └── user_access.py         # Per-user data access
 ├── requirements.txt
 ├── .env                           # Environment variables
 └── app.db                         # SQLite database
@@ -212,106 +212,69 @@ Legacy Data Studio API using headless Claude Code. See V2 for new implementation
 }
 ```
 
-### Video Studio (`/video-factory`) - v4.0 INTERACTIVE WORKFLOW
+### Video Studio (`/video-studio`)
 
-**AI-powered video script generation** with recommendations, research integration, and Remotion rendering.
+AI-powered video creation using real Claude Code PTY terminal with Remotion.
 
-**Workflow:** Idea → Recommendations → Plan (with research) → Preview → Script → Edit → Render
-
-**v4.0 Features:**
-- Session continuity via `--continue` flag
-- Recommendations agent for genre/style/animation suggestions
-- Research integration for facts/stats during planning
-- Visual preview with gradient and image thumbnails
-
-**Project Management:**
+**Projects:**
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/projects` | List projects (filter by email) |
-| POST | `/projects` | Create channel |
-| GET | `/projects/{id}` | Get project details |
-| DELETE | `/projects/{id}` | Delete project |
+| GET | `/projects` | List user's video projects |
+| POST | `/projects` | Create project (npm + Remotion setup) |
+| GET | `/projects/{name}` | Get project details |
+| DELETE | `/projects/{name}` | Delete project |
+| POST | `/projects/{name}/install` | Install npm dependencies |
 
-**Session Management:**
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/projects/{id}/session` | Get current session ID |
-| DELETE | `/projects/{id}/session` | Reset session (fresh start) |
-
-**Context Management:**
+**Sessions:**
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/projects/{id}/context` | Upload context (files, images, notes) |
-| GET | `/projects/{id}/context` | Get all context |
-| DELETE | `/projects/{id}/context/{type}/{name}` | Remove context item |
-| POST | `/projects/{id}/context/import` | Import from workspace project |
+| POST | `/projects/{name}/session` | Start Claude session (with video idea) |
+| POST | `/projects/{name}/session/terminate` | Terminate session |
+| POST | `/projects/{name}/session/resize` | Resize terminal |
 
-**Recommendations (v4.0):**
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/projects/{id}/recommendations` | Generate recommendations (SSE streaming) |
-| GET | `/projects/{id}/recommendations` | Get latest recommendations |
-| PUT | `/projects/{id}/recommendations/{rec_id}` | Update user selections |
-
-**Plan Generation:**
+**Videos:**
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/projects/{id}/plan` | Generate plan with research (SSE, uses --continue) |
-| GET | `/projects/{id}/plans` | List plans |
-| GET | `/projects/{id}/plans/{plan_id}` | Get plan details |
-| PUT | `/projects/{id}/plans/{plan_id}` | Update plan (user edits) |
-| POST | `/projects/{id}/plans/{plan_id}/generate` | Generate script from plan (SSE) |
+| GET | `/projects/{name}/videos` | List rendered videos |
+| GET | `/projects/{name}/videos/{filename}` | Stream/download video |
+| DELETE | `/projects/{name}/videos/{filename}` | Delete video |
 
-**Script Editing:**
+**WebSocket:**
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/projects/{id}/scripts` | List scripts |
-| GET | `/projects/{id}/scripts/{script_id}` | Get script |
-| PUT | `/projects/{id}/scripts/{script_id}` | Update full script |
-| DELETE | `/projects/{id}/scripts/{script_id}/scenes/{scene_id}` | Delete scene |
+| WS | `/terminal/{name}` | Bidirectional terminal I/O |
 
-**Rendering:**
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/projects/{id}/renders` | List rendered videos |
-| GET | `/projects/{id}/renders/{filename}` | Serve video file |
-| POST | `/projects/{id}/scripts/{script_id}/render` | Start Remotion render |
-
-**Key Modules:**
-
-| Module | Purpose |
-|--------|---------|
-| `video_studio_generator.py` | Recommendations + Plan + Script generation with --continue |
-| `video_factory_manager.py` | Project CRUD |
-
-**Skill File:**
-`~/.claude/skills/remotion-video-generator/skill.md` - Comprehensive Remotion documentation for Claude (updated with v4.0 workflow)
-
-**Storage:**
+**Project Structure:**
 ```
-/data/video-factory/project-data/{project_id}/
-├── .claude/
-│   ├── CLAUDE.md          # Dynamic context + task
-│   └── session_id.txt     # Session ID for --continue
-├── context/               # User-uploaded context
-│   ├── images/            # Context images
-│   ├── files/             # Data files
-│   ├── notes.md           # User notes
-│   └── references.json    # Workspace refs
-├── .recommendations/      # Recommendations from Claude (v4.0)
-│   └── {rec_id}.json
-├── .plans/                # Video plans with image_suggestions
-├── scripts/               # EnhancedVideoProps JSON
-├── images/                # Scene images
-└── renders/               # MP4 outputs
+/data/users/{user-id}/video-studio/{project}/
+├── .project.json          # Project metadata
+├── package.json           # npm dependencies (Remotion)
+├── remotion.config.ts     # Remotion configuration
+├── tsconfig.json          # TypeScript config
+├── src/                   # Video components
+│   ├── index.ts           # Remotion entry
+│   ├── Root.tsx           # Composition root
+│   └── Video.tsx          # Main video component
+├── public/                # Assets (images, audio)
+├── out/                   # Rendered videos (MP4)
+├── node_modules/          # npm packages
+└── .claude/
+    ├── CLAUDE.md          # Project instructions
+    └── settings.local.json # Permissions
 ```
+
+**Session Flow:**
+1. Create project → Sets up npm + Remotion scaffolding
+2. Install dependencies → `npm install`
+3. Start session → Spawns Claude Code PTY with idea prompt
+4. WebSocket terminal → Bidirectional I/O for user to see Claude working
+5. Claude researches, plans, builds, renders video
+6. Video appears in `/out` directory
+7. User can view/download rendered videos
 
 ---
 
@@ -579,8 +542,11 @@ The following modules were removed during cleanup:
 
 | Module | Date | Reason |
 |--------|------|--------|
-| `core/video_research.py` | 2026-01-24 | Video Factory cleanup - starting fresh |
-| `core/video_audio.py` | 2026-01-24 | Video Factory cleanup - starting fresh |
+| `routers/video_factory.py` | 2026-01-28 | Video Factory app removed |
+| `core/simple_video_generator.py` | 2026-01-28 | Video Factory app removed |
+| `core/video_script_generator.py` | 2026-01-28 | Video Factory app removed |
+| `core/video_research.py` | 2026-01-24 | Video Factory cleanup |
+| `core/video_audio.py` | 2026-01-24 | Video Factory cleanup |
 | `core/data_analyzer.py` | 2026-01-23 | Replaced by claude_runner.py (Claude Code First) |
 | `core/dashboard_generator.py` | 2026-01-23 | Replaced by claude_runner.py (Claude Code First) |
 | `core/data_studio_manager.py` | 2026-01-23 | Replaced by claude_runner.py |

@@ -1,8 +1,10 @@
-# Cloudflare Tunnel Setup for Custom Domain (ai.ultronsolar.in)
+# Cloudflare Tunnel Setup for Custom Domain
 
-**Your Domain:** ai.ultronsolar.in (registered at your registrar)
+**Current Domain:** orpheuscore.uk (primary)
+**Legacy Domain:** ai.ultronsolar.in (still works)
 **Goal:** Expose ACe_Toolkit to the internet via Cloudflare Tunnel
 **Auto-Start:** Yes (survives reboots without re-authentication)
+**Status:** CONFIGURED AND RUNNING
 
 ---
 
@@ -461,8 +463,10 @@ dig ai.ultronsolar.in
 ✅ **Auto-starts on reboot:** YES (systemd service)
 ✅ **Re-authentication needed:** NO (credentials stored)
 ✅ **Crontab entry needed:** NO (systemd handles it)
-✅ **Domain:** https://ai.ultronsolar.in
-✅ **API:** https://api.ultronsolar.in (optional)
+✅ **Primary Domain:** https://orpheuscore.uk
+✅ **Primary API:** https://api.orpheuscore.uk
+✅ **Legacy Domain:** https://ai.ultronsolar.in (still works)
+✅ **Legacy API:** https://api.ultronsolar.in (still works)
 ✅ **Cost:** FREE
 
 ---
@@ -490,6 +494,7 @@ curl https://ai.ultronsolar.in
 
 ---
 
-**Last Updated:** January 13, 2026
-**Domain:** ai.ultronsolar.in
-**Status:** Ready for setup
+**Last Updated:** January 28, 2026
+**Primary Domain:** orpheuscore.uk
+**Legacy Domain:** ai.ultronsolar.in
+**Status:** LIVE AND OPERATIONAL
