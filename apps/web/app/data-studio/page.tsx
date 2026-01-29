@@ -704,12 +704,12 @@ function AnalysisProgressView({
         }
     };
 
-    // Retry helper for fetching results (files may need time to flush)
+    // Retry helper for fetching results with exponential backoff
     const fetchWithRetry = async <T,>(
         fn: () => Promise<T>,
         label: string,
         maxRetries: number = 5,
-        delayMs: number = 1500
+        baseDelayMs: number = 1000
     ): Promise<T> => {
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
@@ -722,8 +722,10 @@ function AnalysisProgressView({
                     addLog(`❌ ${label} failed after ${maxRetries} attempts: ${e.message}`);
                     throw e;
                 }
-                addLog(`⏳ ${label} not ready, waiting ${delayMs}ms...`);
-                await new Promise(r => setTimeout(r, delayMs));
+                // Exponential backoff: 1s, 2s, 4s, 8s, 16s...
+                const delay = baseDelayMs * Math.pow(2, attempt - 1);
+                addLog(`⏳ ${label} not ready, waiting ${delay}ms...`);
+                await new Promise(r => setTimeout(r, delay));
             }
         }
         throw new Error(`${label} failed`);

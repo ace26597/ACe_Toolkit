@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   User, LogOut, Shield, Clock, Cpu, Globe, Users, Zap,
-  Database, FileText, Video, ChevronRight, Github, Star,
+  Database, FileText, Video, ChevronRight, Star,
   Smartphone, Server, DollarSign, Lock
 } from 'lucide-react';
 import { useAuth, LoginModal, ExperimentalBanner } from '@/components/auth';
@@ -41,15 +41,20 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-4">
-            <a
-              href="https://github.com/ace26597/ACe_Toolkit"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hidden sm:flex items-center gap-2 text-gray-400 hover:text-white transition-colors text-sm"
+            <Link
+              href="/showcase"
+              className="hidden sm:flex items-center gap-2 text-gray-400 hover:text-emerald-400 transition-colors text-sm"
             >
-              <Github className="w-4 h-4" />
-              <span>Star on GitHub</span>
-            </a>
+              <Star className="w-4 h-4" />
+              <span>Showcase</span>
+            </Link>
+            <Link
+              href="/directory"
+              className="hidden sm:flex items-center gap-2 text-gray-400 hover:text-purple-400 transition-colors text-sm"
+            >
+              <Server className="w-4 h-4" />
+              <span>Directory</span>
+            </Link>
 
             {loading ? (
               <div className="w-8 h-8 animate-pulse bg-gray-800 rounded-full" />
@@ -79,6 +84,16 @@ export default function Home() {
                         )}
                       </div>
                       <div className="p-2">
+                        {user.is_admin && (
+                          <Link
+                            href="/admin"
+                            onClick={() => setShowUserMenu(false)}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-400 hover:bg-amber-900/20 rounded-lg transition-colors"
+                          >
+                            <Shield className="w-4 h-4" />
+                            Admin Dashboard
+                          </Link>
+                        )}
                         <button
                           onClick={() => { logout(); setShowUserMenu(false); }}
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-red-900/20 rounded-lg transition-colors"
@@ -109,21 +124,21 @@ export default function Home() {
         <div className="max-w-6xl mx-auto px-4 pt-16 pb-20 sm:pt-24 sm:pb-28 relative">
           <div className="text-center max-w-3xl mx-auto">
             <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-4 py-1.5 mb-6">
-              <span className="text-emerald-400 text-sm font-medium">Open Source</span>
+              <span className="text-emerald-400 text-sm font-medium">145+ Skills</span>
               <span className="text-gray-500">|</span>
-              <span className="text-gray-400 text-sm">Self-Hosted</span>
+              <span className="text-gray-400 text-sm">26 MCP Servers</span>
               <span className="text-gray-500">|</span>
-              <span className="text-gray-400 text-sm">Free Forever</span>
+              <span className="text-gray-400 text-sm">12 Plugins</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-              Turn Any Device Into Your
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400"> Personal AI Research Lab</span>
+              Explore Claude Code
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400"> Skills & MCP Servers</span>
             </h1>
 
             <p className="text-lg sm:text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-              Deploy Claude Code with 145+ scientific skills on a Raspberry Pi or old laptop.
-              Access from anywhere. Share with family. Pay pennies.
+              Try Claude Code with 145+ scientific skills, 26 MCP servers, and 12 plugins — all for free.
+              Experiment with AI-powered research, data analysis, and video creation.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -140,19 +155,17 @@ export default function Home() {
                   onClick={() => setShowLoginModal(true)}
                   className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
                 >
-                  Start Free Trial
+                  Try Free
                   <ChevronRight className="w-5 h-5" />
                 </button>
               )}
-              <a
-                href="https://github.com/ace26597/ACe_Toolkit"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/showcase"
                 className="w-full sm:w-auto border border-gray-700 hover:border-gray-600 text-white font-medium px-8 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
               >
-                <Github className="w-5 h-5" />
-                View on GitHub
-              </a>
+                <Star className="w-5 h-5" />
+                View Showcase
+              </Link>
             </div>
           </div>
         </div>
@@ -171,58 +184,58 @@ export default function Home() {
               <div className="text-sm text-gray-400 mt-1">MCP Servers</div>
             </div>
             <div>
-              <div className="text-3xl sm:text-4xl font-bold text-cyan-400">30+</div>
-              <div className="text-sm text-gray-400 mt-1">Databases</div>
+              <div className="text-3xl sm:text-4xl font-bold text-cyan-400">12</div>
+              <div className="text-sm text-gray-400 mt-1">Plugins</div>
             </div>
             <div>
-              <div className="text-3xl sm:text-4xl font-bold text-blue-400">~$80</div>
-              <div className="text-sm text-gray-400 mt-1">Total Hardware Cost</div>
+              <div className="text-3xl sm:text-4xl font-bold text-blue-400">30+</div>
+              <div className="text-sm text-gray-400 mt-1">Databases</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Why Self-Host */}
+      {/* What You Can Explore */}
       <section className="py-16 sm:py-24">
         <div className="max-w-6xl mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">Why Self-Host?</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">What You Can Explore</h2>
             <p className="text-gray-400 max-w-2xl mx-auto">
-              Own your AI research infrastructure. No recurring fees. No data leaving your network.
+              Full access to Claude Code with skills, MCP servers, and plugins. Try everything for free.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-emerald-500/50 transition-colors">
               <div className="w-12 h-12 bg-emerald-500/10 rounded-lg flex items-center justify-center mb-4">
-                <DollarSign className="w-6 h-6 text-emerald-400" />
+                <Zap className="w-6 h-6 text-emerald-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Share Costs</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">145+ Skills</h3>
               <p className="text-gray-400 text-sm">
-                One API key, multiple users. Split Anthropic costs with family or research group.
-                Pi runs 24/7 for ~$5/year electricity.
+                Scientific research, drug discovery, genomics, data analysis, document generation,
+                and more — all accessible via slash commands.
               </p>
             </div>
 
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-teal-500/50 transition-colors">
               <div className="w-12 h-12 bg-teal-500/10 rounded-lg flex items-center justify-center mb-4">
-                <Globe className="w-6 h-6 text-teal-400" />
+                <Server className="w-6 h-6 text-teal-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Access Anywhere</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">26 MCP Servers</h3>
               <p className="text-gray-400 text-sm">
-                Cloudflare Tunnel gives you free HTTPS from any device.
-                Research from your phone, tablet, or any computer.
+                PubMed, ChEMBL, Clinical Trials, ICD-10, NPI Registry, HuggingFace,
+                Memory, Playwright, and more — direct database access.
               </p>
             </div>
 
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 hover:border-cyan-500/50 transition-colors">
               <div className="w-12 h-12 bg-cyan-500/10 rounded-lg flex items-center justify-center mb-4">
-                <Lock className="w-6 h-6 text-cyan-400" />
+                <Cpu className="w-6 h-6 text-cyan-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">Data Control</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">12 Plugins</h3>
               <p className="text-gray-400 text-sm">
-                Your research stays on your hardware. Per-user isolation.
-                JWT auth with HTTP-only cookies. Full encryption.
+                Scientific Skills, Frontend Design, Feature Dev, Document Skills,
+                HuggingFace integration, and more — extend Claude's capabilities.
               </p>
             </div>
           </div>
@@ -316,57 +329,96 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Hardware Section */}
+      {/* Experimentation Section */}
       <section className="py-16 sm:py-24">
         <div className="max-w-6xl mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">Run It On Anything</h2>
-            <p className="text-gray-400">Raspberry Pi, old laptop, mini PC - if it runs Linux, it works</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">Experiment & Build</h2>
+            <p className="text-gray-400">Explore what's possible with Claude Code and the MCP ecosystem</p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 text-center">
-              <div className="w-16 h-16 bg-green-500/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Server className="w-8 h-8 text-green-400" />
+              <div className="w-16 h-16 bg-emerald-500/10 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <Database className="w-8 h-8 text-emerald-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-1">Raspberry Pi 5</h3>
-              <p className="text-green-400 text-sm mb-3">Recommended</p>
-              <p className="text-gray-400 text-sm">~$80 • 8GB RAM • 24/7 operation • Whisper quiet</p>
-            </div>
-
-            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 text-center">
-              <div className="w-16 h-16 bg-blue-500/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Cpu className="w-8 h-8 text-blue-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white mb-1">Old Laptop</h3>
-              <p className="text-blue-400 text-sm mb-3">Free</p>
-              <p className="text-gray-400 text-sm">Use what you have • 4GB+ RAM • Linux/macOS/WSL</p>
+              <h3 className="text-lg font-semibold text-white mb-1">C3 Researcher</h3>
+              <p className="text-emerald-400 text-sm mb-3">This Platform</p>
+              <p className="text-gray-400 text-sm">Full Claude Code terminal with all skills, MCP servers, and plugins</p>
             </div>
 
             <div className="bg-gray-900 border border-gray-800 rounded-xl p-6 text-center">
               <div className="w-16 h-16 bg-purple-500/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                <Zap className="w-8 h-8 text-purple-400" />
+                <Users className="w-8 h-8 text-purple-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-1">Mini PC</h3>
-              <p className="text-purple-400 text-sm mb-3">Power User</p>
-              <p className="text-gray-400 text-sm">~$200-400 • 16GB+ RAM • Best performance</p>
+              <h3 className="text-lg font-semibold text-white mb-1">Clawdbot</h3>
+              <p className="text-purple-400 text-sm mb-3">Installed • Private Beta</p>
+              <p className="text-gray-400 text-sm">Multi-agent orchestration with skill sharing and collaborative AI workflows</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Pricing/Future */}
+      {/* Showcase Preview */}
+      <section className="py-16 sm:py-24 border-t border-gray-800">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">See What's Been Built</h2>
+            <p className="text-gray-400 max-w-2xl mx-auto">
+              Real projects created using C3 Researcher — from AI videos to clinical trials research.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center mb-4">
+                <Video className="w-5 h-5 text-purple-400" />
+              </div>
+              <h3 className="font-semibold text-white mb-2">AI-Generated Videos</h3>
+              <p className="text-gray-400 text-sm">Claude researched, scripted, and rendered explainer videos using Remotion</p>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <div className="w-10 h-10 bg-amber-500/20 rounded-lg flex items-center justify-center mb-4">
+                <Database className="w-5 h-5 text-amber-400" />
+              </div>
+              <h3 className="font-semibold text-white mb-2">Clinical Trials Analysis</h3>
+              <p className="text-gray-400 text-sm">917 Parkinson's trials analyzed using AACT database access</p>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-6">
+              <div className="w-10 h-10 bg-cyan-500/20 rounded-lg flex items-center justify-center mb-4">
+                <FileText className="w-5 h-5 text-cyan-400" />
+              </div>
+              <h3 className="font-semibold text-white mb-2">Deep Research</h3>
+              <p className="text-gray-400 text-sm">100KB+ research dossiers with comparisons, strategies, and project ideas</p>
+            </div>
+          </div>
+
+          <div className="text-center">
+            <Link
+              href="/showcase"
+              className="inline-flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white font-medium px-6 py-3 rounded-lg transition-colors"
+            >
+              View All Projects
+              <ChevronRight className="w-5 h-5" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Free Access */}
       <section className="py-16 sm:py-24 bg-gray-900/30">
         <div className="max-w-4xl mx-auto px-4 text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">Always Free to Self-Host</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold text-white mb-4">Try Everything Free</h2>
           <p className="text-gray-400 mb-8 max-w-2xl mx-auto">
-            This is open source. Deploy on your own hardware forever.
-            We may offer a hosted option in the future for those who prefer not to self-host.
+            Explore Claude Code skills, MCP servers, and plugins without any cost.
+            Create an account and start experimenting in seconds.
           </p>
 
           <div className="bg-gray-900 border border-gray-800 rounded-xl p-8 max-w-md mx-auto">
-            <div className="text-3xl font-bold text-white mb-2">$0</div>
-            <div className="text-gray-400 mb-6">Forever • Self-Hosted</div>
+            <div className="text-3xl font-bold text-white mb-2">Free</div>
+            <div className="text-gray-400 mb-6">No credit card required</div>
             <ul className="text-left space-y-3 mb-6">
               <li className="flex items-center gap-2 text-gray-300">
                 <Star className="w-4 h-4 text-emerald-400" />
@@ -378,25 +430,23 @@ export default function Home() {
               </li>
               <li className="flex items-center gap-2 text-gray-300">
                 <Star className="w-4 h-4 text-emerald-400" />
-                Multi-user support
+                26 MCP servers
+              </li>
+              <li className="flex items-center gap-2 text-gray-300">
+                <Star className="w-4 h-4 text-emerald-400" />
+                12 plugins
               </li>
               <li className="flex items-center gap-2 text-gray-300">
                 <Star className="w-4 h-4 text-emerald-400" />
                 Mobile access
               </li>
-              <li className="flex items-center gap-2 text-gray-300">
-                <Star className="w-4 h-4 text-emerald-400" />
-                All updates included
-              </li>
             </ul>
-            <a
-              href="https://github.com/ace26597/ACe_Toolkit"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-lg transition-colors"
+            <button
+              onClick={() => setShowLoginModal(true)}
+              className="block w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 rounded-lg transition-colors cursor-pointer"
             >
-              Get Started on GitHub
-            </a>
+              Try Free
+            </button>
           </div>
         </div>
       </section>
@@ -421,7 +471,8 @@ export default function Home() {
               <span className="text-sm text-gray-400">C3 Researcher</span>
             </div>
             <div className="flex items-center gap-6 text-sm text-gray-400">
-              <a href="https://github.com/ace26597/ACe_Toolkit" className="hover:text-white transition-colors">GitHub</a>
+              <Link href="/showcase" className="hover:text-white transition-colors">Showcase</Link>
+              <Link href="/directory" className="hover:text-white transition-colors">Directory</Link>
               <Link href="/ccresearch/tips" className="hover:text-white transition-colors">Tips</Link>
               <Link href="/ccresearch/use-cases" className="hover:text-white transition-colors">Use Cases</Link>
             </div>

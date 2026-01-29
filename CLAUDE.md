@@ -1,6 +1,21 @@
 # CLAUDE.md - ACe_Toolkit
 
-**Last Updated:** January 28, 2026 | **Status:** Active | **Deployment:** Raspberry Pi + Cloudflare Tunnel
+**Last Updated:** January 29, 2026 | **Status:** Active | **Deployment:** Raspberry Pi + Cloudflare Tunnel
+
+---
+
+## Claude Code Extensions (User Scope)
+
+All Claude Code extensions are configured at **user scope** (`~/.claude/`) for global availability across all sessions:
+
+| Component | Count | Location |
+|-----------|-------|----------|
+| **MCP Servers** | 34 | `~/.claude.json` |
+| **Skills** | 14 | `~/.claude/skills/` |
+| **Agents** | 13 | `~/.claude/agents/` |
+| **Plugins** | 15 | `~/.claude/settings.json` |
+
+This means all C3 Researcher, Data Studio, and Video Studio sessions automatically have access to all extensions without per-project configuration.
 
 ---
 
@@ -42,7 +57,7 @@ lsof -i :3000 -i :8000  # Check our ports
 | **Remotion Video Studio** | `/video-studio` | AI video creation with Claude Code terminal + Remotion |
 
 **C3 Researcher Workspace Features:**
-- 145+ scientific skills, 26 MCP servers, 14 plugins
+- 145+ scientific skills, 34 MCP servers, 15 plugins (all user-scoped)
 - Access to 30+ databases: PubMed, ChEMBL, AACT (566K+ trials), UniProt, etc.
 - Claude Code terminal with SSH mode option
 - Project-based workspace with notes and file management
@@ -242,6 +257,8 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
+| 2026-01-29 | **MIGRATION: User Scope Extensions** - All MCP, skills, agents, plugins moved to ~/.claude/ for global access |
+| 2026-01-29 | **Cleanup:** Removed project-scope duplicates (.mcp.json, .claude/skills/, .claude/agents/) |
 | 2026-01-28 | **NEW: Remotion Video Studio** - Real PTY terminal for video creation with full Claude access |
 | 2026-01-28 | **Video Studio:** Per-user npm projects, --dangerously-skip-permissions, minimal CLAUDE.md |
 | 2026-01-28 | **REMOVED: Video Factory** - Replaced by Video Studio |

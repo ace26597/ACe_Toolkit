@@ -309,15 +309,45 @@ async def get_my_status(current_user: User = Depends(get_current_user)):
 
 # ==================== Admin Endpoints ====================
 
-@router.get("/admin/users", response_model=List[UserAdminResponse])
+@router.get("/admin/users")
 async def list_all_users(
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all users (admin only)."""
+    """List all users with stats (admin only)."""
     result = await db.execute(select(User).order_by(User.created_at.desc()))
     users = result.scalars().all()
-    return users
+
+    # Calculate stats
+    total_users = len(users)
+    approved_users = sum(1 for u in users if u.is_approved)
+    trial_users = sum(1 for u in users if not u.is_approved and u.trial_expires_at)
+    admin_users = sum(1 for u in users if u.is_admin)
+
+    # Convert users to dict format
+    users_data = []
+    for u in users:
+        users_data.append({
+            "id": str(u.id),
+            "email": u.email,
+            "name": u.name,
+            "is_admin": u.is_admin,
+            "is_approved": u.is_approved,
+            "is_trial": not u.is_approved and u.trial_expires_at is not None,
+            "trial_expires_at": u.trial_expires_at.isoformat() if u.trial_expires_at else None,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "last_login": u.last_login_at.isoformat() if u.last_login_at else None,
+        })
+
+    return {
+        "users": users_data,
+        "stats": {
+            "total_users": total_users,
+            "approved_users": approved_users,
+            "trial_users": trial_users,
+            "admin_users": admin_users,
+        }
+    }
 
 
 @router.post("/admin/users/{user_id}/approve")

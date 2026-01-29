@@ -298,6 +298,30 @@
       "status": "active",
       "category": "utility",
       "tools": ["get_accounts", "get_transactions"]
+    },
+    {
+      "id": "yahoo-finance",
+      "name": "Yahoo Finance",
+      "description": "Stock quotes, historical prices, company info, news (FREE)",
+      "status": "active",
+      "category": "finance",
+      "tools": ["get_stock_quote", "get_historical_prices", "get_company_info", "get_financials", "get_news"]
+    },
+    {
+      "id": "alpaca",
+      "name": "Alpaca Trading",
+      "description": "Trade stocks, ETFs, crypto, options + market data (FREE paper trading)",
+      "status": "active",
+      "category": "finance",
+      "tools": ["get_account", "get_positions", "place_order", "get_market_data", "get_bars"]
+    },
+    {
+      "id": "coingecko",
+      "name": "CoinGecko",
+      "description": "Crypto prices, market data, 8M+ tokens, 200+ chains (FREE official MCP)",
+      "status": "active",
+      "category": "finance",
+      "tools": ["get_price", "get_market_data", "get_coin_info", "search_coins", "get_trending"]
     }
   ],
   "scientificCategories": [
@@ -352,11 +376,12 @@
   ],
   "stats": {
     "totalSkills": 145,
-    "totalPlugins": 14,
-    "totalMcpServers": 26,
+    "totalPlugins": 13,
+    "totalMcpServers": 29,
     "scientificMcpServers": 11,
     "aiMcpServers": 2,
     "utilityMcpServers": 13,
+    "financeMcpServers": 3,
     "totalDatabases": 30,
     "installedSkills": 15,
     "installedAgents": 1

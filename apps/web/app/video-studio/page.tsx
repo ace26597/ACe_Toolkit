@@ -213,6 +213,11 @@ function VideoStudioContent() {
 
     return () => {
       mounted = false;
+      // Close WebSocket on unmount to prevent memory leaks
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
       if (xtermRef.current) {
         (xtermRef.current as any).dispose();
         xtermRef.current = null;

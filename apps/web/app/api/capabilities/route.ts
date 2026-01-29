@@ -79,7 +79,7 @@ export async function GET() {
     },
     stats: {
       totalSkills: 145,
-      totalPlugins: 14,
+      totalPlugins: 12,
       totalMcpServers: 26,
       medicalMcpServers: 10,
       researchMcpServers: 4,

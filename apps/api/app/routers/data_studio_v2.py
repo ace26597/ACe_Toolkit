@@ -13,15 +13,20 @@ import json
 import logging
 import os
 import shutil
+import uuid
 from datetime import datetime
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from jose import jwt, JWTError
+from sqlalchemy.future import select
 
 from app.core.claude_runner import claude_runner
 from app.core.user_access import require_valid_access
+from app.core.database import AsyncSessionLocal
+from app.core.config import settings
 from app.models.models import User
 
 logger = logging.getLogger(__name__)
@@ -655,6 +660,27 @@ async def nlp_edit(
 
 # ==================== Chat Interface ====================
 
+async def get_user_from_websocket(websocket: WebSocket) -> Optional[User]:
+    """Authenticate user from WebSocket cookies (same pattern as Video Studio)."""
+    token = websocket.cookies.get("access_token")
+    if not token:
+        return None
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        user_id_str: str = payload.get("sub")
+        if user_id_str is None:
+            return None
+        user_id = uuid.UUID(user_id_str)
+    except (JWTError, ValueError):
+        return None
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalars().first()
+        return user
+
+
 @router.websocket("/projects/{project_name}/chat")
 async def chat_websocket(
     websocket: WebSocket,
@@ -663,8 +689,10 @@ async def chat_websocket(
     """
     WebSocket endpoint for chat-based data analysis.
 
+    Authentication is done via HTTP-only cookie (access_token),
+    same pattern as Video Studio for security.
+
     Client sends:
-    - {"type": "auth", "token": "..."} - Authenticate first
     - {"type": "message", "content": "...", "mode": "headless|terminal"}
     - {"type": "ping"}
 
@@ -679,8 +707,23 @@ async def chat_websocket(
     """
     await websocket.accept()
 
-    user_id = None
-    project_dir = None
+    # Authenticate via HTTP-only cookie (secure pattern from Video Studio)
+    user = await get_user_from_websocket(websocket)
+    if not user:
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+
+    user_id = str(user.id)
+    project_dir = get_project_dir(user_id, project_name)
+
+    # Verify project exists and belongs to user
+    if not os.path.exists(project_dir):
+        await websocket.send_json({"type": "error", "content": "Project not found"})
+        await websocket.close(code=4004, reason="Project not found")
+        return
+
+    logger.info(f"Chat WebSocket connected for {user_id}:{project_name}")
+    await websocket.send_json({"type": "status", "content": "Authenticated"})
 
     try:
         while True:
@@ -691,28 +734,7 @@ async def chat_websocket(
                 await websocket.send_json({"type": "pong"})
                 continue
 
-            if msg_type == "auth":
-                # Simple auth - in production, verify JWT token
-                token = data.get("token", "")
-                # For now, extract user_id from token (simplified)
-                # In production, decode and verify JWT
-                user_id = data.get("user_id", "")
-                if user_id:
-                    project_dir = get_project_dir(user_id, project_name)
-                    if os.path.exists(project_dir):
-                        await websocket.send_json({"type": "status", "content": "Authenticated"})
-                    else:
-                        await websocket.send_json({"type": "error", "content": "Project not found"})
-                        user_id = None
-                else:
-                    await websocket.send_json({"type": "error", "content": "Invalid authentication"})
-                continue
-
             if msg_type == "message":
-                if not user_id or not project_dir:
-                    await websocket.send_json({"type": "error", "content": "Not authenticated"})
-                    continue
-
                 content = data.get("content", "")
                 mode = data.get("mode", "headless")
 
