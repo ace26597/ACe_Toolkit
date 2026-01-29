@@ -2375,15 +2375,15 @@ export default function WorkspacePage() {
                     {/* Stats Bar */}
                     <div className="flex-shrink-0 grid grid-cols-4 gap-2 p-4 border-b border-slate-800">
                       <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2.5 text-center">
-                        <div className="text-lg font-bold text-emerald-400">140+</div>
+                        <div className="text-lg font-bold text-emerald-400">145+</div>
                         <div className="text-xs text-slate-500">Skills</div>
                       </div>
                       <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2.5 text-center">
-                        <div className="text-lg font-bold text-blue-400">26</div>
+                        <div className="text-lg font-bold text-blue-400">34</div>
                         <div className="text-xs text-slate-500">MCP Servers</div>
                       </div>
                       <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2.5 text-center">
-                        <div className="text-lg font-bold text-purple-400">13</div>
+                        <div className="text-lg font-bold text-purple-400">14</div>
                         <div className="text-xs text-slate-500">Plugins</div>
                       </div>
                       <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2.5 text-center">

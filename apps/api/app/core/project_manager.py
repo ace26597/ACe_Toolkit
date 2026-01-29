@@ -280,32 +280,131 @@ class ProjectManager:
             await f.write(json.dumps(meta, indent=2))
 
     def _get_claude_settings(self) -> Dict[str, Any]:
-        """Get Claude Code settings for project-level permissions."""
+        """Get Claude Code settings for project-level permissions.
+
+        SECURITY: Comprehensive deny rules to prevent:
+        - Access to sensitive files (credentials, keys, configs)
+        - Process manipulation (kill, signal)
+        - Service/system control (systemctl, reboot)
+        - Privilege escalation (sudo, su)
+        - Container/virtualization escape (docker, podman)
+        - Package management (apt, pip - could install malware)
+        - Network recon/exfiltration (curl, wget, nc)
+        - Access to other users' data
+        """
         return {
             "permissions": {
                 "allow": ["Bash", "Read", "Write", "Edit"],
                 "deny": [
-                    # Block access to sensitive system files
+                    # ===== SENSITIVE FILES =====
+                    # Credentials and keys
                     "Read(/home/ace/.ccresearch_allowed_emails.json)",
-                    "Read(/home/ace/.claude/CLAUDE.md)",
+                    "Read(/home/ace/.secrets/**)",
+                    "Read(/home/ace/.credentials/**)",
+                    "Read(/home/ace/.ssh/**)",
+                    "Read(/home/ace/.gnupg/**)",
+                    "Read(/home/ace/.aws/**)",
+                    "Read(/home/ace/.config/gcloud/**)",
+                    "Read(/home/ace/.kube/**)",
+                    "Read(/home/ace/.env)",
+                    "Read(/home/ace/.env.*)",
+                    "Read(/home/ace/.bashrc)",
+                    "Read(/home/ace/.bash_history)",
+                    "Read(/home/ace/.zshrc)",
+                    "Read(/home/ace/.zsh_history)",
+                    "Read(/home/ace/.netrc)",
+                    "Read(/home/ace/.npmrc)",
+                    "Read(/home/ace/.pypirc)",
+                    # Application source code
                     "Read(/home/ace/dev/**)",
                     "Write(/home/ace/dev/**)",
                     "Edit(/home/ace/dev/**)",
-                    "Read(/home/ace/.ssh/**)",
-                    "Read(/home/ace/.gnupg/**)",
-                    "Read(/home/ace/.env)",
-                    "Read(/home/ace/.env.*)",
+                    # Claude config (prevent meta-attacks)
+                    "Read(/home/ace/.claude/CLAUDE.md)",
+                    "Read(/home/ace/.claude.json)",
+                    "Read(/home/ace/.claude/settings.json)",
+                    # System files
                     "Read(/etc/shadow)",
                     "Read(/etc/passwd)",
-                    # Block dangerous commands
+                    "Read(/etc/sudoers)",
+                    "Read(/etc/sudoers.d/**)",
+                    # Other users' data
+                    "Read(/data/users/**)",
+
+                    # ===== PROCESS MANIPULATION =====
                     "Bash(kill:*)",
                     "Bash(pkill:*)",
+                    "Bash(killall:*)",
+                    "Bash(fuser:*)",
+                    "Bash(xkill:*)",
+
+                    # ===== SERVICE/SYSTEM CONTROL =====
                     "Bash(systemctl:*)",
-                    "Bash(sudo:*)",
-                    "Bash(su:*)",
+                    "Bash(service:*)",
+                    "Bash(journalctl:*)",
                     "Bash(shutdown:*)",
                     "Bash(reboot:*)",
-                    "Bash(docker:*)"
+                    "Bash(poweroff:*)",
+                    "Bash(halt:*)",
+                    "Bash(init:*)",
+                    "Bash(telinit:*)",
+                    "Bash(crontab:*)",
+
+                    # ===== PRIVILEGE ESCALATION =====
+                    "Bash(sudo:*)",
+                    "Bash(su:*)",
+                    "Bash(doas:*)",
+                    "Bash(pkexec:*)",
+                    "Bash(gksu:*)",
+                    "Bash(gksudo:*)",
+                    "Bash(chmod:*)",
+                    "Bash(chown:*)",
+                    "Bash(chgrp:*)",
+
+                    # ===== CONTAINERS/VIRTUALIZATION =====
+                    "Bash(docker:*)",
+                    "Bash(podman:*)",
+                    "Bash(kubectl:*)",
+                    "Bash(lxc:*)",
+                    "Bash(virsh:*)",
+                    "Bash(qemu:*)",
+
+                    # ===== PACKAGE MANAGEMENT =====
+                    "Bash(apt:*)",
+                    "Bash(apt-get:*)",
+                    "Bash(dpkg:*)",
+                    "Bash(yum:*)",
+                    "Bash(dnf:*)",
+                    "Bash(pacman:*)",
+                    "Bash(snap:*)",
+                    "Bash(flatpak:*)",
+
+                    # ===== DISK/MOUNT OPERATIONS =====
+                    "Bash(mount:*)",
+                    "Bash(umount:*)",
+                    "Bash(fdisk:*)",
+                    "Bash(parted:*)",
+                    "Bash(mkfs:*)",
+                    "Bash(dd:*)",
+
+                    # ===== NETWORK (prevent exfiltration) =====
+                    # Note: Some tools useful for research - consider if needed
+                    "Bash(nc:*)",
+                    "Bash(netcat:*)",
+                    "Bash(ncat:*)",
+                    "Bash(socat:*)",
+                    "Bash(nmap:*)",
+                    "Bash(tcpdump:*)",
+                    "Bash(wireshark:*)",
+                    "Bash(iptables:*)",
+                    "Bash(ufw:*)",
+
+                    # ===== SYSTEM INFO (limit recon) =====
+                    "Bash(passwd:*)",
+                    "Bash(useradd:*)",
+                    "Bash(userdel:*)",
+                    "Bash(usermod:*)",
+                    "Bash(groupadd:*)",
                 ]
             },
             "hasClaudeMdExternalIncludesApproved": False,
@@ -350,9 +449,9 @@ class ProjectManager:
 ## Capabilities
 
 This project has full access to Claude Code with:
-- 140+ scientific research skills
-- 26 MCP servers (PubMed, ChEMBL, AACT, etc.)
-- 13 plugins
+- 145+ scientific research skills
+- 34 MCP servers (PubMed, ChEMBL, AACT, etc.)
+- 14 plugins
 - Full file system access within this workspace
 
 ---

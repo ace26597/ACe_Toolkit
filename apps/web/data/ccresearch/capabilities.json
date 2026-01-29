@@ -1,6 +1,6 @@
 {
-  "version": "2.3.0",
-  "lastUpdated": "2026-01-28",
+  "version": "2.4.0",
+  "lastUpdated": "2026-01-29",
   "features": {
     "mobileSupport": true,
     "minScreenWidth": 390,
@@ -87,6 +87,12 @@
       "id": "aact-clinical-trials",
       "name": "AACT Clinical Trials",
       "description": "Query AACT Clinical Trials database (566K+ studies) via SQL",
+      "status": "active"
+    },
+    {
+      "id": "claude-md-management",
+      "name": "Claude MD Management",
+      "description": "Manage and improve CLAUDE.md files across projects",
       "status": "active"
     }
   ],
@@ -322,6 +328,46 @@
       "status": "active",
       "category": "finance",
       "tools": ["get_price", "get_market_data", "get_coin_info", "search_coins", "get_trending"]
+    },
+    {
+      "id": "MongoDB",
+      "name": "MongoDB",
+      "description": "MongoDB database operations and queries",
+      "status": "active",
+      "category": "utility",
+      "tools": ["connect", "find", "aggregate", "collection-schema", "list-collections", "list-databases"]
+    },
+    {
+      "id": "hugging-face",
+      "name": "HuggingFace (Anonymous)",
+      "description": "HuggingFace Hub access without authentication",
+      "status": "active",
+      "category": "ai",
+      "tools": ["model_search", "dataset_search", "paper_search", "space_search"]
+    },
+    {
+      "id": "hf-image",
+      "name": "HuggingFace Image",
+      "description": "Image generation with HuggingFace models (FLUX, etc.)",
+      "status": "active",
+      "category": "ai",
+      "tools": ["FLUX_1-schnell-infer", "available-files", "search-spaces"]
+    },
+    {
+      "id": "remotion",
+      "name": "Remotion",
+      "description": "Programmatic video creation with React",
+      "status": "active",
+      "category": "utility",
+      "tools": ["remotion-documentation"]
+    },
+    {
+      "id": "remotion-documentation",
+      "name": "Remotion Docs",
+      "description": "Remotion documentation lookup",
+      "status": "active",
+      "category": "utility",
+      "tools": ["remotion-documentation"]
     }
   ],
   "scientificCategories": [
@@ -376,15 +422,15 @@
   ],
   "stats": {
     "totalSkills": 145,
-    "totalPlugins": 13,
-    "totalMcpServers": 29,
+    "totalPlugins": 14,
+    "totalMcpServers": 34,
     "scientificMcpServers": 11,
-    "aiMcpServers": 2,
-    "utilityMcpServers": 13,
+    "aiMcpServers": 4,
+    "utilityMcpServers": 16,
     "financeMcpServers": 3,
     "totalDatabases": 30,
     "installedSkills": 15,
-    "installedAgents": 1
+    "installedAgents": 13
   },
   "agents": [
     {

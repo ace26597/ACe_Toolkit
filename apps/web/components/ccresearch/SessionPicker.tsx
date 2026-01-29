@@ -171,19 +171,19 @@ export function SessionPicker({
           {/* Stats Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-emerald-400">140+</div>
+              <div className="text-2xl font-bold text-emerald-400">145+</div>
               <div className="text-xs text-gray-500 flex items-center justify-center gap-1">
                 <FlaskConical className="w-3 h-3" /> Skills
               </div>
             </div>
             <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-blue-400">26</div>
+              <div className="text-2xl font-bold text-blue-400">34</div>
               <div className="text-xs text-gray-500 flex items-center justify-center gap-1">
                 <Server className="w-3 h-3" /> MCP Servers
               </div>
             </div>
             <div className="bg-gray-900 border border-gray-800 rounded-lg p-3 text-center">
-              <div className="text-2xl font-bold text-purple-400">13</div>
+              <div className="text-2xl font-bold text-purple-400">14</div>
               <div className="text-xs text-gray-500 flex items-center justify-center gap-1">
                 <Plug className="w-3 h-3" /> Plugins
               </div>

@@ -126,9 +126,9 @@ export default function Home() {
             <div className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/30 rounded-full px-4 py-1.5 mb-6">
               <span className="text-emerald-400 text-sm font-medium">145+ Skills</span>
               <span className="text-gray-500">|</span>
-              <span className="text-gray-400 text-sm">26 MCP Servers</span>
+              <span className="text-gray-400 text-sm">34 MCP Servers</span>
               <span className="text-gray-500">|</span>
-              <span className="text-gray-400 text-sm">12 Plugins</span>
+              <span className="text-gray-400 text-sm">14 Plugins</span>
             </div>
 
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
@@ -137,7 +137,7 @@ export default function Home() {
             </h1>
 
             <p className="text-lg sm:text-xl text-gray-400 mb-8 max-w-2xl mx-auto">
-              Try Claude Code with 145+ scientific skills, 26 MCP servers, and 12 plugins — all for free.
+              Try Claude Code with 145+ scientific skills, 34 MCP servers, and 14 plugins — all for free.
               Experiment with AI-powered research, data analysis, and video creation.
             </p>
 
@@ -180,11 +180,11 @@ export default function Home() {
               <div className="text-sm text-gray-400 mt-1">Scientific Skills</div>
             </div>
             <div>
-              <div className="text-3xl sm:text-4xl font-bold text-teal-400">26</div>
+              <div className="text-3xl sm:text-4xl font-bold text-teal-400">34</div>
               <div className="text-sm text-gray-400 mt-1">MCP Servers</div>
             </div>
             <div>
-              <div className="text-3xl sm:text-4xl font-bold text-cyan-400">12</div>
+              <div className="text-3xl sm:text-4xl font-bold text-cyan-400">14</div>
               <div className="text-sm text-gray-400 mt-1">Plugins</div>
             </div>
             <div>
@@ -221,7 +221,7 @@ export default function Home() {
               <div className="w-12 h-12 bg-teal-500/10 rounded-lg flex items-center justify-center mb-4">
                 <Server className="w-6 h-6 text-teal-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">26 MCP Servers</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">34 MCP Servers</h3>
               <p className="text-gray-400 text-sm">
                 PubMed, ChEMBL, Clinical Trials, ICD-10, NPI Registry, HuggingFace,
                 Memory, Playwright, and more — direct database access.
@@ -232,7 +232,7 @@ export default function Home() {
               <div className="w-12 h-12 bg-cyan-500/10 rounded-lg flex items-center justify-center mb-4">
                 <Cpu className="w-6 h-6 text-cyan-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white mb-2">12 Plugins</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">14 Plugins</h3>
               <p className="text-gray-400 text-sm">
                 Scientific Skills, Frontend Design, Feature Dev, Document Skills,
                 HuggingFace integration, and more — extend Claude's capabilities.
@@ -430,11 +430,11 @@ export default function Home() {
               </li>
               <li className="flex items-center gap-2 text-gray-300">
                 <Star className="w-4 h-4 text-emerald-400" />
-                26 MCP servers
+                34 MCP servers
               </li>
               <li className="flex items-center gap-2 text-gray-300">
                 <Star className="w-4 h-4 text-emerald-400" />
-                12 plugins
+                14 plugins
               </li>
               <li className="flex items-center gap-2 text-gray-300">
                 <Star className="w-4 h-4 text-emerald-400" />

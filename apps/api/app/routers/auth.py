@@ -3,6 +3,7 @@ Authentication Router
 
 Handles user registration, login, logout, token refresh, and admin user management.
 Includes 24-hour trial system for new users.
+Rate limited to prevent brute force attacks.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
@@ -12,7 +13,10 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from typing import List
 import uuid
+import re
 from pathlib import Path
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.core.database import get_db
 from app.models.models import User, RefreshToken
@@ -25,6 +29,27 @@ import logging
 logger = logging.getLogger("auth")
 
 router = APIRouter()
+
+# Rate limiter instance (shared from main app)
+limiter = Limiter(key_func=get_remote_address)
+
+
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """
+    Validate password meets security requirements.
+    Returns (is_valid, error_message).
+    """
+    if len(password) < 12:
+        return False, "Password must be at least 12 characters long"
+    if not re.search(r"[A-Z]", password):
+        return False, "Password must contain at least one uppercase letter"
+    if not re.search(r"[a-z]", password):
+        return False, "Password must contain at least one lowercase letter"
+    if not re.search(r"\d", password):
+        return False, "Password must contain at least one digit"
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
+        return False, "Password must contain at least one special character (!@#$%^&*)"
+    return True, ""
 
 # Trial duration for new users
 TRIAL_DURATION_HOURS = 24
@@ -111,12 +136,19 @@ def check_trial_status(user: User) -> dict:
 
 
 @router.post("/register", response_model=UserResponse)
-async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def register(request: Request, user_in: UserCreate, db: AsyncSession = Depends(get_db)):
     """
     Register a new user with 24-hour trial access.
+    Rate limited to 5 requests per minute per IP.
 
     After the trial expires, admin approval is required for continued access.
     """
+    # Validate password strength
+    is_valid, error_msg = validate_password_strength(user_in.password)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
     result = await db.execute(select(User).where(User.email == user_in.email))
     if result.scalars().first():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -152,9 +184,11 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login")
-async def login(response: Response, user_in: UserLogin, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, response: Response, user_in: UserLogin, db: AsyncSession = Depends(get_db)):
     """
     Login and receive JWT tokens.
+    Rate limited to 10 requests per minute per IP.
 
     Returns 403 with detail="trial_expired" if user's trial has ended and they're not approved.
     """

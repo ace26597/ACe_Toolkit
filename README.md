@@ -20,7 +20,7 @@
 
 - **Full Claude Code Terminal** — Not a wrapper, the real thing with all capabilities
 - **145+ Scientific Skills** — PubMed, ChEMBL, RDKit, PyTorch, clinical trials, and more
-- **26 MCP Servers** — Direct access to scientific databases and utilities
+- **34 MCP Servers** — Direct access to scientific databases and utilities
 - **Access From Anywhere** — Cloudflare Tunnel = free HTTPS, no port forwarding
 - **Mobile Support** — Works on iPhone, Android, tablets
 - **Multi-User** — Share with family/friends, everyone gets isolated storage

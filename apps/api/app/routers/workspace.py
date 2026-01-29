@@ -29,6 +29,79 @@ router = APIRouter()
 
 # ==================== HELPER ====================
 
+# Allowed file extensions for uploads (security whitelist)
+ALLOWED_EXTENSIONS = {
+    # Documents
+    'txt', 'md', 'pdf', 'doc', 'docx', 'rtf', 'odt',
+    # Spreadsheets
+    'csv', 'tsv', 'xls', 'xlsx', 'ods',
+    # Data
+    'json', 'xml', 'yaml', 'yml', 'parquet', 'feather',
+    # Images
+    'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico',
+    # Code (safe to view, not execute)
+    'py', 'js', 'ts', 'jsx', 'tsx', 'html', 'css', 'scss',
+    'java', 'c', 'cpp', 'h', 'hpp', 'go', 'rs', 'rb', 'php',
+    'sql', 'sh', 'bash', 'zsh', 'ps1', 'r', 'jl',
+    # Config
+    'ini', 'cfg', 'conf', 'toml', 'env', 'gitignore',
+    # Archives (allowed but not auto-extracted)
+    'zip', 'tar', 'gz', 'bz2', '7z',
+    # Notebooks
+    'ipynb',
+    # Audio/Video (for video studio)
+    'mp3', 'wav', 'ogg', 'mp4', 'webm', 'mov',
+}
+
+# Dangerous extensions that should NEVER be allowed
+BLOCKED_EXTENSIONS = {
+    'exe', 'dll', 'so', 'dylib',  # Executables
+    'bat', 'cmd', 'com', 'msi',    # Windows scripts/installers
+    'app', 'dmg', 'pkg',           # macOS
+    'deb', 'rpm', 'apk',           # Linux/Android packages
+    'jar', 'war', 'ear',           # Java archives (can execute)
+    'scr', 'pif', 'vbs', 'vbe',    # Windows script files
+    'ws', 'wsf', 'wsc', 'wsh',     # Windows Script Host
+    'hta', 'cpl', 'msc',           # Windows control panel
+}
+
+
+def validate_upload_file(filename: str) -> tuple[bool, str]:
+    """
+    Validate uploaded file name and extension.
+    Returns (is_valid, error_message).
+    """
+    if not filename:
+        return False, "Filename is required"
+
+    # Normalize filename
+    filename = filename.strip()
+
+    # Check for path traversal attempts
+    if '..' in filename or '/' in filename or '\\' in filename:
+        return False, "Invalid filename: path traversal not allowed"
+
+    # Check for hidden files (starting with .)
+    if filename.startswith('.'):
+        return False, "Hidden files (starting with .) are not allowed"
+
+    # Extract extension
+    if '.' not in filename:
+        return False, "File must have an extension"
+
+    ext = filename.rsplit('.', 1)[-1].lower()
+
+    # Check against blocked list first
+    if ext in BLOCKED_EXTENSIONS:
+        return False, f"File type '.{ext}' is not allowed for security reasons"
+
+    # Check against allowed list
+    if ext not in ALLOWED_EXTENSIONS:
+        return False, f"File type '.{ext}' is not supported. Allowed: documents, data files, images, code"
+
+    return True, ""
+
+
 def get_user_workspace_manager(user: User) -> WorkspaceManager:
     """Get a workspace manager configured for the user's data directory."""
     user_workspace_dir = get_user_workspace_dir(user)
@@ -336,6 +409,11 @@ async def upload_data(
     user: User = Depends(require_valid_access)
 ):
     """Upload a file to the data directory."""
+    # Validate file type BEFORE reading content
+    is_valid, error_msg = validate_upload_file(file.filename or "")
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
     manager = get_user_workspace_manager(user)
     # Check project exists
     project = await manager.get_project(name)
@@ -382,6 +460,11 @@ async def upload_data_local(
     - Has 2GB file size limit (streams to disk)
     - Use this instead of /upload when uploading large files from the same network.
     """
+    # Validate file type BEFORE processing
+    is_valid, error_msg = validate_upload_file(file.filename or "")
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
     import aiofiles
 
     # Get client IP

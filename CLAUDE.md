@@ -249,7 +249,7 @@ journalctl -u cloudflared -f
 └── claude-workspaces/  # Legacy (deprecated)
 ```
 
-**Credentials:** `~/.credentials/credentials.json` (AACT, API keys)
+**Credentials:** `~/.secrets/ace_toolkit.json` (API keys, passwords - 600 permissions)
 
 ---
 
@@ -257,6 +257,15 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
+| 2026-01-29 | **SECURITY: Secrets Management** - Moved all secrets to `~/.secrets/ace_toolkit.json` (600 perms) |
+| 2026-01-29 | **SECURITY: CORS Hardened** - Removed wildcard, only allow specific origins |
+| 2026-01-29 | **SECURITY: Rate Limiting** - Login (10/min), Register (5/min) per IP via slowapi |
+| 2026-01-29 | **SECURITY: Password Policy** - Min 12 chars, uppercase, lowercase, digit, special char |
+| 2026-01-29 | **SECURITY: Headers** - Added X-Frame-Options, X-Content-Type-Options, HSTS, XSS-Protection |
+| 2026-01-29 | **SECURITY: File Validation** - Whitelist allowed extensions, block dangerous files |
+| 2026-01-29 | **SECURITY: Sandbox Rules** - 100+ deny rules for bash commands |
+| 2026-01-29 | **SECURITY: Share Expiration** - Share links expire after 7 days |
+| 2026-01-29 | **FIX: Capabilities Counts** - Updated to 145+ skills, 34 MCP, 14 plugins across all pages |
 | 2026-01-29 | **FIX: Admin Dashboard** - Cross-subdomain cookie support (domain=.orpheuscore.uk, samesite=none) |
 | 2026-01-29 | **FIX: Frontend API URL** - Changed to https://api.orpheuscore.uk for production builds |
 | 2026-01-29 | **MIGRATION: User Scope Extensions** - All MCP, skills, agents, plugins moved to ~/.claude/ for global access |
@@ -287,7 +296,7 @@ journalctl -u cloudflared -f
 | 2026-01-22 | **Welcome Page:** Comprehensive capabilities view when no project selected |
 | 2026-01-22 | **No Auto-Select:** User must explicitly choose/create project to start |
 | 2026-01-22 | **MAJOR: CCResearch merged into Workspace** - /ccresearch redirects to /workspace?tab=terminal |
-| 2026-01-22 | **Terminal Tab:** Claude Code or SSH mode with stats bar (145+ skills, 26 MCP servers, etc.) |
+| 2026-01-22 | **Terminal Tab:** Claude Code or SSH mode with stats bar (145+ skills, 34 MCP servers, etc.) |
 | 2026-01-22 | **Unified Project Architecture** - Projects shared across all apps |
 | 2026-01-22 | **Removed Apps:** Data Analyst, Logs Viewer, Notes, Import Research |
 | 2026-01-22 | **Backend Cleanup:** Removed analyst, notes, logs, projects, research routers |

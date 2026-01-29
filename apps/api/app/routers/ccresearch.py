@@ -235,6 +235,7 @@ class ShareResponse(BaseModel):
     share_token: str
     share_url: str
     shared_at: datetime
+    expires_at: datetime  # When the share link expires
 
 
 class SharedSessionResponse(BaseModel):
@@ -244,6 +245,7 @@ class SharedSessionResponse(BaseModel):
     email: str  # Show who created it
     created_at: datetime
     shared_at: datetime
+    expires_at: Optional[datetime] = None  # When the share link expires
     files_count: int
     has_log: bool
 
@@ -2009,14 +2011,19 @@ async def create_share_link(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    # Share link expiration (7 days from creation)
+    SHARE_EXPIRY_DAYS = 7
+
     # Check if already shared
     if session.share_token:
-        # Return existing share link
+        # Return existing share link (check if expired)
         share_url = f"https://orpheuscore.uk/ccresearch/share/{session.share_token}"
+        expires_at = session.share_expires_at or (session.shared_at + timedelta(days=SHARE_EXPIRY_DAYS) if session.shared_at else datetime.utcnow() + timedelta(days=SHARE_EXPIRY_DAYS))
         return ShareResponse(
             share_token=session.share_token,
             share_url=share_url,
-            shared_at=session.shared_at or datetime.utcnow()
+            shared_at=session.shared_at or datetime.utcnow(),
+            expires_at=expires_at
         )
 
     # Generate new share token
@@ -2030,18 +2037,21 @@ async def create_share_link(
     if existing.scalar_one_or_none():
         share_token = generate_share_token()  # Try once more
 
-    # Update session
+    # Update session with expiration
+    now = datetime.utcnow()
     session.share_token = share_token
-    session.shared_at = datetime.utcnow()
+    session.shared_at = now
+    session.share_expires_at = now + timedelta(days=SHARE_EXPIRY_DAYS)
     await db.commit()
 
     share_url = f"https://orpheuscore.uk/ccresearch/share/{share_token}"
-    logger.info(f"Created share link for session {ccresearch_id}: {share_url}")
+    logger.info(f"Created share link for session {ccresearch_id}: {share_url} (expires: {session.share_expires_at})")
 
     return ShareResponse(
         share_token=share_token,
         share_url=share_url,
-        shared_at=session.shared_at
+        shared_at=session.shared_at,
+        expires_at=session.share_expires_at
     )
 
 
@@ -2109,6 +2119,7 @@ async def get_shared_session(
     Get public info for a shared session (no auth required).
 
     Returns limited session info for display on the share page.
+    Share links expire after 7 days.
     """
     result = await db.execute(
         select(CCResearchSession)
@@ -2118,6 +2129,10 @@ async def get_shared_session(
 
     if not session:
         raise HTTPException(status_code=404, detail="Shared session not found or link expired")
+
+    # Check if share link has expired
+    if session.share_expires_at and datetime.utcnow() > session.share_expires_at:
+        raise HTTPException(status_code=410, detail="Share link has expired")
 
     # Count files in workspace
     workspace = Path(session.workspace_dir)
@@ -2135,9 +2150,28 @@ async def get_shared_session(
         email=session.email,
         created_at=session.created_at,
         shared_at=session.shared_at or session.created_at,
+        expires_at=session.share_expires_at,
         files_count=files_count,
         has_log=has_log
     )
+
+
+async def _get_valid_shared_session(share_token: str, db: AsyncSession) -> CCResearchSession:
+    """Helper to get a shared session and validate it hasn't expired."""
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.share_token == share_token)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Shared session not found or link expired")
+
+    # Check if share link has expired
+    if session.share_expires_at and datetime.utcnow() > session.share_expires_at:
+        raise HTTPException(status_code=410, detail="Share link has expired")
+
+    return session
 
 
 @router.get("/share/{share_token}/files", response_model=FileListResponse)
@@ -2147,14 +2181,7 @@ async def list_shared_files(
     db: AsyncSession = Depends(get_db)
 ):
     """List files in a shared session workspace (no auth required)."""
-    result = await db.execute(
-        select(CCResearchSession)
-        .where(CCResearchSession.share_token == share_token)
-    )
-    session = result.scalar_one_or_none()
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Shared session not found")
+    session = await _get_valid_shared_session(share_token, db)
 
     workspace = Path(session.workspace_dir)
 
@@ -2209,14 +2236,7 @@ async def download_shared_file(
     db: AsyncSession = Depends(get_db)
 ):
     """Download a file from a shared session (no auth required)."""
-    result = await db.execute(
-        select(CCResearchSession)
-        .where(CCResearchSession.share_token == share_token)
-    )
-    session = result.scalar_one_or_none()
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Shared session not found")
+    session = await _get_valid_shared_session(share_token, db)
 
     workspace = Path(session.workspace_dir)
     target_path = (workspace / path).resolve()
@@ -2252,14 +2272,7 @@ async def read_shared_file_content(
     db: AsyncSession = Depends(get_db)
 ):
     """Read text content of a file in a shared session (no auth required)."""
-    result = await db.execute(
-        select(CCResearchSession)
-        .where(CCResearchSession.share_token == share_token)
-    )
-    session = result.scalar_one_or_none()
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Shared session not found")
+    session = await _get_valid_shared_session(share_token, db)
 
     workspace = Path(session.workspace_dir)
     target_path = (workspace / path).resolve()
@@ -2297,15 +2310,9 @@ async def get_shared_session_log(
 
     Returns ALL logs for the session concatenated chronologically,
     with ANSI escape sequences removed for readability.
+    Share links expire after 7 days.
     """
-    result = await db.execute(
-        select(CCResearchSession)
-        .where(CCResearchSession.share_token == share_token)
-    )
-    session = result.scalar_one_or_none()
-
-    if not session:
-        raise HTTPException(status_code=404, detail="Shared session not found")
+    session = await _get_valid_shared_session(share_token, db)
 
     # Use read_full_session_log to get ALL logs concatenated chronologically
     log_content = ccresearch_manager.read_full_session_log(session.id, max_lines, clean=True)

@@ -312,6 +312,7 @@ class CCResearchSession(Base):
     # Sharing - public read-only access via token
     share_token = Column(String, nullable=True, unique=True, index=True)  # Random token for public sharing
     shared_at = Column(DateTime, nullable=True)  # When sharing was enabled
+    share_expires_at = Column(DateTime, nullable=True)  # When share link expires (default: 7 days from shared_at)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)

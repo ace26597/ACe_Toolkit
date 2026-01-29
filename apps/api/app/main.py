@@ -3,6 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from contextlib import asynccontextmanager
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
 from app.routers import auth, ccresearch, workspace, public_api, data_studio, data_studio_v2, video_studio
 from app.core.database import engine
@@ -14,6 +17,9 @@ import psutil
 from datetime import datetime
 from pathlib import Path
 from sqlalchemy.future import select
+
+# Initialize rate limiter
+limiter = Limiter(key_func=get_remote_address)
 
 # Configure logging with request ID support
 logging.basicConfig(
@@ -28,6 +34,21 @@ MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB
 
 # Startup time for uptime calculation
 STARTUP_TIME = None
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add security headers to all responses"""
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        # Security headers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # HSTS - only for HTTPS (Cloudflare handles this but belt-and-suspenders)
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
 
 class RequestIDMiddleware(BaseHTTPMiddleware):
     """Add unique request ID to each request for tracing"""
@@ -203,6 +224,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Rate limiter setup
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS Configuration - Restrict to allowed origins
 ALLOWED_ORIGINS = [
     "https://orpheuscore.uk",        # Primary domain
@@ -225,6 +250,7 @@ app.add_middleware(
 
 # Add custom middleware (order matters - first added = last executed)
 app.add_middleware(FileSizeLimitMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestIDMiddleware)
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])

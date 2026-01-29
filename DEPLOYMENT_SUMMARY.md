@@ -27,7 +27,7 @@
 
 | Application | URL | Description |
 |-------------|-----|-------------|
-| **C3 Researcher Workspace** | /workspace | Claude Code terminal with 145+ skills, 26 MCP servers |
+| **C3 Researcher Workspace** | /workspace | Claude Code terminal with 145+ skills, 34 MCP servers |
 | **C3 Data Studio** | /data-studio | AI-powered data analysis and dashboards |
 | **Remotion Video Studio** | /video-studio | AI video creation with Claude + Remotion |
 

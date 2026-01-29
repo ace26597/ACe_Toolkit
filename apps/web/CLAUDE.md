@@ -82,7 +82,7 @@ Legacy share links still work at `/ccresearch/share/[token]`.
 Claude Code Custom Researcher - AI-powered research terminal with comprehensive scientific capabilities.
 
 **Features:**
-- 145+ scientific skills, 26 MCP servers, 14 plugins
+- 145+ scientific skills, 34 MCP servers, 14 plugins
 - Access to 30+ databases: PubMed, ChEMBL, AACT (566K+ trials), UniProt, etc.
 - Project organization with unified storage
 - Markdown notes with live preview (GFM tables, Mermaid)
@@ -108,7 +108,7 @@ When no project is selected, displays comprehensive capabilities overview:
 - **Terminal:** Full Claude Code terminal (merged from CCResearch)
   - Terminal mode selection: Claude Code (default) or SSH mode
   - SSH mode requires access key
-  - Stats bar: 145+ skills, 26 MCP servers, 14 plugins, 566K+ clinical trials
+  - Stats bar: 145+ skills, 34 MCP servers, 14 plugins, 566K+ clinical trials
   - File browser sidebar with upload and refresh
   - Import Data modal (GitHub clone, Web URL fetch)
   - Session list with Resume option
