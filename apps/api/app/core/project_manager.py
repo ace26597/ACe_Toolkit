@@ -390,6 +390,26 @@ mkdir -p output
 
 ---
 
+## Remotion Video Creation
+
+If creating videos with Remotion:
+- **DO NOT** launch Remotion Studio (`npx remotion studio`) - it won't work in this environment
+- Instead, render videos directly using: `npx remotion render <composition> output/video.mp4`
+- Save all rendered videos to the `output/` directory
+
+---
+
+## Important: Storage Notes
+
+This workspace runs on an SSD via symlink mount (`/data` → external SSD).
+
+**Symlink Limitations:**
+- Creating symlinks within this workspace may fail or behave unexpectedly
+- Always use **direct file copies** instead of symlinks
+- Use relative paths within the workspace when possible
+
+---
+
 *Unified Project - Claude Code Research Platform*
 """
         async with aiofiles.open(project_path / "CLAUDE.md", 'w') as f:
