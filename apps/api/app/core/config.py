@@ -1,38 +1,35 @@
 """
-Configuration module with secure secrets management.
+Configuration module with centralized secrets management.
 
-Secrets are loaded from ~/.secrets/ace_toolkit.json (not committed to git).
-Non-sensitive config can be set via environment variables or .env file.
+Secrets are loaded from ~/.secrets/credentials.json (centralized credential manager).
+This file is shared across all applications on this machine.
+
+Usage:
+    from app.core.config import settings
+
+    # Access settings
+    settings.SECRET_KEY
+    settings.OPENAI_API_KEY
 """
 
 from pydantic_settings import BaseSettings
 from typing import List, Optional
-import json
-from pathlib import Path
+import sys
 import os
 
-# Load secrets from secure file
-SECRETS_FILE = Path.home() / ".secrets" / "ace_toolkit.json"
-_secrets = {}
+# Add centralized secrets manager to path
+sys.path.insert(0, str(os.path.expanduser("~/.local/lib/python")))
 
-if SECRETS_FILE.exists():
-    try:
-        with open(SECRETS_FILE) as f:
-            _secrets = json.load(f)
-    except Exception as e:
-        print(f"Warning: Could not load secrets file: {e}")
-
-
-def get_secret(path: str, default: str = "") -> str:
-    """Get a secret value by dot-notation path (e.g., 'jwt.secret_key')."""
-    keys = path.split(".")
-    value = _secrets
-    for key in keys:
-        if isinstance(value, dict):
-            value = value.get(key, {})
-        else:
-            return default
-    return value if isinstance(value, str) else default
+try:
+    from secrets_manager import get_secret, get_api_key, get_app_config
+except ImportError:
+    # Fallback if secrets_manager not installed
+    def get_secret(path: str, default=None, **kwargs):
+        return os.getenv(path.upper().replace(".", "_"), default)
+    def get_api_key(service: str):
+        return os.getenv(f"{service.upper()}_API_KEY")
+    def get_app_config(app: str):
+        return {}
 
 
 class Settings(BaseSettings):
@@ -42,9 +39,9 @@ class Settings(BaseSettings):
     # Database (SQLite for this deployment)
     DATABASE_URL: str = "sqlite+aiosqlite:///./app.db"
 
-    # Security - loaded from secrets file
-    SECRET_KEY: str = get_secret("jwt.secret_key", "INSECURE_DEFAULT_CHANGE_ME")
-    ALGORITHM: str = get_secret("jwt.algorithm", "HS256")
+    # Security - from centralized secrets
+    SECRET_KEY: str = get_secret("apps.ace_toolkit.jwt_secret", default="INSECURE_DEFAULT_CHANGE_ME")
+    ALGORITHM: str = get_secret("apps.ace_toolkit.jwt_algorithm", default="HS256")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
 
@@ -65,10 +62,10 @@ class Settings(BaseSettings):
     # Export
     PLAYWRIGHT_BROWSERS_PATH: Optional[str] = None
 
-    # AI API Keys - loaded from secrets file
-    OPENAI_API_KEY: Optional[str] = get_secret("api_keys.openai") or os.getenv("OPENAI_API_KEY")
-    ANTHROPIC_API_KEY: Optional[str] = get_secret("api_keys.anthropic") or os.getenv("ANTHROPIC_API_KEY")
-    TAVILY_API_KEY: Optional[str] = os.getenv("TAVILY_API_KEY")
+    # AI API Keys - from centralized secrets
+    OPENAI_API_KEY: Optional[str] = get_api_key("openai") or os.getenv("OPENAI_API_KEY")
+    ANTHROPIC_API_KEY: Optional[str] = get_api_key("anthropic") or os.getenv("ANTHROPIC_API_KEY")
+    TAVILY_API_KEY: Optional[str] = get_api_key("tavily") or os.getenv("TAVILY_API_KEY")
 
     # Storage Paths (SSD-backed for data persistence)
     DATA_BASE_DIR: str = "/data"
@@ -91,25 +88,34 @@ class Settings(BaseSettings):
     MEDRESEARCH_LOGS_DIR: str = "/data/ccresearch-logs"
     MEDRESEARCH_SANDBOX_ENABLED: bool = True
 
-    # AACT Clinical Trials Database - loaded from secrets file
+    # AACT Clinical Trials Database - from centralized secrets
     AACT_DB_HOST: Optional[str] = get_secret("databases.aact.host") or os.getenv("AACT_DB_HOST")
-    AACT_DB_PORT: Optional[str] = str(get_secret("databases.aact.port", "5432")) if get_secret("databases.aact.port") else os.getenv("AACT_DB_PORT")
-    AACT_DB_NAME: Optional[str] = get_secret("databases.aact.name") or os.getenv("AACT_DB_NAME")
-    AACT_DB_USER: Optional[str] = get_secret("databases.aact.user") or os.getenv("AACT_DB_USER")
+    AACT_DB_PORT: Optional[str] = None
+    AACT_DB_NAME: Optional[str] = get_secret("databases.aact.database") or os.getenv("AACT_DB_NAME")
+    AACT_DB_USER: Optional[str] = get_secret("databases.aact.username") or os.getenv("AACT_DB_USER")
     AACT_DB_PASSWORD: Optional[str] = get_secret("databases.aact.password") or os.getenv("AACT_DB_PASSWORD")
-    AACT_DB_URL: Optional[str] = None
+    AACT_DB_URL: Optional[str] = get_secret("databases.aact.connection_string")
 
-    # Notifications - loaded from secrets file
-    DISCORD_WEBHOOK_URL: Optional[str] = get_secret("notifications.discord_webhook") or os.getenv("DISCORD_WEBHOOK_URL")
+    # Notifications - from centralized secrets
+    DISCORD_WEBHOOK_URL: Optional[str] = get_secret("services.discord.webhook_url") or os.getenv("DISCORD_WEBHOOK_URL")
     NTFY_TOPIC_URL: Optional[str] = os.getenv("NTFY_TOPIC_URL")
 
-    # Admin account - loaded from secrets file
-    ADMIN_EMAIL: str = get_secret("admin.email", "admin@example.com")
-    ADMIN_PASSWORD: Optional[str] = get_secret("admin.password") or os.getenv("ADMIN_PASSWORD")
+    # Admin account - from centralized secrets
+    ADMIN_EMAIL: str = get_secret("apps.ace_toolkit.admin_email", default="admin@example.com")
+    ADMIN_PASSWORD: Optional[str] = get_secret("apps.ace_toolkit.admin_password") or os.getenv("ADMIN_PASSWORD")
 
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # Set AACT_DB_PORT from secrets (handle int -> str conversion)
+        port = get_secret("databases.aact.port")
+        if port:
+            self.AACT_DB_PORT = str(port)
+        elif os.getenv("AACT_DB_PORT"):
+            self.AACT_DB_PORT = os.getenv("AACT_DB_PORT")
 
 
 settings = Settings()
@@ -118,5 +124,5 @@ settings = Settings()
 if settings.SECRET_KEY == "INSECURE_DEFAULT_CHANGE_ME":
     print("=" * 60)
     print("SECURITY WARNING: Using insecure default SECRET_KEY!")
-    print("Create ~/.secrets/ace_toolkit.json with a secure key.")
+    print("Set it in ~/.secrets/credentials.json at apps.ace_toolkit.jwt_secret")
     print("=" * 60)

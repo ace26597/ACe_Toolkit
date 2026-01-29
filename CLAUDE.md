@@ -249,7 +249,9 @@ journalctl -u cloudflared -f
 └── claude-workspaces/  # Legacy (deprecated)
 ```
 
-**Credentials:** `~/.secrets/ace_toolkit.json` (API keys, passwords - 600 permissions)
+**Credentials:** `~/.secrets/credentials.json` (centralized secrets manager - 600 permissions)
+
+See `~/.secrets/README.md` for usage. CLI: `secrets get api_keys.openai`
 
 ---
 
@@ -257,7 +259,8 @@ journalctl -u cloudflared -f
 
 | Date | Change |
 |------|--------|
-| 2026-01-29 | **SECURITY: Secrets Management** - Moved all secrets to `~/.secrets/ace_toolkit.json` (600 perms) |
+| 2026-01-29 | **NEW: Centralized Secrets Manager** - `~/.secrets/credentials.json` + CLI tool (`secrets get/set`) |
+| 2026-01-29 | **SECURITY: Secrets Management** - Moved all secrets to centralized manager (600 perms) |
 | 2026-01-29 | **SECURITY: CORS Hardened** - Removed wildcard, only allow specific origins |
 | 2026-01-29 | **SECURITY: Rate Limiting** - Login (10/min), Register (5/min) per IP via slowapi |
 | 2026-01-29 | **SECURITY: Password Policy** - Min 12 chars, uppercase, lowercase, digit, special char |
