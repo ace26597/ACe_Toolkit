@@ -244,6 +244,28 @@ const mcpServers = [
     tools: ['find', 'aggregate', 'list-collections', 'collection-schema'],
     install: 'npx mongodb-mcp-server --readOnly',
   },
+  {
+    id: 'motherduck',
+    name: 'MotherDuck',
+    description: 'Cloud DuckDB analytics platform for fast SQL queries',
+    category: 'Utility',
+    endpoint: 'npx @motherduck/mcp-server',
+    source: 'https://github.com/motherduck-io/mcp-server',
+    provider: 'MotherDuck',
+    tools: ['run_query', 'list_databases', 'describe_table'],
+    install: 'npx @motherduck/mcp-server',
+  },
+  {
+    id: 'open-targets',
+    name: 'Open Targets',
+    description: 'Drug target identification and validation platform',
+    category: 'Medical',
+    endpoint: 'https://mcp.opentargets.org/mcp',
+    source: 'https://platform.opentargets.org/',
+    provider: 'Open Targets',
+    tools: ['search_targets', 'get_associations', 'get_evidence'],
+    install: 'MCP Endpoint (HTTP)',
+  },
   // Finance
   {
     id: 'yahoo-finance',
@@ -832,6 +854,40 @@ export default function DirectoryPage() {
             {copiedId === 'config-example' ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             Copy Configuration
           </button>
+        </div>
+
+        {/* CLI Quick Reference */}
+        <div className="mt-12 bg-slate-900 border border-slate-800 rounded-lg p-6">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Code className="w-5 h-5 text-blue-400" />
+            CLI Quick Reference
+          </h2>
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+            <div className="bg-slate-800 p-3 rounded">
+              <code className="text-cyan-400">claude</code>
+              <p className="text-slate-400 text-xs mt-1">Start interactive session</p>
+            </div>
+            <div className="bg-slate-800 p-3 rounded">
+              <code className="text-cyan-400">claude -p "prompt"</code>
+              <p className="text-slate-400 text-xs mt-1">One-shot (headless mode)</p>
+            </div>
+            <div className="bg-slate-800 p-3 rounded">
+              <code className="text-cyan-400">claude -c</code>
+              <p className="text-slate-400 text-xs mt-1">Continue last session</p>
+            </div>
+            <div className="bg-slate-800 p-3 rounded">
+              <code className="text-cyan-400">claude mcp list</code>
+              <p className="text-slate-400 text-xs mt-1">List MCP servers</p>
+            </div>
+            <div className="bg-slate-800 p-3 rounded">
+              <code className="text-cyan-400">claude plugins list</code>
+              <p className="text-slate-400 text-xs mt-1">List installed plugins</p>
+            </div>
+            <div className="bg-slate-800 p-3 rounded">
+              <code className="text-cyan-400">claude config</code>
+              <p className="text-slate-400 text-xs mt-1">Open configuration</p>
+            </div>
+          </div>
         </div>
 
         {/* Resources */}
