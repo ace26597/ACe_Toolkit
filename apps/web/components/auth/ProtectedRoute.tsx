@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { useAuth } from './AuthProvider';
 import { LoginModal } from './LoginModal';
-import { Loader2, Lock, Clock, AlertCircle } from 'lucide-react';
+import { Lock, Clock } from 'lucide-react';
+import { AppSkeleton } from '@/components/ui/Skeleton';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,16 +14,9 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { user, loading, isTrialExpired, trialInfo } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
 
-  // Show loading spinner while checking auth
+  // Show skeleton while checking auth
   if (loading) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 text-blue-500 animate-spin mx-auto" />
-          <p className="text-zinc-400 mt-3">Checking authentication...</p>
-        </div>
-      </div>
-    );
+    return <AppSkeleton />;
   }
 
   // Show login prompt if not authenticated

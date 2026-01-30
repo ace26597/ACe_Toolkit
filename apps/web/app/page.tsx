@@ -8,6 +8,8 @@ import {
   Server, Terminal, ArrowRight, Sparkles, ExternalLink
 } from 'lucide-react';
 import { useAuth, LoginModal, ExperimentalBanner } from '@/components/auth';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { MobileMenu } from '@/components/ui/MobileMenu';
 
 export default function Home() {
   const { user, loading, logout, trialInfo } = useAuth();
@@ -43,7 +45,17 @@ export default function Home() {
             <Link href="/ccresearch/tips" className="text-slate-400 hover:text-white transition-colors">Tips</Link>
           </nav>
 
-          <div className="flex items-center gap-3">
+          <MobileMenu links={[
+            { href: '/workspace', label: 'Workspace' },
+            { href: '/directory', label: 'Directory' },
+            { href: '/showcase', label: 'Showcase' },
+            { href: '/ccresearch/tips', label: 'Tips' },
+            { href: '/changelog', label: 'Changelog' },
+            { href: '/status', label: 'Status' },
+          ]} />
+
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
             {loading ? (
               <div className="w-7 h-7 animate-pulse bg-slate-800 rounded-full" />
             ) : user ? (
