@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-01-28",
+  "lastUpdated": "2026-01-29",
   "categories": [
     {
       "id": "scientific-databases",
@@ -602,6 +602,194 @@
           "prompt": "Generate comprehensive documentation for this Python module including docstrings, usage examples, and API reference.",
           "tags": ["docs", "docstrings"],
           "skill": "document-skills"
+        }
+      ]
+    },
+    {
+      "id": "finance",
+      "title": "Finance & Markets",
+      "icon": "BarChart3",
+      "iconColor": "green",
+      "description": "Stock quotes, crypto prices, market data, and financial analysis",
+      "examples": [
+        {
+          "id": "stock-analysis",
+          "title": "Stock Analysis with Yahoo Finance",
+          "description": "Get stock quotes, historical data, and company info",
+          "prompt": "Get stock data for AAPL, GOOGL, and MSFT from Yahoo Finance. Compare their P/E ratios, year-to-date performance, and create a comparison chart.",
+          "tags": ["stocks", "analysis", "visualization"],
+          "mcp": "yahoo-finance",
+          "verified": true
+        },
+        {
+          "id": "crypto-prices",
+          "title": "Cryptocurrency Market Data",
+          "description": "Get real-time crypto prices and market data",
+          "prompt": "Use CoinGecko to get the current prices of Bitcoin, Ethereum, and Solana. Show their 24h change, market cap, and trading volume.",
+          "tags": ["crypto", "prices", "market-data"],
+          "mcp": "coingecko",
+          "verified": true
+        },
+        {
+          "id": "portfolio-tracking",
+          "title": "Portfolio Analysis",
+          "description": "Analyze portfolio performance across assets",
+          "prompt": "I have positions in AAPL (100 shares), BTC (0.5), and ETH (5). Get current prices and calculate my total portfolio value and daily P&L.",
+          "tags": ["portfolio", "tracking", "analysis"],
+          "mcp": "yahoo-finance"
+        },
+        {
+          "id": "market-news",
+          "title": "Financial News Analysis",
+          "description": "Get and analyze market news",
+          "prompt": "Get the latest news for Tesla (TSLA) from Yahoo Finance. Summarize the key headlines and their potential market impact.",
+          "tags": ["news", "sentiment", "analysis"],
+          "mcp": "yahoo-finance"
+        },
+        {
+          "id": "crypto-trending",
+          "title": "Trending Cryptocurrencies",
+          "description": "Find trending coins and tokens",
+          "prompt": "What are the top trending cryptocurrencies on CoinGecko right now? Show their prices, 24h change, and market cap.",
+          "tags": ["crypto", "trending", "discovery"],
+          "mcp": "coingecko",
+          "verified": true
+        }
+      ]
+    },
+    {
+      "id": "video-generation",
+      "title": "Video Generation",
+      "icon": "Video",
+      "iconColor": "purple",
+      "description": "Create videos programmatically with Remotion",
+      "examples": [
+        {
+          "id": "explainer-video",
+          "title": "AI Explainer Video",
+          "description": "Create an educational explainer video",
+          "prompt": "Create a 60-second explainer video about how machine learning works. Research the topic, write a script with 5-7 scenes, and render using Remotion.",
+          "tags": ["education", "explainer", "AI"],
+          "skill": "remotion-best-practices",
+          "verified": true
+        },
+        {
+          "id": "product-demo",
+          "title": "Product Demo Video",
+          "description": "Create a product demonstration video",
+          "prompt": "Create a product demo video showcasing a new mobile app. Include: intro hook, 3 key features with animations, and call-to-action. 45-60 seconds.",
+          "tags": ["product", "demo", "marketing"],
+          "skill": "remotion-best-practices"
+        },
+        {
+          "id": "data-visualization-video",
+          "title": "Animated Data Visualization",
+          "description": "Turn data into animated video",
+          "prompt": "Create an animated video showing stock market trends over 2025. Use bar chart races and line chart animations. Include voiceover narration.",
+          "tags": ["data-viz", "animation", "charts"],
+          "skill": "remotion-best-practices"
+        },
+        {
+          "id": "social-media-video",
+          "title": "Social Media Short",
+          "description": "Create viral-style short video",
+          "prompt": "Create a 30-second TikTok/Reels style video about '5 Python tips developers don't know'. Fast-paced, text overlays, engaging transitions.",
+          "tags": ["social", "short-form", "viral"],
+          "skill": "remotion-best-practices"
+        }
+      ]
+    },
+    {
+      "id": "document-generation",
+      "title": "Document Generation",
+      "icon": "FileText",
+      "iconColor": "cyan",
+      "description": "Create DOCX, PDF, XLSX, and PPTX documents",
+      "examples": [
+        {
+          "id": "docx-report",
+          "title": "Professional DOCX Report",
+          "description": "Create formatted Word document",
+          "prompt": "Create a professional report in DOCX format summarizing my data analysis. Include: title page, executive summary, methodology, findings with charts, and recommendations.",
+          "tags": ["Word", "report", "professional"],
+          "skill": "docx",
+          "verified": true
+        },
+        {
+          "id": "excel-dashboard",
+          "title": "Excel Dashboard",
+          "description": "Create Excel workbook with formulas and charts",
+          "prompt": "Create an Excel dashboard for sales tracking. Include: data entry sheet, pivot tables, charts, conditional formatting, and summary formulas.",
+          "tags": ["Excel", "dashboard", "formulas"],
+          "skill": "xlsx",
+          "verified": true
+        },
+        {
+          "id": "pdf-form",
+          "title": "PDF Document with Tables",
+          "description": "Generate formatted PDF",
+          "prompt": "Create a PDF invoice template with company header, itemized table, tax calculations, and payment terms. Make it professional and printable.",
+          "tags": ["PDF", "invoice", "template"],
+          "skill": "pdf-processing-pro"
+        },
+        {
+          "id": "data-to-xlsx",
+          "title": "CSV to Formatted Excel",
+          "description": "Convert and enhance CSV data",
+          "prompt": "Load my CSV data and create a formatted Excel workbook with: styled headers, number formatting, charts for key metrics, and a summary sheet.",
+          "tags": ["conversion", "Excel", "formatting"],
+          "skill": "xlsx",
+          "verified": true
+        },
+        {
+          "id": "multi-doc-generation",
+          "title": "Batch Document Generation",
+          "description": "Generate multiple documents from template",
+          "prompt": "Using the customer data CSV, generate personalized DOCX letters for each customer. Include their name, account details, and custom message.",
+          "tags": ["batch", "template", "personalization"],
+          "skill": "docx"
+        }
+      ]
+    },
+    {
+      "id": "web-automation",
+      "title": "Web Automation",
+      "icon": "Globe",
+      "iconColor": "blue",
+      "description": "Browser automation, scraping, and web research",
+      "examples": [
+        {
+          "id": "web-scraping",
+          "title": "Web Page Scraping",
+          "description": "Extract data from websites",
+          "prompt": "Use Playwright to navigate to Hacker News, extract the top 30 post titles, scores, and links. Save to a CSV file.",
+          "tags": ["scraping", "automation", "data-extraction"],
+          "mcp": "playwright",
+          "verified": true
+        },
+        {
+          "id": "screenshot-capture",
+          "title": "Automated Screenshots",
+          "description": "Capture website screenshots",
+          "prompt": "Use Playwright to take screenshots of my website at different viewport sizes (mobile, tablet, desktop). Save to output/ folder.",
+          "tags": ["screenshots", "responsive", "testing"],
+          "mcp": "playwright"
+        },
+        {
+          "id": "form-filling",
+          "title": "Automated Form Submission",
+          "description": "Fill and submit web forms",
+          "prompt": "Use Playwright to navigate to a contact form, fill in test data, and submit. Verify the success message appears.",
+          "tags": ["forms", "testing", "automation"],
+          "mcp": "playwright"
+        },
+        {
+          "id": "web-research",
+          "title": "Multi-Site Research",
+          "description": "Research across multiple websites",
+          "prompt": "Research the top 5 JavaScript frameworks in 2026. Visit their official sites, extract key features, and create a comparison table.",
+          "tags": ["research", "comparison", "web"],
+          "mcp": "playwright"
         }
       ]
     }

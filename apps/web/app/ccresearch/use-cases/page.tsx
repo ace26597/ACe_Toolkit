@@ -28,7 +28,9 @@ import {
   Palette,
   GitBranch,
   Upload,
-  FileUp
+  FileUp,
+  Video,
+  Stethoscope
 } from 'lucide-react';
 
 // Import data from JSON
@@ -70,6 +72,10 @@ const iconMap: Record<string, React.ReactNode> = {
   Code: <Code className="w-5 h-5" />,
   Upload: <Upload className="w-5 h-5" />,
   FileUp: <FileUp className="w-5 h-5" />,
+  Globe: <Globe className="w-5 h-5" />,
+  FileText: <FileText className="w-5 h-5" />,
+  Video: <Video className="w-5 h-5" />,
+  Stethoscope: <Stethoscope className="w-5 h-5" />,
 };
 
 const colorMap: Record<string, string> = {

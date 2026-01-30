@@ -212,15 +212,15 @@ export default function TipsPage() {
             </div>
           </TipCard>
 
-          <TipCard title="Use Thinking Keywords for Complex Tasks" icon={<Brain className="w-5 h-5" />}>
-            <p>For complex problems, use keywords to allocate more computational resources:</p>
+          <TipCard title="Extended Thinking Modes" icon={<Brain className="w-5 h-5" />}>
+            <p>Trigger extended thinking with specific keywords that allocate more tokens:</p>
             <ul className="list-disc list-inside mt-2 space-y-1">
-              <li><code className="bg-slate-800 px-1.5 rounded text-amber-300">think</code> - Standard analysis</li>
-              <li><code className="bg-slate-800 px-1.5 rounded text-amber-300">think hard</code> - Deeper reasoning</li>
-              <li><code className="bg-slate-800 px-1.5 rounded text-amber-300">think harder</code> - Extended analysis</li>
-              <li><code className="bg-slate-800 px-1.5 rounded text-amber-300">ultrathink</code> - Maximum reasoning effort</li>
+              <li><code className="bg-slate-800 px-1.5 rounded text-amber-300">think</code> - 4K thinking tokens</li>
+              <li><code className="bg-slate-800 px-1.5 rounded text-amber-300">think hard</code> / <code className="bg-slate-800 px-1.5 rounded text-amber-300">megathink</code> - 10K tokens</li>
+              <li><code className="bg-slate-800 px-1.5 rounded text-amber-300">ultrathink</code> - 32K tokens (use sparingly)</li>
             </ul>
-            <CodeBlock code="Think hard about the best architecture for a real-time data pipeline that needs to handle 10k events/second" />
+            <p className="text-slate-400 text-xs mt-2">Best for: architecture decisions, complex debugging, unfamiliar codebases. Note: Uses significant tokens.</p>
+            <CodeBlock code="Ultrathink about the best architecture for a real-time data pipeline handling 10k events/second" />
           </TipCard>
 
           <TipCard title="Break Down Large Tasks" icon={<Zap className="w-5 h-5" />}>
@@ -335,6 +335,23 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
               <li>Ask Claude to verify results match expectations</li>
             </ul>
           </TipCard>
+
+          <TipCard title="Use Subagents for Parallel Work" icon={<Zap className="w-5 h-5" />}>
+            <p>Claude can spawn parallel subagents (up to 7 simultaneously) for faster work:</p>
+            <CodeBlock code="Use 5 parallel subagents to: 1) Search for auth implementations, 2) Find API endpoints, 3) Check test coverage, 4) Review dependencies, 5) Analyze error handling" />
+            <p className="text-slate-400 text-xs mt-2">
+              Be explicit: "Use parallel tasks" or "Use 5 subagents" triggers parallelization.
+            </p>
+          </TipCard>
+
+          <TipCard title="Use CLI Tools for External Services" icon={<Terminal className="w-5 h-5" />}>
+            <p>Tell Claude to use CLI tools - they're the most context-efficient way to interact with services:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li><code className="bg-slate-800 px-1.5 rounded">gh</code> - GitHub (PRs, issues, comments)</li>
+              <li><code className="bg-slate-800 px-1.5 rounded">aws</code> / <code className="bg-slate-800 px-1.5 rounded">gcloud</code> - Cloud services</li>
+              <li><code className="bg-slate-800 px-1.5 rounded">npm</code> / <code className="bg-slate-800 px-1.5 rounded">pip</code> - Package management</li>
+            </ul>
+          </TipCard>
         </Section>
 
         {/* Section 4: Common Mistakes */}
@@ -383,9 +400,51 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
           </TipCard>
         </Section>
 
-        {/* Section 5: Quick Reference */}
+        {/* Section 5: Keyboard Shortcuts */}
         <Section
-          title="Quick Reference Commands"
+          title="Keyboard Shortcuts"
+          icon={<Keyboard className="w-5 h-5" />}
+          iconColor="text-green-400"
+        >
+          <div className="grid md:grid-cols-2 gap-3">
+            <div className="bg-slate-900/50 rounded-lg p-3">
+              <code className="text-cyan-400">Esc</code>
+              <p className="text-slate-400 text-xs mt-1">Interrupt Claude's current action</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-3">
+              <code className="text-cyan-400">Esc + Esc</code>
+              <p className="text-slate-400 text-xs mt-1">Open rewind menu (undo actions)</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-3">
+              <code className="text-cyan-400">@</code>
+              <p className="text-slate-400 text-xs mt-1">Mention files or folders</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-3">
+              <code className="text-cyan-400">!</code>
+              <p className="text-slate-400 text-xs mt-1">Bash mode prefix (run shell commands)</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-3">
+              <code className="text-cyan-400">Ctrl+V</code>
+              <p className="text-slate-400 text-xs mt-1">Paste image from clipboard</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-3">
+              <code className="text-cyan-400">Ctrl+R</code>
+              <p className="text-slate-400 text-xs mt-1">Show full output/context</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-3">
+              <code className="text-cyan-400">Tab</code>
+              <p className="text-slate-400 text-xs mt-1">Auto-complete files/commands</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-3">
+              <code className="text-cyan-400">Shift+Tab</code>
+              <p className="text-slate-400 text-xs mt-1">Auto-accept mode (YOLO)</p>
+            </div>
+          </div>
+        </Section>
+
+        {/* Section 6: Quick Reference Commands */}
+        <Section
+          title="Slash Commands Reference"
           icon={<Command className="w-5 h-5" />}
           iconColor="text-blue-400"
         >
@@ -396,31 +455,47 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
             </div>
             <div className="bg-slate-900/50 rounded-lg p-3">
               <code className="text-cyan-400">/clear</code>
-              <p className="text-slate-400 text-xs mt-1">Clear conversation history</p>
+              <p className="text-slate-400 text-xs mt-1">Reset conversation and context</p>
             </div>
             <div className="bg-slate-900/50 rounded-lg p-3">
-              <code className="text-cyan-400">/compact</code>
-              <p className="text-slate-400 text-xs mt-1">Summarize and reduce context</p>
+              <code className="text-cyan-400">/compact [instructions]</code>
+              <p className="text-slate-400 text-xs mt-1">Summarize conversation to reduce context</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-3">
+              <code className="text-cyan-400">/context</code>
+              <p className="text-slate-400 text-xs mt-1">Visualize current context usage</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-3">
+              <code className="text-cyan-400">/cost</code>
+              <p className="text-slate-400 text-xs mt-1">Show session cost and duration</p>
             </div>
             <div className="bg-slate-900/50 rounded-lg p-3">
               <code className="text-cyan-400">/mcp</code>
               <p className="text-slate-400 text-xs mt-1">List MCP servers and tools</p>
             </div>
             <div className="bg-slate-900/50 rounded-lg p-3">
-              <code className="text-cyan-400">/skills</code>
-              <p className="text-slate-400 text-xs mt-1">List available skills</p>
+              <code className="text-cyan-400">/memory</code>
+              <p className="text-slate-400 text-xs mt-1">Open CLAUDE.md files for editing</p>
             </div>
             <div className="bg-slate-900/50 rounded-lg p-3">
-              <code className="text-cyan-400">/usage</code>
-              <p className="text-slate-400 text-xs mt-1">Check token usage and limits</p>
+              <code className="text-cyan-400">/model</code>
+              <p className="text-slate-400 text-xs mt-1">Switch Claude model</p>
             </div>
             <div className="bg-slate-900/50 rounded-lg p-3">
               <code className="text-cyan-400">/doctor</code>
               <p className="text-slate-400 text-xs mt-1">Diagnose configuration issues</p>
             </div>
             <div className="bg-slate-900/50 rounded-lg p-3">
-              <code className="text-cyan-400">Escape key</code>
-              <p className="text-slate-400 text-xs mt-1">Interrupt Claude's current action</p>
+              <code className="text-cyan-400">/rewind</code>
+              <p className="text-slate-400 text-xs mt-1">Undo recent actions</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-3">
+              <code className="text-cyan-400">/agents</code>
+              <p className="text-slate-400 text-xs mt-1">Manage custom subagents</p>
+            </div>
+            <div className="bg-slate-900/50 rounded-lg p-3">
+              <code className="text-cyan-400">/init</code>
+              <p className="text-slate-400 text-xs mt-1">Initialize project CLAUDE.md</p>
             </div>
           </div>
         </Section>
@@ -477,34 +552,49 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
 
         {/* Example Prompts Section */}
         <Section
-          title="Example Prompts for C3 Researcher"
+          title="Example Prompts"
           icon={<Sparkles className="w-5 h-5" />}
           iconColor="text-pink-400"
         >
           <div className="space-y-3">
             <div className="bg-slate-900/50 rounded-lg p-4">
-              <p className="text-sm text-slate-400 mb-2">Scientific Literature Review</p>
-              <CodeBlock code="Search PubMed for recent papers on CRISPR base editing. Summarize the top 5 papers, extract key methods, and create a comparison table." />
-            </div>
-
-            <div className="bg-slate-900/50 rounded-lg p-4">
-              <p className="text-sm text-slate-400 mb-2">Drug Discovery Research</p>
-              <CodeBlock code="Use ChEMBL to find all known inhibitors of JAK2. Filter for IC50 < 100nM, then analyze their structural features and create a summary report." />
-            </div>
-
-            <div className="bg-slate-900/50 rounded-lg p-4">
-              <p className="text-sm text-slate-400 mb-2">Clinical Trials Analysis</p>
-              <CodeBlock code="Query ClinicalTrials.gov for Phase 3 trials of checkpoint inhibitors in melanoma. Create a table comparing primary endpoints, enrollment status, and sponsors." />
-            </div>
-
-            <div className="bg-slate-900/50 rounded-lg p-4">
               <p className="text-sm text-slate-400 mb-2">Data Analysis</p>
-              <CodeBlock code="Read the CSV file I uploaded. Perform exploratory data analysis, identify correlations, and create visualizations. Save the report as analysis_report.md." />
+              <CodeBlock code="Read the CSV file I uploaded. Perform exploratory data analysis, identify correlations, create visualizations with Plotly, and save a report to output/analysis.md" />
             </div>
 
             <div className="bg-slate-900/50 rounded-lg p-4">
-              <p className="text-sm text-slate-400 mb-2">Code Generation</p>
-              <CodeBlock code="Create a Python script that processes the protein sequences in sequences.fasta, calculates molecular weights, and outputs results to a CSV file." />
+              <p className="text-sm text-slate-400 mb-2">Document Generation</p>
+              <CodeBlock code="Create a professional report in DOCX format summarizing my data analysis. Include charts, tables, and executive summary. Save to output/report.docx" />
+            </div>
+
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <p className="text-sm text-slate-400 mb-2">Web Research</p>
+              <CodeBlock code="Research the latest trends in AI agents for 2026. Search the web, compile findings, and create a summary with citations." />
+            </div>
+
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <p className="text-sm text-slate-400 mb-2">HuggingFace Models</p>
+              <CodeBlock code="Search HuggingFace for the best text classification models under 500MB. Compare their benchmarks and show how to use the top one." />
+            </div>
+
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <p className="text-sm text-slate-400 mb-2">Video Generation (Remotion)</p>
+              <CodeBlock code="Create a 60-second explainer video about machine learning using Remotion. Research the topic, write a script, and render the video." />
+            </div>
+
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <p className="text-sm text-slate-400 mb-2">Financial Data</p>
+              <CodeBlock code="Get stock data for AAPL, GOOGL, MSFT from Yahoo Finance. Compare their performance over the last year and create a visualization." />
+            </div>
+
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <p className="text-sm text-slate-400 mb-2">Scientific Literature</p>
+              <CodeBlock code="Search PubMed for recent papers on CRISPR. Summarize the top 5, extract methods, and create a comparison table in markdown." />
+            </div>
+
+            <div className="bg-slate-900/50 rounded-lg p-4">
+              <p className="text-sm text-slate-400 mb-2">Code Refactoring</p>
+              <CodeBlock code="Read src/utils.py and refactor for clarity. Improve naming, add type hints, reduce complexity, and ensure all tests still pass." />
             </div>
           </div>
         </Section>
@@ -512,16 +602,19 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
         {/* Footer */}
         <div className="mt-12 text-center text-slate-500 text-sm">
           <p>
-            These tips are compiled from Anthropic's official best practices and community experience.
+            Tips compiled from official docs and community experience. Last updated January 2026.
           </p>
-          <p className="mt-2">
-            Sources:{' '}
+          <p className="mt-2 space-x-2">
             <a href="https://www.anthropic.com/engineering/claude-code-best-practices" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
-              Anthropic Engineering Blog
+              Anthropic Best Practices
             </a>
-            {' | '}
-            <a href="https://github.com/ykdojo/claude-code-tips" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
-              Claude Code Tips Repo
+            <span>•</span>
+            <a href="https://github.com/Njengah/claude-code-cheat-sheet" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+              Cheat Sheet
+            </a>
+            <span>•</span>
+            <a href="https://claudelog.com/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">
+              ClaudeLog Docs
             </a>
           </p>
           <div className="mt-6">
