@@ -8,6 +8,7 @@ import {
   ExternalLink, Cpu, Star, Clock, FileText, Code, Beaker, Search
 } from 'lucide-react';
 import { useAuth, LoginModal } from '@/components/auth';
+import { ShowcaseDemo } from '@/components/showcase/ShowcaseDemo';
 
 interface ShowcaseProject {
   id: string;
@@ -333,6 +334,15 @@ export default function ShowcasePage() {
                 <p className="text-slate-300 text-lg leading-relaxed">
                   {selected.longDescription}
                 </p>
+
+                {/* Live Demo */}
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                    <Play className="w-5 h-5 text-green-400" />
+                    Live Recreation
+                  </h3>
+                  <ShowcaseDemo projectId={selected.id} />
+                </div>
 
                 {/* Highlights */}
                 <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
