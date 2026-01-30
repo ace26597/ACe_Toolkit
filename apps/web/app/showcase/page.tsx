@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Video, Database, Brain, FlaskConical, Workflow, Globe,
   TrendingUp, BarChart3, ChevronRight, ChevronLeft, Play,
-  ExternalLink, Cpu, Star, Clock, FileText, Code, Beaker
+  ExternalLink, Cpu, Star, Clock, FileText, Code, Beaker, Search
 } from 'lucide-react';
 import { useAuth, LoginModal } from '@/components/auth';
 
@@ -237,8 +237,17 @@ export default function ShowcasePage() {
   const { user } = useAuth();
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const selected = showcaseProjects.find(p => p.id === selectedProject);
+
+  const filteredProjects = showcaseProjects.filter(p =>
+    searchQuery === '' ||
+    p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    p.skillsUsed.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -289,6 +298,7 @@ export default function ShowcasePage() {
             See what's possible when Claude Code has access to 145+ skills, 34 MCP servers, and 14 plugins.
             These are real projects created using C3 Researcher.
           </p>
+          <p className="text-xs text-slate-600 mt-4">Last updated: January 2026</p>
         </div>
       </section>
 
@@ -429,8 +439,26 @@ export default function ShowcasePage() {
           </div>
         ) : (
           /* Grid View */
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {showcaseProjects.map((project) => (
+          <>
+            {/* Search Bar */}
+            <div className="mb-8">
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                <input
+                  type="text"
+                  placeholder="Search projects, skills, categories..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                />
+              </div>
+              <p className="text-sm text-slate-500 mt-2">
+                {filteredProjects.length} of {showcaseProjects.length} projects
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredProjects.map((project) => (
               <button
                 key={project.id}
                 onClick={() => setSelectedProject(project.id)}
@@ -471,6 +499,7 @@ export default function ShowcasePage() {
               </button>
             ))}
           </div>
+          </>
         )}
       </div>
 

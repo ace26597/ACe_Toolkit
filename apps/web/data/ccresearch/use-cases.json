@@ -792,6 +792,152 @@
           "mcp": "playwright"
         }
       ]
+    },
+    {
+      "id": "ai-ml-training",
+      "title": "AI/ML Development",
+      "icon": "Brain",
+      "iconColor": "purple",
+      "description": "Model training, fine-tuning, evaluation, and deployment",
+      "examples": [
+        {
+          "id": "model-training",
+          "title": "Train Classification Model",
+          "description": "Train a model on custom data",
+          "prompt": "Load my labeled CSV data. Train a classification model using scikit-learn with cross-validation. Compare RandomForest, XGBoost, and LogisticRegression. Save the best model.",
+          "tags": ["training", "classification", "sklearn"],
+          "skill": "scikit-learn",
+          "verified": true
+        },
+        {
+          "id": "fine-tuning",
+          "title": "Fine-tune Language Model",
+          "description": "Fine-tune a HuggingFace model",
+          "prompt": "Fine-tune a small BERT model on my text classification dataset. Use HuggingFace Transformers with early stopping. Track metrics with Weights & Biases.",
+          "tags": ["fine-tuning", "NLP", "transformers"],
+          "skill": "transformers"
+        },
+        {
+          "id": "model-evaluation",
+          "title": "Model Evaluation & Metrics",
+          "description": "Comprehensive model evaluation",
+          "prompt": "Evaluate my trained model on the test set. Generate: confusion matrix, classification report, ROC curves, precision-recall curves. Save visualizations to output/.",
+          "tags": ["evaluation", "metrics", "visualization"],
+          "skill": "scikit-learn"
+        },
+        {
+          "id": "hyperparameter-tuning",
+          "title": "Hyperparameter Optimization",
+          "description": "Optimize model hyperparameters",
+          "prompt": "Perform hyperparameter tuning on my XGBoost model using Optuna. Search for optimal learning_rate, max_depth, n_estimators. Use 5-fold CV.",
+          "tags": ["hyperparameters", "optimization", "optuna"],
+          "skill": "scikit-learn"
+        },
+        {
+          "id": "embeddings",
+          "title": "Generate Text Embeddings",
+          "description": "Create embeddings for similarity search",
+          "prompt": "Generate embeddings for all documents in my corpus using sentence-transformers. Store in a vector database and implement semantic search.",
+          "tags": ["embeddings", "vector-search", "NLP"],
+          "skill": "transformers"
+        }
+      ]
+    },
+    {
+      "id": "integrations",
+      "title": "Tool Integrations",
+      "icon": "Server",
+      "iconColor": "cyan",
+      "description": "Connect to Notion, Linear, Figma, and other productivity tools",
+      "examples": [
+        {
+          "id": "notion-docs",
+          "title": "Notion Documentation Sync",
+          "description": "Create and update Notion pages",
+          "prompt": "Read my codebase and create a documentation page in Notion. Include: project overview, architecture diagram, API endpoints, and setup instructions.",
+          "tags": ["Notion", "documentation", "sync"],
+          "mcp": "notion"
+        },
+        {
+          "id": "linear-issues",
+          "title": "Linear Issue Management",
+          "description": "Create and track issues in Linear",
+          "prompt": "Analyze my codebase for TODO comments. Create Linear issues for each one with appropriate labels, priority, and estimates.",
+          "tags": ["Linear", "issues", "project-management"],
+          "mcp": "linear"
+        },
+        {
+          "id": "figma-to-code",
+          "title": "Figma Design to Code",
+          "description": "Convert Figma designs to React components",
+          "prompt": "Access my Figma file and convert the 'Button' component to a React component with Tailwind CSS. Match colors, spacing, and typography exactly.",
+          "tags": ["Figma", "React", "design-to-code"],
+          "mcp": "figma"
+        },
+        {
+          "id": "github-pr-review",
+          "title": "GitHub PR Review",
+          "description": "Review pull requests with Claude",
+          "prompt": "Review the open PR #123 on this repo. Check for: bugs, security issues, code style, test coverage. Post review comments on specific lines.",
+          "tags": ["GitHub", "code-review", "PR"],
+          "mcp": "git"
+        },
+        {
+          "id": "slack-summary",
+          "title": "Slack Channel Summary",
+          "description": "Summarize Slack discussions",
+          "prompt": "Read the last 50 messages in #engineering channel. Summarize key decisions, action items, and unresolved questions.",
+          "tags": ["Slack", "summary", "communication"],
+          "mcp": "slack"
+        }
+      ]
+    },
+    {
+      "id": "multi-agent",
+      "title": "Multi-Agent Patterns",
+      "icon": "Sparkles",
+      "iconColor": "yellow",
+      "description": "Parallel processing, subagents, and orchestration workflows",
+      "examples": [
+        {
+          "id": "parallel-research",
+          "title": "Parallel Research Tasks",
+          "description": "Research multiple topics simultaneously",
+          "prompt": "Use 5 parallel subagents to research: 1) React trends, 2) Vue trends, 3) Angular trends, 4) Svelte trends, 5) Solid trends. Compile into a comparison report.",
+          "tags": ["parallel", "research", "subagents"],
+          "verified": true
+        },
+        {
+          "id": "code-review-agents",
+          "title": "Multi-Agent Code Review",
+          "description": "Different agents review different aspects",
+          "prompt": "Review my PR using specialized subagents: 1) Security reviewer, 2) Performance reviewer, 3) Style reviewer, 4) Test coverage reviewer. Compile findings.",
+          "tags": ["code-review", "agents", "parallel"],
+          "verified": true
+        },
+        {
+          "id": "feature-planning",
+          "title": "Feature Planning Workflow",
+          "description": "Orchestrate planning with multiple perspectives",
+          "prompt": "Plan a new authentication feature using subagents: 1) Product manager (requirements), 2) UX designer (user flows), 3) Architect (system design), 4) Security (threat model).",
+          "tags": ["planning", "orchestration", "feature"],
+          "plugin": "feature-dev"
+        },
+        {
+          "id": "data-pipeline",
+          "title": "Parallel Data Processing",
+          "description": "Process data files in parallel",
+          "prompt": "I have 10 CSV files in data/. Use parallel tasks to: analyze each file, identify data quality issues, and merge results into a single report.",
+          "tags": ["parallel", "data", "ETL"]
+        },
+        {
+          "id": "test-suite-parallel",
+          "title": "Parallel Test Execution",
+          "description": "Run different test suites simultaneously",
+          "prompt": "Run in parallel: 1) Unit tests, 2) Integration tests, 3) E2E tests, 4) Performance tests. Collect all results and create a combined report.",
+          "tags": ["testing", "parallel", "CI"]
+        }
+      ]
     }
   ]
 }

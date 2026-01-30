@@ -300,6 +300,83 @@ const mcpServers = [
     tools: ['get_price', 'get_market_data', 'get_coin_info', 'search_coins', 'get_trending'],
     install: 'npx -y mcp-remote https://mcp.api.coingecko.com/mcp',
   },
+  {
+    id: 'bitly',
+    name: 'Bitly',
+    description: 'URL shortening, branded links, and click analytics',
+    category: 'Utility',
+    endpoint: 'npx @bitly/mcp-server',
+    source: 'https://github.com/bitly/bitly-mcp',
+    provider: 'Bitly',
+    tools: ['shorten_url', 'get_clicks', 'create_branded_link', 'get_link_history'],
+    install: 'npx @bitly/mcp-server (requires API key)',
+  },
+  {
+    id: 'lunarcrush',
+    name: 'LunarCrush',
+    description: 'Crypto social intelligence, sentiment analysis, influencer tracking',
+    category: 'Finance',
+    endpoint: 'npx lunarcrush-mcp-server',
+    source: 'https://lunarcrush.com/developers',
+    provider: 'LunarCrush',
+    tools: ['get_coin_social', 'get_influencers', 'get_trending', 'get_sentiment'],
+    install: 'npx lunarcrush-mcp-server (requires API key)',
+  },
+  {
+    id: 'mercury',
+    name: 'Mercury Banking',
+    description: 'Business banking API - accounts, transactions, payments',
+    category: 'Finance',
+    endpoint: 'npx mercury-mcp-server',
+    source: 'https://mercury.com/developers',
+    provider: 'Mercury',
+    tools: ['get_accounts', 'get_transactions', 'get_balance', 'list_recipients'],
+    install: 'npx mercury-mcp-server (requires API key)',
+  },
+  {
+    id: 'cloudflare',
+    name: 'Cloudflare',
+    description: 'DNS management, analytics, Workers, R2 storage',
+    category: 'Utility',
+    endpoint: 'npx @cloudflare/mcp-server',
+    source: 'https://github.com/cloudflare/mcp-server-cloudflare',
+    provider: 'Cloudflare',
+    tools: ['manage_dns', 'get_analytics', 'deploy_worker', 'manage_r2'],
+    install: 'npx @cloudflare/mcp-server-cloudflare (requires API token)',
+  },
+  {
+    id: 'linear',
+    name: 'Linear',
+    description: 'Issue tracking, project management, team workflows',
+    category: 'Development',
+    endpoint: 'npx @anthropic/linear-mcp',
+    source: 'https://github.com/anthropics/linear-mcp',
+    provider: 'Anthropic',
+    tools: ['create_issue', 'search_issues', 'update_issue', 'get_projects'],
+    install: 'npx @anthropic/linear-mcp (requires API key)',
+  },
+  {
+    id: 'notion',
+    name: 'Notion',
+    description: 'Workspace pages, databases, and content management',
+    category: 'Utility',
+    endpoint: 'npx @notionhq/mcp-server',
+    source: 'https://github.com/makenotion/notion-mcp',
+    provider: 'Notion',
+    tools: ['search_pages', 'get_page', 'create_page', 'query_database'],
+    install: 'npx @notionhq/notion-mcp-server (requires integration token)',
+  },
+  {
+    id: 'figma',
+    name: 'Figma',
+    description: 'Design files, components, and dev mode access',
+    category: 'Development',
+    endpoint: 'Figma Desktop App',
+    source: 'https://help.figma.com/hc/en-us/articles/32132100718103',
+    provider: 'Figma',
+    tools: ['get_file', 'get_components', 'get_styles', 'export_assets'],
+    install: 'Enable in Figma Desktop App → Settings → Dev Mode MCP',
+  },
 ];
 
 // Plugins with sources
@@ -558,6 +635,7 @@ export default function DirectoryPage() {
             Complete list of everything installed on C3 Researcher with source links and installation commands.
             Copy configs directly to your <code className="text-blue-400">claude_desktop_config.json</code>.
           </p>
+          <p className="text-xs text-slate-600 mt-3">Last updated: January 2026</p>
         </div>
 
         {/* Search */}

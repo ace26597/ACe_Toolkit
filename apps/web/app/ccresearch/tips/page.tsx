@@ -162,6 +162,9 @@ export default function TipsPage() {
                 </p>
               </div>
             </div>
+            <div className="text-xs text-slate-500">
+              Updated: Jan 2026
+            </div>
           </div>
         </div>
       </header>
@@ -498,6 +501,162 @@ def process_data(input: pd.DataFrame) -> pd.DataFrame:
               <p className="text-slate-400 text-xs mt-1">Initialize project CLAUDE.md</p>
             </div>
           </div>
+        </Section>
+
+        {/* CLAUDE.md Best Practices */}
+        <Section
+          title="CLAUDE.md Best Practices"
+          icon={<FileText className="w-5 h-5" />}
+          iconColor="text-amber-400"
+        >
+          <TipCard title="What is CLAUDE.md?" icon={<FileText className="w-5 h-5" />}>
+            <p>CLAUDE.md is automatically loaded into context when Claude starts. Use it for:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li><strong>Project context</strong> - What this codebase does</li>
+              <li><strong>Conventions</strong> - Coding standards, naming, architecture</li>
+              <li><strong>Commands</strong> - How to build, test, deploy</li>
+              <li><strong>Gotchas</strong> - Known issues, workarounds</li>
+            </ul>
+          </TipCard>
+
+          <TipCard title="Keep it Concise" type="warning" icon={<AlertTriangle className="w-5 h-5" />}>
+            <p>Long CLAUDE.md files get ignored. Rules:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>If Claude already does it correctly, don't document it</li>
+              <li>Focus on project-specific quirks, not general practices</li>
+              <li>Use bullet points, not paragraphs</li>
+              <li>Under 500 lines is ideal</li>
+            </ul>
+          </TipCard>
+
+          <TipCard title="Example Structure" icon={<Code className="w-5 h-5" />}>
+            <CodeBlock code={`# Project Name
+
+## Quick Start
+npm run dev    # Start development
+npm run test   # Run tests
+
+## Architecture
+- /src/api - FastAPI backend
+- /src/web - Next.js frontend
+
+## Conventions
+- Use snake_case for Python
+- Use camelCase for TypeScript
+- Commits: type: subject (feat, fix, docs)
+
+## Known Issues
+- Port 3000 conflicts with X - use 3001`} />
+          </TipCard>
+        </Section>
+
+        {/* Hooks & Automation */}
+        <Section
+          title="Hooks & Automation"
+          icon={<Wrench className="w-5 h-5" />}
+          iconColor="text-purple-400"
+        >
+          <TipCard title="What are Hooks?" icon={<Wrench className="w-5 h-5" />}>
+            <p>Hooks run shell commands when Claude performs actions. Define in <code className="bg-slate-800 px-1.5 rounded">.claude/settings.json</code>:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li><strong>PreToolUse</strong> - Before a tool runs</li>
+              <li><strong>PostToolUse</strong> - After a tool completes</li>
+              <li><strong>Notification</strong> - For alerts (e.g., Slack)</li>
+            </ul>
+          </TipCard>
+
+          <TipCard title="Example: Auto-format on Edit" icon={<Code className="w-5 h-5" />}>
+            <CodeBlock code={`{
+  "hooks": {
+    "PostToolUse": [{
+      "tool": "Edit",
+      "command": "prettier --write $FILE_PATH"
+    }]
+  }
+}`} />
+            <p className="text-slate-400 text-xs mt-2">
+              This runs Prettier after every file edit.
+            </p>
+          </TipCard>
+
+          <TipCard title="Headless Mode for CI/CD" icon={<Terminal className="w-5 h-5" />}>
+            <p>Use Claude in scripts and pipelines:</p>
+            <CodeBlock code={`# One-shot query
+claude -p "Fix lint errors in src/" --output-format json
+
+# With streaming
+claude -p "Generate tests" --output-format stream-json
+
+# In pre-commit hook
+claude -p "Review this diff for security issues" < diff.txt`} />
+          </TipCard>
+        </Section>
+
+        {/* Git Worktrees */}
+        <Section
+          title="Git Worktrees Pattern"
+          icon={<GitBranch className="w-5 h-5" />}
+          iconColor="text-cyan-400"
+        >
+          <TipCard title="Parallel Development" icon={<GitBranch className="w-5 h-5" />}>
+            <p>Use git worktrees to run multiple Claude sessions on different branches:</p>
+            <CodeBlock code={`# Create worktree for a feature
+git worktree add ../my-project-feature feature-branch
+
+# Run Claude in main
+cd my-project && claude
+
+# Run Claude in feature (separate terminal)
+cd ../my-project-feature && claude`} />
+            <p className="text-slate-400 text-xs mt-2">
+              Each worktree is isolated - no branch switching needed.
+            </p>
+          </TipCard>
+
+          <TipCard title="When to Use Worktrees" icon={<Lightbulb className="w-5 h-5" />}>
+            <ul className="list-disc list-inside space-y-1">
+              <li>Working on feature while fixing urgent bug</li>
+              <li>Running tests on one branch while developing on another</li>
+              <li>Comparing implementations side-by-side</li>
+              <li>Parallel Claude sessions for different tasks</li>
+            </ul>
+          </TipCard>
+        </Section>
+
+        {/* Checkpointing & Recovery */}
+        <Section
+          title="Checkpointing & Recovery"
+          icon={<RefreshCw className="w-5 h-5" />}
+          iconColor="text-red-400"
+        >
+          <TipCard title="Rewind Changes" icon={<RefreshCw className="w-5 h-5" />}>
+            <p>Made a mistake? Use rewind to undo:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li><code className="bg-slate-800 px-1.5 rounded">Esc + Esc</code> - Open rewind menu</li>
+              <li><code className="bg-slate-800 px-1.5 rounded">/rewind</code> - Same as above</li>
+              <li>Select a checkpoint to restore to that state</li>
+            </ul>
+            <p className="text-slate-400 text-xs mt-2">
+              Claude auto-creates checkpoints before major changes.
+            </p>
+          </TipCard>
+
+          <TipCard title="Manual Checkpoints" icon={<Target className="w-5 h-5" />}>
+            <p>Create explicit save points:</p>
+            <CodeBlock code="Before you make changes, create a checkpoint so I can rewind if needed" />
+            <p className="text-slate-400 text-xs mt-2">
+              Useful before risky refactors or experiments.
+            </p>
+          </TipCard>
+
+          <TipCard title="Git as Backup" type="info" icon={<GitBranch className="w-5 h-5" />}>
+            <p>For extra safety:</p>
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>Commit before major Claude sessions</li>
+              <li>Use branches for experimental changes</li>
+              <li><code className="bg-slate-800 px-1.5 rounded">git stash</code> to save uncommitted work</li>
+            </ul>
+          </TipCard>
         </Section>
 
         {/* Mobile Usage Section */}
