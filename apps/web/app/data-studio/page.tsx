@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import {
     ArrowLeft, Database, FileSpreadsheet, Trash2, Loader2,
@@ -1453,6 +1454,9 @@ function PlotlyWidget({
 // ==================== Main Page ====================
 
 function DataStudioContent() {
+    const searchParams = useSearchParams();
+    const router = useRouter();
+
     const [viewMode, setViewMode] = useState<ViewMode>('projects');
     const [selectedProject, setSelectedProject] = useState<DataStudioProject | null>(null);
     const [metadata, setMetadata] = useState<ProjectMetadata | null>(null);
@@ -1461,6 +1465,43 @@ function DataStudioContent() {
     const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('combined');
     const [analysisFileCount, setAnalysisFileCount] = useState(0);
     const [analysisFileNames, setAnalysisFileNames] = useState<string[]>([]);
+    const [initialLoadDone, setInitialLoadDone] = useState(false);
+
+    // Restore project from URL on mount
+    useEffect(() => {
+        const urlProject = searchParams.get('project');
+        if (urlProject && !initialLoadDone) {
+            // Load the project from URL
+            dataStudioV2Api.listProjects().then(projects => {
+                const project = projects.find(p => p.name === urlProject);
+                if (project) {
+                    setSelectedProject(project);
+                    if (project.has_dashboard) {
+                        loadExistingData(project);
+                    } else if (project.file_count > 0) {
+                        setViewMode('analyzing');
+                    } else {
+                        setViewMode('import');
+                    }
+                }
+                setInitialLoadDone(true);
+            }).catch(() => {
+                setInitialLoadDone(true);
+            });
+        } else {
+            setInitialLoadDone(true);
+        }
+    }, [searchParams]);
+
+    // Update URL when project changes
+    useEffect(() => {
+        if (!initialLoadDone) return;
+
+        const params = new URLSearchParams();
+        if (selectedProject) params.set('project', selectedProject.name);
+        const newUrl = params.toString() ? `?${params.toString()}` : '/data-studio';
+        window.history.replaceState({}, '', newUrl);
+    }, [selectedProject, initialLoadDone]);
 
     const handleSelectProject = (project: DataStudioProject) => {
         setSelectedProject(project);
@@ -1621,7 +1662,13 @@ function DataStudioContent() {
 export default function DataStudioPage() {
     return (
         <ProtectedRoute>
-            <DataStudioContent />
+            <Suspense fallback={
+                <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-cyan-400" />
+                </div>
+            }>
+                <DataStudioContent />
+            </Suspense>
         </ProtectedRoute>
     );
 }

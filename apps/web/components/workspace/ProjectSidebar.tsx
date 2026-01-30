@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { FolderOpen, Plus, Trash2, RefreshCw, ChevronRight } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { FolderOpen, Plus, Trash2, RefreshCw, ChevronRight, ChevronLeft, PanelLeftClose, PanelLeft } from 'lucide-react';
 import { WorkspaceProject } from '@/lib/api';
 
 interface ProjectSidebarProps {
@@ -11,7 +11,11 @@ interface ProjectSidebarProps {
   onCreateProject: (name: string) => void;
   onDeleteProject: (name: string) => void;
   loading: boolean;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
+
+const COLLAPSED_KEY = 'workspace_sidebar_collapsed';
 
 export default function ProjectSidebar({
   projects,
@@ -20,9 +24,32 @@ export default function ProjectSidebar({
   onCreateProject,
   onDeleteProject,
   loading,
+  collapsed: controlledCollapsed,
+  onToggleCollapse,
 }: ProjectSidebarProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+
+  // Use controlled collapsed state if provided, otherwise manage internally
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const isCollapsed = controlledCollapsed !== undefined ? controlledCollapsed : internalCollapsed;
+
+  // Load collapsed state from localStorage on mount (only for internal state)
+  useEffect(() => {
+    if (controlledCollapsed === undefined) {
+      const saved = localStorage.getItem(COLLAPSED_KEY);
+      if (saved === 'true') setInternalCollapsed(true);
+    }
+  }, [controlledCollapsed]);
+
+  const toggleCollapse = () => {
+    if (onToggleCollapse) {
+      onToggleCollapse();
+    } else {
+      setInternalCollapsed(!internalCollapsed);
+      localStorage.setItem(COLLAPSED_KEY, (!internalCollapsed).toString());
+    }
+  };
 
   const handleCreate = () => {
     if (newProjectName.trim()) {
@@ -41,21 +68,95 @@ export default function ProjectSidebar({
     }
   };
 
+  // Collapsed view - just icons
+  if (isCollapsed) {
+    return (
+      <aside className="w-14 bg-slate-800/50 border-r border-slate-700 flex flex-col transition-all duration-200">
+        {/* Header */}
+        <div className="p-2 border-b border-slate-700 flex flex-col items-center gap-2">
+          <button
+            onClick={toggleCollapse}
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+            title="Expand sidebar"
+          >
+            <PanelLeft size={18} />
+          </button>
+          <button
+            onClick={() => {
+              toggleCollapse();
+              setTimeout(() => setIsCreating(true), 200);
+            }}
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+            title="New Project"
+          >
+            <Plus size={18} />
+          </button>
+        </div>
+
+        {/* Project Icons */}
+        <div className="flex-1 overflow-y-auto py-2">
+          {loading ? (
+            <div className="flex items-center justify-center h-16">
+              <RefreshCw size={16} className="text-slate-400 animate-spin" />
+            </div>
+          ) : projects.length === 0 ? (
+            <div className="flex items-center justify-center h-16">
+              <FolderOpen size={16} className="text-slate-500" />
+            </div>
+          ) : (
+            <ul className="flex flex-col items-center gap-1">
+              {projects.map((project) => (
+                <li key={project.name}>
+                  <button
+                    onClick={() => onSelectProject(project.name)}
+                    className={`p-2 rounded transition-colors ${
+                      selectedProject === project.name
+                        ? 'bg-indigo-600/30 text-indigo-300'
+                        : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
+                    }`}
+                    title={project.name}
+                  >
+                    <FolderOpen size={18} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-2 border-t border-slate-700 text-xs text-slate-500 text-center">
+          {projects.length}
+        </div>
+      </aside>
+    );
+  }
+
+  // Expanded view
   return (
-    <aside className="w-64 bg-slate-800/50 border-r border-slate-700 flex flex-col">
+    <aside className="w-64 bg-slate-800/50 border-r border-slate-700 flex flex-col transition-all duration-200">
       {/* Header */}
       <div className="p-4 border-b border-slate-700">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">
             Projects
           </h2>
-          <button
-            onClick={() => setIsCreating(true)}
-            className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
-            title="New Project"
-          >
-            <Plus size={18} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setIsCreating(true)}
+              className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+              title="New Project"
+            >
+              <Plus size={18} />
+            </button>
+            <button
+              onClick={toggleCollapse}
+              className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+              title="Collapse sidebar"
+            >
+              <PanelLeftClose size={18} />
+            </button>
+          </div>
         </div>
       </div>
 

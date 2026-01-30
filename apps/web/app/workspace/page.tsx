@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, ChevronDown, Clock, Download, Terminal, Plus, FileCode, FileJson, Image, Video, Music, FileType, Upload, Table, FileSpreadsheet, Loader2, Lightbulb, Play, Power, Github, Globe, Link as LinkIcon, Key, Database, Server, Sparkles, Wrench, Dna, Pill, Brain, BarChart3, BookOpen, Zap, Copy, Check, ExternalLink, Beaker, Menu } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { ProtectedRoute, useAuth } from '@/components/auth';
 import ProjectSidebar from '@/components/workspace/ProjectSidebar';
 import DataBrowser from '@/components/workspace/DataBrowser';
@@ -979,7 +980,11 @@ type ViewMode = 'notes' | 'data' | 'terminal';
 
 const LAST_PROJECT_KEY = 'workspace_last_project';
 
-export default function WorkspacePage() {
+function WorkspaceContent() {
+  // URL params for project and tab persistence
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
   // Mobile detection
   const isMobile = useIsMobile(768);
 
@@ -987,6 +992,9 @@ export default function WorkspacePage() {
   const [projects, setProjects] = useState<WorkspaceProject[]>([]);
   const [selectedProject, setSelectedProject] = useState<string | null>(null);
   const [loadingProjects, setLoadingProjects] = useState(true);
+
+  // Sidebar collapsed state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Text files state (for Notes view - all readable files in project)
   const [textFiles, setTextFiles] = useState<WorkspaceDataItem[]>([]);
@@ -1065,38 +1073,62 @@ export default function WorkspacePage() {
     }
   }, []);
 
-  // Restore state from localStorage on mount
+  // Restore state from URL params (priority) or localStorage on mount
   useEffect(() => {
+    // URL params take priority over localStorage
+    const urlProject = searchParams.get('project');
+    const urlTab = searchParams.get('tab');
+
     const savedProject = localStorage.getItem('workspace_selected_project');
     const savedViewMode = localStorage.getItem('workspace_view_mode');
     const savedTerminalMode = localStorage.getItem('workspace_terminal_mode');
     const savedFileBrowser = localStorage.getItem('workspace_file_browser_open');
+    const savedSidebarCollapsed = localStorage.getItem('workspace_sidebar_collapsed');
 
-    if (savedProject) setSelectedProject(savedProject);
-    if (savedViewMode && ['terminal', 'notes', 'data'].includes(savedViewMode)) {
+    // Project: URL param > localStorage
+    if (urlProject) {
+      setSelectedProject(urlProject);
+    } else if (savedProject) {
+      setSelectedProject(savedProject);
+    }
+
+    // Tab/ViewMode: URL param > localStorage
+    if (urlTab && ['terminal', 'notes', 'data'].includes(urlTab)) {
+      setViewMode(urlTab as ViewMode);
+    } else if (savedViewMode && ['terminal', 'notes', 'data'].includes(savedViewMode)) {
       setViewMode(savedViewMode as ViewMode);
     }
+
     if (savedTerminalMode && ['claude', 'ssh'].includes(savedTerminalMode)) {
       setTerminalMode(savedTerminalMode as 'claude' | 'ssh');
     }
     if (savedFileBrowser !== null) {
       setShowFileBrowser(savedFileBrowser === 'true');
     }
-  }, []);
+    if (savedSidebarCollapsed === 'true') {
+      setSidebarCollapsed(true);
+    }
+  }, [searchParams]);
 
-  // Persist selected project to localStorage
+  // Update URL and localStorage when project or viewMode changes
   useEffect(() => {
+    // Persist to localStorage
     if (selectedProject) {
       localStorage.setItem('workspace_selected_project', selectedProject);
     } else {
       localStorage.removeItem('workspace_selected_project');
     }
-  }, [selectedProject]);
-
-  // Persist view mode to localStorage
-  useEffect(() => {
     localStorage.setItem('workspace_view_mode', viewMode);
-  }, [viewMode]);
+    localStorage.setItem('workspace_sidebar_collapsed', sidebarCollapsed.toString());
+
+    // Update URL without triggering navigation
+    const params = new URLSearchParams();
+    if (selectedProject) params.set('project', selectedProject);
+    if (viewMode !== 'terminal') params.set('tab', viewMode); // Only include if not default
+
+    const newUrl = params.toString() ? `?${params.toString()}` : '/workspace';
+    window.history.replaceState({}, '', newUrl);
+  }, [selectedProject, viewMode, sidebarCollapsed]);
 
   // Persist terminal mode to localStorage
   useEffect(() => {
@@ -1901,6 +1933,8 @@ export default function WorkspacePage() {
             onCreateProject={handleCreateProject}
             onDeleteProject={handleDeleteProject}
             loading={loadingProjects}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
           />
         </div>
 
@@ -2800,5 +2834,18 @@ export default function WorkspacePage() {
         hasProject={!!selectedProject}
       />
     </ProtectedRoute>
+  );
+}
+
+// Wrap with Suspense for useSearchParams (required in Next.js 16)
+export default function WorkspacePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 animate-spin text-indigo-400" />
+      </div>
+    }>
+      <WorkspaceContent />
+    </Suspense>
   );
 }

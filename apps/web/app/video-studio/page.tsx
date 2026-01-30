@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Video, Plus, Play, Download, Trash2, FolderOpen,
   Terminal, Loader2, X, RefreshCw, ChevronRight,
-  Film, Clock
+  Film, Clock, PanelLeft, PanelLeftClose, Menu
 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth';
 import { getApiUrl } from '@/lib/api';
@@ -47,8 +47,11 @@ function formatDate(dateStr: string | number): string {
   });
 }
 
+const SIDEBAR_COLLAPSED_KEY = 'video_studio_sidebar_collapsed';
+
 function VideoStudioContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -62,6 +65,10 @@ function VideoStudioContent() {
   const [sessionActive, setSessionActive] = useState(false);
   const [playingVideo, setPlayingVideo] = useState<VideoFile | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Sidebar and mobile state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   // Terminal refs
   const terminalRef = useRef<HTMLDivElement>(null);
@@ -103,10 +110,33 @@ function VideoStudioContent() {
     }
   }, []);
 
-  // Initialize
+  // Initialize - fetch projects and restore state from URL/localStorage
   useEffect(() => {
     fetchProjects();
-  }, [fetchProjects]);
+
+    // Restore sidebar collapsed state
+    const savedCollapsed = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+    if (savedCollapsed === 'true') setSidebarCollapsed(true);
+
+    // Restore project from URL param
+    const urlProject = searchParams.get('project');
+    if (urlProject) {
+      setSelectedProject(urlProject);
+    }
+  }, [fetchProjects, searchParams]);
+
+  // Update URL when project changes
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (selectedProject) params.set('project', selectedProject);
+    const newUrl = params.toString() ? `?${params.toString()}` : '/video-studio';
+    window.history.replaceState({}, '', newUrl);
+  }, [selectedProject]);
+
+  // Persist sidebar collapsed state
+  useEffect(() => {
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, sidebarCollapsed.toString());
+  }, [sidebarCollapsed]);
 
   // Fetch details when project selected
   useEffect(() => {
@@ -390,23 +420,95 @@ function VideoStudioContent() {
     fetchProjectDetails(selectedProject);
   };
 
-  return (
-    <div className="min-h-screen bg-gray-950 text-white flex">
-      {/* Sidebar - Projects */}
-      <div className="w-72 border-r border-gray-800 flex flex-col">
+  // Sidebar content component (shared between collapsed/expanded)
+  const renderSidebar = (collapsed: boolean, isMobileDrawer?: boolean) => {
+    if (collapsed && !isMobileDrawer) {
+      // Collapsed sidebar - icons only
+      return (
+        <div className="w-14 border-r border-gray-800 flex flex-col bg-gray-950 transition-all duration-200">
+          <div className="p-2 border-b border-gray-800 flex flex-col items-center gap-2">
+            <button
+              onClick={() => setSidebarCollapsed(false)}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+              title="Expand sidebar"
+            >
+              <PanelLeft className="w-4 h-4 text-gray-400" />
+            </button>
+            <button
+              onClick={() => {
+                setSidebarCollapsed(false);
+                setTimeout(() => setIsCreatingProject(true), 200);
+              }}
+              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+              title="New Project"
+            >
+              <Plus className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto py-2">
+            {isLoading ? (
+              <div className="flex justify-center p-2">
+                <Loader2 className="w-4 h-4 animate-spin text-gray-500" />
+              </div>
+            ) : (
+              projects.map((project) => (
+                <button
+                  key={project.name}
+                  onClick={() => setSelectedProject(project.name)}
+                  className={`w-full p-2 flex justify-center transition-colors ${
+                    selectedProject === project.name
+                      ? 'bg-purple-600/20 text-purple-400'
+                      : 'text-gray-500 hover:bg-gray-800 hover:text-white'
+                  }`}
+                  title={project.display_name || project.name}
+                >
+                  <FolderOpen className="w-4 h-4" />
+                </button>
+              ))
+            )}
+          </div>
+          <div className="p-2 border-t border-gray-800 text-xs text-gray-600 text-center">
+            {projects.length}
+          </div>
+        </div>
+      );
+    }
+
+    // Expanded sidebar
+    return (
+      <div className={`${isMobileDrawer ? 'w-full' : 'w-72'} border-r border-gray-800 flex flex-col bg-gray-950 transition-all duration-200`}>
         <div className="p-4 border-b border-gray-800">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Film className="w-5 h-5 text-purple-400" />
               <h1 className="font-semibold">Video Studio</h1>
             </div>
-            <button
-              onClick={() => setIsCreatingProject(true)}
-              className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
-              title="New Project"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setIsCreatingProject(true)}
+                className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
+                title="New Project"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              {!isMobileDrawer && (
+                <button
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
+                  title="Collapse sidebar"
+                >
+                  <PanelLeftClose className="w-4 h-4 text-gray-400" />
+                </button>
+              )}
+              {isMobileDrawer && (
+                <button
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className="p-1.5 hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Create Project Modal */}
@@ -453,22 +555,25 @@ function VideoStudioContent() {
             projects.map((project) => (
               <div
                 key={project.name}
-                onClick={() => setSelectedProject(project.name)}
-                className={`p-3 border-b border-gray-800 cursor-pointer hover:bg-gray-900 transition-colors ${
+                onClick={() => {
+                  setSelectedProject(project.name);
+                  if (isMobileDrawer) setMobileSidebarOpen(false);
+                }}
+                className={`p-3 border-b border-gray-800 cursor-pointer hover:bg-gray-900 transition-colors group ${
                   selectedProject === project.name ? 'bg-gray-900 border-l-2 border-l-purple-500' : ''
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FolderOpen className="w-4 h-4 text-gray-500" />
-                    <span className="text-sm font-medium">{project.display_name || project.name}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FolderOpen className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                    <span className="text-sm font-medium truncate">{project.display_name || project.name}</span>
                   </div>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       handleDeleteProject(project.name);
                     }}
-                    className="p-1 hover:bg-gray-700 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="p-1 hover:bg-gray-700 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                   >
                     <Trash2 className="w-3.5 h-3.5 text-gray-500" />
                   </button>
@@ -489,6 +594,51 @@ function VideoStudioContent() {
             ))
           )}
         </div>
+        <div className="p-3 border-t border-gray-800 text-xs text-gray-500 text-center">
+          {projects.length} project{projects.length !== 1 ? 's' : ''}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-950 text-white flex flex-col md:flex-row">
+      {/* Mobile Header */}
+      <div className="md:hidden flex items-center justify-between p-3 border-b border-gray-800 bg-gray-950">
+        <button
+          onClick={() => setMobileSidebarOpen(true)}
+          className="p-2 hover:bg-gray-800 rounded-lg"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="flex items-center gap-2">
+          <Film className="w-5 h-5 text-purple-400" />
+          <span className="font-semibold">Video Studio</span>
+        </div>
+        <button
+          onClick={() => setIsCreatingProject(true)}
+          className="p-2 hover:bg-gray-800 rounded-lg"
+        >
+          <Plus className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Mobile Sidebar Drawer */}
+      {mobileSidebarOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <div className="relative w-80 max-w-[85%] h-full">
+            {renderSidebar(false, true)}
+          </div>
+        </div>
+      )}
+
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        {renderSidebar(sidebarCollapsed)}
       </div>
 
       {/* Main Content */}
@@ -679,7 +829,13 @@ function VideoStudioContent() {
 export default function VideoStudioPage() {
   return (
     <ProtectedRoute>
-      <VideoStudioContent />
+      <Suspense fallback={
+        <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
+        </div>
+      }>
+        <VideoStudioContent />
+      </Suspense>
     </ProtectedRoute>
   );
 }
