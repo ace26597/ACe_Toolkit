@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth, LoginModal, ExperimentalBanner } from '@/components/auth';
 import { MobileMenu } from '@/components/ui/MobileMenu';
+import { TerminalDemo } from '@/components/home/TerminalDemo';
 
 export default function Home() {
   const { user, loading, logout, trialInfo } = useAuth();
@@ -100,37 +101,45 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Hero - Compact */}
+      {/* Hero - Two Column */}
       <section className="relative border-b border-slate-800/50">
         <div className="absolute inset-0 bg-gradient-to-b from-blue-600/5 to-transparent" />
         <div className="max-w-7xl mx-auto px-4 py-12 md:py-16 relative">
-          <div className="max-w-3xl">
-            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 leading-tight">
-              Claude Code with{' '}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
-                145+ Skills
-              </span>
-            </h1>
-            <p className="text-lg text-slate-400 mb-6 max-w-2xl">
-              Full terminal access to research tools, MCP servers, and plugins.
-              Data analysis, document generation, web research, and more.
-            </p>
-            <div className="flex flex-wrap items-center gap-3">
-              {user ? (
-                <Link href="/workspace"
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2.5 rounded-md transition-colors inline-flex items-center gap-2">
-                  Open Workspace <ArrowRight className="w-4 h-4" />
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+            {/* Left - Text */}
+            <div>
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-4 leading-tight">
+                Claude Code with{' '}
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">
+                  145+ Skills
+                </span>
+              </h1>
+              <p className="text-lg text-slate-400 mb-6 max-w-xl">
+                Full terminal access to research tools, MCP servers, and plugins.
+                Data analysis, document generation, web research, and more.
+              </p>
+              <div className="flex flex-wrap items-center gap-3">
+                {user ? (
+                  <Link href="/workspace"
+                    className="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2.5 rounded-md transition-colors inline-flex items-center gap-2">
+                    Open Workspace <ArrowRight className="w-4 h-4" />
+                  </Link>
+                ) : (
+                  <button onClick={() => setShowLoginModal(true)}
+                    className="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2.5 rounded-md transition-colors inline-flex items-center gap-2">
+                    Try Free <ArrowRight className="w-4 h-4" />
+                  </button>
+                )}
+                <Link href="/showcase"
+                  className="text-slate-400 hover:text-white font-medium px-4 py-2.5 transition-colors inline-flex items-center gap-2">
+                  View Showcase <ExternalLink className="w-4 h-4" />
                 </Link>
-              ) : (
-                <button onClick={() => setShowLoginModal(true)}
-                  className="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2.5 rounded-md transition-colors inline-flex items-center gap-2">
-                  Try Free <ArrowRight className="w-4 h-4" />
-                </button>
-              )}
-              <Link href="/showcase"
-                className="text-slate-400 hover:text-white font-medium px-4 py-2.5 transition-colors inline-flex items-center gap-2">
-                View Showcase <ExternalLink className="w-4 h-4" />
-              </Link>
+              </div>
+            </div>
+
+            {/* Right - Terminal Demo */}
+            <div className="lg:pl-4">
+              <TerminalDemo />
             </div>
           </div>
         </div>
