@@ -6,7 +6,6 @@ import {
   ArrowLeft, Activity, CheckCircle2, XCircle, AlertCircle,
   RefreshCw, Server, Database, Globe, Wifi
 } from 'lucide-react';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface ServiceStatus {
   name: string;
@@ -134,7 +133,6 @@ export default function StatusPage() {
               <span className="font-semibold text-white">Status</span>
             </div>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 

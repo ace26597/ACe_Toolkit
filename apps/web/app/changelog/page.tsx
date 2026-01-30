@@ -1,8 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { Cpu, ArrowLeft, Sparkles, Bug, Wrench, Zap, Package } from 'lucide-react';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { ArrowLeft, Sparkles, Bug, Wrench, Zap, Package } from 'lucide-react';
 
 interface ChangelogEntry {
   date: string;
@@ -98,7 +97,6 @@ export default function ChangelogPage() {
               <span className="font-semibold text-white">Changelog</span>
             </div>
           </div>
-          <ThemeToggle />
         </div>
       </header>
 

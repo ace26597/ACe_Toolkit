@@ -8,7 +8,6 @@ import {
   Server, Terminal, ArrowRight, Sparkles, ExternalLink
 } from 'lucide-react';
 import { useAuth, LoginModal, ExperimentalBanner } from '@/components/auth';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { MobileMenu } from '@/components/ui/MobileMenu';
 
 export default function Home() {
@@ -55,7 +54,6 @@ export default function Home() {
           ]} />
 
           <div className="flex items-center gap-2">
-            <ThemeToggle />
             {loading ? (
               <div className="w-7 h-7 animate-pulse bg-slate-800 rounded-full" />
             ) : user ? (
