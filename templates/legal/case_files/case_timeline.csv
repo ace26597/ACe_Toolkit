@@ -1,0 +1,19 @@
+date,event_type,description,documents,parties_involved,next_action
+2025-06-15,filing,Initial complaint filed in Superior Court,complaint_001.pdf,Plaintiff Smith v. Defendant Corp,Await service of process
+2025-06-28,service,Defendant served with summons and complaint,proof_of_service.pdf,Process server,Answer due in 30 days
+2025-07-25,response,Defendant filed Answer with affirmative defenses,answer_001.pdf,Defendant Corp,Begin discovery
+2025-08-01,discovery,Plaintiff propounded first set of interrogatories,interrogatories_set1.pdf,Plaintiff Smith,Responses due in 30 days
+2025-08-15,discovery,Plaintiff served first request for production,rfp_set1.pdf,Plaintiff Smith,Production due in 30 days
+2025-09-01,discovery,Defendant responded to interrogatories,interrog_responses.pdf,Defendant Corp,Review responses
+2025-09-15,discovery,Document production completed by defendant,production_log.xlsx,Defendant Corp,Review documents
+2025-10-01,motion,Plaintiff filed motion to compel additional discovery,motion_compel.pdf,Plaintiff Smith,Opposition due in 14 days
+2025-10-15,motion,Defendant filed opposition to motion to compel,opposition_mtc.pdf,Defendant Corp,Reply due in 7 days
+2025-10-22,motion,Plaintiff filed reply brief,reply_mtc.pdf,Plaintiff Smith,Hearing scheduled
+2025-11-01,hearing,Motion to compel hearing,hearing_transcript.pdf,Both parties,Await ruling
+2025-11-10,order,Court granted motion to compel in part,order_mtc.pdf,Court,Supplemental production due
+2025-12-01,discovery,Supplemental document production,supp_production.xlsx,Defendant Corp,Schedule depositions
+2026-01-15,deposition,Deposition of Defendant CEO scheduled,depo_notice_ceo.pdf,Defendant Corp CEO,Prepare deposition outline
+2026-02-01,deposition,Deposition of Plaintiff scheduled,depo_notice_plaintiff.pdf,Plaintiff Smith,Prepare witness
+2026-03-01,deadline,Discovery cutoff,n/a,All parties,File dispositive motions
+2026-04-01,motion,Summary judgment motion deadline,n/a,All parties,Prepare MSJ if appropriate
+2026-06-01,trial,Trial date set,trial_order.pdf,All parties,Trial preparation

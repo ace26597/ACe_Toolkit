@@ -1,0 +1,45 @@
+{
+  "id": "nda-review",
+  "vertical": "legal",
+  "title": "NDA Contract Review",
+  "description": "Comprehensive review of a Non-Disclosure Agreement identifying risks, missing clauses, and negotiation points",
+  "duration": "~3 min",
+  "createdAt": "2026-01-30T12:00:00Z",
+  "tags": ["Contract Review", "NDA", "Risk Analysis"],
+  "steps": [
+    {
+      "type": "user",
+      "content": "Review the NDA in contracts/ - identify key risks and missing clauses"
+    },
+    {
+      "type": "assistant",
+      "content": "I'll perform a comprehensive NDA review following the contract analysis checklist.",
+      "thinking": "Reading NDA and checking against standard clauses: parties, definitions, exclusions, term, remedies..."
+    },
+    {
+      "type": "tool",
+      "tool": "Read",
+      "input": "data/contracts/sample_nda.md",
+      "output": "# NON-DISCLOSURE AGREEMENT\n\n**Effective Date:** January 15, 2026\n\n**BETWEEN:**\n- Disclosing Party: Acme Corporation\n- Receiving Party: [RECIPIENT]\n\n## 1. Definition of Confidential Information\nAll non-public information disclosed by the Disclosing Party..."
+    },
+    {
+      "type": "assistant",
+      "content": "## NDA Analysis Report\n\n### Document Overview\n- **Type:** Mutual NDA (one-way obligations)\n- **Term:** 3 years + 2 year survival\n- **Governing Law:** Delaware\n\n### Key Clauses Identified\n\n| Clause | Status | Notes |\n|--------|--------|-------|\n| Confidential Info Definition | Present | Broad definition - includes oral disclosures |\n| Exclusions | Present | Standard 4 exclusions |\n| Permitted Disclosures | Present | Limited to need-to-know |\n| Term | Present | 3 years |\n| Survival | Present | 2 years post-termination |\n| Return/Destruction | Present | 30-day requirement |\n| Remedies | Present | Injunctive relief + damages |\n| Governing Law | Present | Delaware |\n\n### Risk Assessment\n\n**HIGH RISK:**\n1. **Unlimited liability** - No cap on damages for breach\n2. **Broad definition** - \"Related materials\" undefined\n3. **Oral disclosures** - Difficult to track/prove\n\n**MEDIUM RISK:**\n1. **No carve-out** for residual knowledge\n2. **Short notice period** for return (30 days)\n\n### Missing/Weak Clauses\n1. Liability cap clause\n2. Residual knowledge exception\n3. Permitted disclosure for legal advice"
+    },
+    {
+      "type": "assistant",
+      "content": "### Negotiation Recommendations\n\n1. **Add liability cap:** Suggest limiting damages to direct damages, capped at $500K\n2. **Residual knowledge clause:** Add exception for information retained in unaided memory\n3. **Extend return period:** Negotiate 60 days instead of 30\n4. **Add materiality qualifier:** \"Material breach\" rather than any breach\n\n### Red Flags\n- One-sided NDA (only receiving party has obligations)\n- No mutual confidentiality despite \"mutual\" title\n- Injunctive relief without bond requirement\n\n**Recommendation:** Request revisions before signing. The unlimited liability exposure is the primary concern."
+    },
+    {
+      "type": "result",
+      "summary": "3 high-risk issues found | 2 missing clauses | Recommendation: Negotiate liability cap before signing"
+    }
+  ],
+  "files_created": [
+    "output/nda_review_report.md"
+  ],
+  "tools_used": [
+    "Read",
+    "Write"
+  ]
+}

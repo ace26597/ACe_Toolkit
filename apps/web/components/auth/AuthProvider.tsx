@@ -96,9 +96,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await authApi.logout();
+    // Always clear local state first, regardless of backend response
     setUser(null);
     setTrialInfo(null);
+    try {
+      await authApi.logout();
+    } catch {
+      // Ignore errors - cookies may already be invalid/expired
+      // Local state is already cleared which is the important part
+    }
   };
 
   return (

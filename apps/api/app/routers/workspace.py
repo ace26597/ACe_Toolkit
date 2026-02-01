@@ -112,6 +112,7 @@ def get_user_workspace_manager(user: User) -> WorkspaceManager:
 
 class ProjectCreate(BaseModel):
     name: str
+    template: Optional[str] = None  # Template name: "finance", "legal", "realestate"
 
 
 class ProjectRename(BaseModel):
@@ -192,10 +193,16 @@ async def list_projects(user: User = Depends(require_valid_access)):
 
 @router.post("/projects", response_model=ProjectResponse)
 async def create_project(project: ProjectCreate, user: User = Depends(require_valid_access)):
-    """Create a new project with directory structure on SSD."""
+    """Create a new project with directory structure on SSD.
+
+    Optionally specify a template to pre-populate with sample data:
+    - "finance": Portfolio analysis, SEC filings research
+    - "legal": Contract review, case management
+    - "realestate": Property analysis, due diligence
+    """
     manager = get_user_workspace_manager(user)
     try:
-        result = await manager.create_project(project.name)
+        result = await manager.create_project(project.name, template=project.template)
         return ProjectResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -16,6 +16,7 @@ import {
     DataStudioProject, DataFile, ProjectMetadata, Dashboard, DashboardWidget
 } from '@/lib/api';
 import mermaid from 'mermaid';
+import DOMPurify from 'isomorphic-dompurify';
 
 // Dynamic import for Plotly (client-side only)
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false });
@@ -1390,7 +1391,7 @@ function WidgetCard({
                 {widget.type === 'mermaid' && mermaidSvg && (
                     <div
                         className="flex justify-center bg-gray-900/50 rounded p-4 overflow-auto"
-                        dangerouslySetInnerHTML={{ __html: mermaidSvg }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(mermaidSvg, { USE_PROFILES: { svg: true, svgFilters: true } }) }}
                     />
                 )}
 

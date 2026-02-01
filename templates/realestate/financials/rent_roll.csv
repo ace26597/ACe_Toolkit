@@ -1,0 +1,3 @@
+unit,tenant_name,move_in_date,lease_start,lease_end,monthly_rent,security_deposit,last_increase,notes,status
+A,John Smith,2023-07-01,2025-07-01,2026-06-30,1650,1650,2025-07-01,Long-term tenant - always pays on time,Current
+B,Jane Doe,2024-10-01,2024-10-01,2026-09-30,1600,1600,N/A,First year - no issues,Current

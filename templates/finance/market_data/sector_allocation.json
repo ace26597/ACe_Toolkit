@@ -1,0 +1,15 @@
+{
+  "target_allocation": {
+    "Technology": 0.35,
+    "Healthcare": 0.20,
+    "Financials": 0.15,
+    "Consumer Discretionary": 0.10,
+    "Consumer Staples": 0.10,
+    "Industrials": 0.05,
+    "Energy": 0.03,
+    "Cash": 0.02
+  },
+  "rebalance_threshold": 0.05,
+  "last_rebalance": "2024-10-01",
+  "notes": "Overweight tech for AI exposure, underweight energy"
+}

@@ -1,0 +1,67 @@
+{
+  "property_id": "PROP-2026-001",
+  "address": {
+    "street": "1234 Oak Street",
+    "unit": "Unit A",
+    "city": "Austin",
+    "state": "TX",
+    "zip": "78701",
+    "county": "Travis"
+  },
+  "property_type": "Duplex",
+  "year_built": 1985,
+  "lot_size_sqft": 7500,
+  "building_sqft": 2400,
+  "units": [
+    {
+      "unit_id": "A",
+      "bedrooms": 2,
+      "bathrooms": 1,
+      "sqft": 1200,
+      "current_rent": 1650,
+      "market_rent": 1800,
+      "lease_end": "2026-06-30",
+      "tenant_name": "John Smith"
+    },
+    {
+      "unit_id": "B",
+      "bedrooms": 2,
+      "bathrooms": 1,
+      "sqft": 1200,
+      "current_rent": 1600,
+      "market_rent": 1800,
+      "lease_end": "2026-09-30",
+      "tenant_name": "Jane Doe"
+    }
+  ],
+  "financials": {
+    "asking_price": 425000,
+    "assessed_value": 380000,
+    "annual_taxes": 7600,
+    "insurance_annual": 2400,
+    "hoa_monthly": 0,
+    "utilities_owner_paid_monthly": 150,
+    "maintenance_reserve_monthly": 200,
+    "vacancy_rate": 0.05,
+    "property_management_rate": 0.08
+  },
+  "features": [
+    "Central AC",
+    "Gas heating",
+    "Washer/dryer hookups",
+    "Private parking",
+    "Fenced backyard",
+    "Recently updated kitchens"
+  ],
+  "condition": {
+    "roof_age_years": 8,
+    "hvac_age_years": 5,
+    "water_heater_age_years": 3,
+    "foundation": "Slab - good condition",
+    "electrical": "Updated 200 amp",
+    "plumbing": "Copper - good condition"
+  },
+  "notes": "Owner motivated - estate sale. Below market rents provide upside. Good neighborhood with appreciation potential.",
+  "listing_date": "2026-01-10",
+  "days_on_market": 20
+}

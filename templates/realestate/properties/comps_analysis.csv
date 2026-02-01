@@ -1,0 +1,8 @@
+address,property_type,sqft,beds,baths,year_built,sale_price,sale_date,price_per_sqft,days_on_market,distance_miles,adjustments,adjusted_price
+"1234 Oak Street (Subject)",Duplex,2400,4,2,1985,425000,listing,177,20,0,0,425000
+"1310 Oak Street",Duplex,2200,4,2,1982,395000,2025-11-15,180,25,0.1,"+10000 (smaller)"",405000
+"1456 Elm Avenue",Duplex,2600,4,2,1990,445000,2025-12-01,171,18,0.3,"-15000 (larger/newer)",430000
+"890 Pine Road",Duplex,2350,4,2,1988,410000,2025-10-20,174,30,0.5,"+5000 (similar)",415000
+"2100 Cedar Lane",Fourplex,3800,8,4,1975,625000,2025-11-01,164,45,0.8,"N/A - different type",N/A
+"1122 Maple Street",Duplex,2500,4,3,1992,460000,2025-09-15,184,15,0.4,"-20000 (extra bath/newer)",440000
+"1567 Oak Street",SFH,1800,3,2,1980,350000,2025-12-10,194,12,0.2,"N/A - different type",N/A

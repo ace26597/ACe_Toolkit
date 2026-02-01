@@ -7,16 +7,20 @@ Rate limited to prevent brute force attacks.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
-from typing import List
+from typing import List, Optional
 import uuid
 import re
+import httpx
+import secrets
 from pathlib import Path
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from urllib.parse import urlencode
 
 from app.core.database import get_db
 from app.models.models import User, RefreshToken
@@ -194,7 +198,18 @@ async def login(request: Request, response: Response, user_in: UserLogin, db: As
     """
     result = await db.execute(select(User).where(User.email == user_in.email))
     user = result.scalars().first()
-    if not user or not verify_password(user_in.password, user.hashed_password):
+    if not user:
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    # Check if user is OAuth-only (no password set - empty string or None)
+    if not user.hashed_password:
+        provider = user.oauth_provider or "social"
+        raise HTTPException(
+            status_code=400,
+            detail=f"This account uses {provider.title()} Sign-In. Please use the '{provider.title()}' button to log in."
+        )
+
+    if not verify_password(user_in.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
     # Check trial status (admins and approved users always have access)
@@ -258,15 +273,20 @@ async def login(request: Request, response: Response, user_in: UserLogin, db: As
 
 
 def get_cookie_kwargs():
-    """Get cookie kwargs based on environment (production vs development)."""
+    """Get cookie kwargs based on environment (production vs development).
+
+    IMPORTANT: Use SameSite=Lax for same-site requests (orpheuscore.uk <-> api.orpheuscore.uk).
+    SameSite=None causes issues on mobile browsers (iOS Safari ITP blocks it).
+    Since frontend and API share the same registrable domain, Lax is correct.
+    """
     is_production = settings.ADMIN_EMAIL == "ace.tech.gg@gmail.com"
     if is_production:
         return {
             "httponly": True,
             "path": "/",
             "secure": True,
-            "samesite": "none",
-            "domain": ".orpheuscore.uk"
+            "samesite": "lax",  # Changed from "none" - fixes mobile browser login issues
+            "domain": "orpheuscore.uk"  # Removed leading dot (deprecated)
         }
     else:
         return {
@@ -278,12 +298,12 @@ def get_cookie_kwargs():
 
 
 @router.post("/logout")
-async def logout(response: Response, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Logout and clear cookies."""
+async def logout(response: Response):
+    """Logout and clear cookies. Does not require authentication - always clears cookies."""
     is_production = settings.ADMIN_EMAIL == "ace.tech.gg@gmail.com"
     delete_kwargs = {"path": "/"}
     if is_production:
-        delete_kwargs["domain"] = ".orpheuscore.uk"
+        delete_kwargs["domain"] = "orpheuscore.uk"  # Match cookie domain (no leading dot)
     response.delete_cookie("access_token", **delete_kwargs)
     response.delete_cookie("refresh_token", **delete_kwargs)
     return {"message": "Logged out"}
@@ -350,6 +370,214 @@ async def get_my_status(current_user: User = Depends(get_current_user)):
         },
         "trial": trial_info
     }
+
+
+# ==================== OAuth Endpoints ====================
+
+# Google OAuth configuration
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo"
+
+# In-memory state storage (for CSRF protection)
+# In production, consider using Redis or database for multi-instance deployments
+_oauth_states: dict = {}
+
+
+@router.get("/google")
+async def google_login(request: Request):
+    """Redirect to Google OAuth consent screen."""
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(status_code=500, detail="Google OAuth not configured")
+
+    # Generate state for CSRF protection
+    state = secrets.token_urlsafe(32)
+    _oauth_states[state] = datetime.utcnow()
+
+    # Clean old states (older than 10 minutes)
+    cutoff = datetime.utcnow() - timedelta(minutes=10)
+    expired = [k for k, v in _oauth_states.items() if v < cutoff]
+    for k in expired:
+        _oauth_states.pop(k, None)
+
+    # Determine redirect URI based on environment
+    is_production = settings.ADMIN_EMAIL == "ace.tech.gg@gmail.com"
+    redirect_uri = f"{settings.OAUTH_REDIRECT_BASE}/auth/google/callback" if is_production else "http://localhost:8000/auth/google/callback"
+
+    params = {
+        "client_id": settings.GOOGLE_CLIENT_ID,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "state": state,
+        "access_type": "offline",
+        "prompt": "select_account",
+    }
+
+    auth_url = f"{GOOGLE_AUTH_URL}?{urlencode(params)}"
+    return RedirectResponse(url=auth_url)
+
+
+@router.get("/google/callback")
+async def google_callback(
+    request: Request,
+    response: Response,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """Handle Google OAuth callback."""
+    is_production = settings.ADMIN_EMAIL == "ace.tech.gg@gmail.com"
+    frontend_url = settings.FRONTEND_URL if is_production else "http://localhost:3000"
+
+    # Handle OAuth errors
+    if error:
+        logger.warning(f"Google OAuth error: {error}")
+        return RedirectResponse(url=f"{frontend_url}?error=oauth_denied")
+
+    if not code or not state:
+        return RedirectResponse(url=f"{frontend_url}?error=oauth_invalid")
+
+    # Verify state (CSRF protection)
+    if state not in _oauth_states:
+        logger.warning("Invalid OAuth state - possible CSRF attempt")
+        return RedirectResponse(url=f"{frontend_url}?error=oauth_invalid_state")
+    _oauth_states.pop(state)
+
+    # Determine redirect URI (must match what was sent to Google)
+    redirect_uri = f"{settings.OAUTH_REDIRECT_BASE}/auth/google/callback" if is_production else "http://localhost:8000/auth/google/callback"
+
+    try:
+        # Exchange code for tokens
+        async with httpx.AsyncClient() as client:
+            token_response = await client.post(
+                GOOGLE_TOKEN_URL,
+                data={
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "code": code,
+                    "grant_type": "authorization_code",
+                    "redirect_uri": redirect_uri,
+                },
+            )
+
+            if token_response.status_code != 200:
+                logger.error(f"Google token exchange failed: {token_response.text}")
+                return RedirectResponse(url=f"{frontend_url}?error=oauth_token_failed")
+
+            tokens = token_response.json()
+            access_token = tokens.get("access_token")
+
+            # Get user info from Google
+            userinfo_response = await client.get(
+                GOOGLE_USERINFO_URL,
+                headers={"Authorization": f"Bearer {access_token}"}
+            )
+
+            if userinfo_response.status_code != 200:
+                logger.error(f"Google userinfo failed: {userinfo_response.text}")
+                return RedirectResponse(url=f"{frontend_url}?error=oauth_userinfo_failed")
+
+            userinfo = userinfo_response.json()
+
+        # Extract user data from Google
+        google_id = userinfo.get("id")
+        email = userinfo.get("email")
+        name = userinfo.get("name", email.split("@")[0] if email else "User")
+        avatar_url = userinfo.get("picture")
+
+        if not email:
+            return RedirectResponse(url=f"{frontend_url}?error=oauth_no_email")
+
+        # Find or create user
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalars().first()
+
+        if user:
+            # Existing user - update OAuth info if not already set
+            if not user.oauth_provider:
+                user.oauth_provider = "google"
+                user.oauth_id = google_id
+            if not user.avatar_url and avatar_url:
+                user.avatar_url = avatar_url
+            user.last_login_at = datetime.utcnow()
+        else:
+            # New user - create account with trial
+            trial_expires_at = datetime.utcnow() + timedelta(hours=TRIAL_DURATION_HOURS)
+            user = User(
+                name=name,
+                email=email,
+                hashed_password="",  # Empty string for OAuth users (SQLite NOT NULL constraint)
+                oauth_provider="google",
+                oauth_id=google_id,
+                avatar_url=avatar_url,
+                is_admin=False,
+                is_approved=False,
+                trial_expires_at=trial_expires_at
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+
+            # Send notification to admin
+            try:
+                await notify_new_signup(email, name)
+            except Exception as e:
+                logger.warning(f"Failed to send signup notification: {e}")
+
+            # Create user's data directory
+            user_data_dir = Path(settings.USER_DATA_BASE_DIR) / str(user.id)
+            user_data_dir.mkdir(parents=True, exist_ok=True)
+            for subdir in ["workspace", "analyst", "video-factory", "ccresearch", "research"]:
+                (user_data_dir / subdir).mkdir(exist_ok=True)
+
+        await db.commit()
+
+        # Check trial status
+        trial_info = check_trial_status(user)
+        if not trial_info["has_access"]:
+            return RedirectResponse(url=f"{frontend_url}?error=trial_expired")
+
+        # Create JWT tokens
+        token_days = APPROVED_USER_COOKIE_DAYS if (user.is_admin or user.is_approved) else TRIAL_USER_COOKIE_DAYS
+        access_token = create_access_token(subject=user.id, expires_delta=timedelta(days=token_days))
+        refresh_token = create_refresh_token(subject=user.id)
+
+        # Store refresh token
+        rt_entry = RefreshToken(
+            token_hash=hash_token(refresh_token),
+            user_id=user.id,
+            expires_at=datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+        )
+        db.add(rt_entry)
+        await db.commit()
+
+        # Create redirect response with cookies
+        redirect_response = RedirectResponse(url=f"{frontend_url}/workspace", status_code=302)
+
+        cookie_seconds = token_days * 24 * 60 * 60
+        cookie_kwargs = get_cookie_kwargs()
+
+        redirect_response.set_cookie(
+            key="access_token",
+            value=access_token,
+            max_age=cookie_seconds,
+            **cookie_kwargs
+        )
+        redirect_response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            max_age=cookie_seconds,
+            **cookie_kwargs
+        )
+
+        logger.info(f"Google OAuth login successful for {email}")
+        return redirect_response
+
+    except Exception as e:
+        logger.exception(f"Google OAuth error: {e}")
+        return RedirectResponse(url=f"{frontend_url}?error=oauth_server_error")
 
 
 # ==================== Admin Endpoints ====================

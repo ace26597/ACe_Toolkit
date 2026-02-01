@@ -1,0 +1,48 @@
+{
+  "watchlist": [
+    {
+      "ticker": "TSLA",
+      "target_price": 200.00,
+      "notes": "Waiting for pullback to add position",
+      "sector": "Consumer Discretionary"
+    },
+    {
+      "ticker": "AMD",
+      "target_price": 120.00,
+      "notes": "AI chip competitor to NVDA, undervalued",
+      "sector": "Technology"
+    },
+    {
+      "ticker": "COST",
+      "target_price": 700.00,
+      "notes": "Strong membership growth, defensive play",
+      "sector": "Consumer Staples"
+    },
+    {
+      "ticker": "LLY",
+      "target_price": 700.00,
+      "notes": "GLP-1 drug leader, watch for FDA news",
+      "sector": "Healthcare"
+    },
+    {
+      "ticker": "META",
+      "target_price": 450.00,
+      "notes": "AI ad targeting improvements",
+      "sector": "Technology"
+    }
+  ],
+  "alerts": [
+    {
+      "ticker": "AAPL",
+      "condition": "price_below",
+      "value": 180.00,
+      "action": "Buy 50 more shares"
+    },
+    {
+      "ticker": "NVDA",
+      "condition": "price_above",
+      "value": 600.00,
+      "action": "Sell 20 shares (trim position)"
+    }
+  ]
+}

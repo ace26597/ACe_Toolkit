@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import mermaid from 'mermaid';
+import DOMPurify from 'isomorphic-dompurify';
 
 // Initialize mermaid
 mermaid.initialize({
@@ -58,7 +59,7 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
     <div
       ref={containerRef}
       className="bg-slate-900/50 rounded-lg p-4 my-3 overflow-x-auto"
-      dangerouslySetInnerHTML={{ __html: svg }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }) }}
     />
   );
 }

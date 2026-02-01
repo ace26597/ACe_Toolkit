@@ -104,6 +104,12 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = get_secret("apps.ace_toolkit.admin_email", default="admin@example.com")
     ADMIN_PASSWORD: Optional[str] = get_secret("apps.ace_toolkit.admin_password") or os.getenv("ADMIN_PASSWORD")
 
+    # OAuth - Google
+    GOOGLE_CLIENT_ID: Optional[str] = get_secret("oauth.google.client_id") or os.getenv("GOOGLE_CLIENT_ID")
+    GOOGLE_CLIENT_SECRET: Optional[str] = get_secret("oauth.google.client_secret") or os.getenv("GOOGLE_CLIENT_SECRET")
+    OAUTH_REDIRECT_BASE: str = "https://api.orpheuscore.uk"  # Production callback base URL
+    FRONTEND_URL: str = "https://orpheuscore.uk"  # Where to redirect after OAuth
+
     class Config:
         env_file = ".env"
         case_sensitive = True

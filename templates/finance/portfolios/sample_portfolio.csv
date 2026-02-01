@@ -1,0 +1,11 @@
+ticker,shares,cost_basis,purchase_date,sector
+AAPL,100,175.50,2024-01-15,Technology
+MSFT,50,380.25,2024-02-01,Technology
+GOOGL,25,140.00,2024-03-10,Technology
+AMZN,30,178.50,2024-01-20,Consumer Discretionary
+NVDA,40,480.00,2024-04-05,Technology
+JPM,75,195.00,2024-02-15,Financials
+JNJ,60,160.25,2024-01-10,Healthcare
+V,45,275.00,2024-03-01,Financials
+UNH,20,525.00,2024-02-20,Healthcare
+PG,80,155.50,2024-01-25,Consumer Staples

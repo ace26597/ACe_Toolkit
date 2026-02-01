@@ -11,7 +11,12 @@ class User(Base):
     id = Column(Uuid, primary_key=True, default=uuid.uuid4)
     name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=False)
+    hashed_password = Column(String, nullable=True)  # Nullable for OAuth-only users
+
+    # OAuth fields
+    oauth_provider = Column(String, nullable=True)  # 'google', 'github', etc.
+    oauth_id = Column(String, nullable=True, index=True)  # Provider's user ID
+    avatar_url = Column(String, nullable=True)  # Profile picture from OAuth
 
     # Auth system fields
     is_admin = Column(Boolean, default=False, nullable=False)

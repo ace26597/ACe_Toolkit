@@ -56,6 +56,55 @@ class WorkspaceManager:
             safe = f"project-{uuid.uuid4().hex[:8]}"
         return safe
 
+    async def _copy_template_files(self, project_path: Path, template: str) -> None:
+        """Copy template files to a new project.
+
+        Args:
+            project_path: Path to the project directory
+            template: Template name ("finance", "legal", "realestate")
+        """
+        # Get template directory - relative to ACe_Toolkit root
+        ace_toolkit_root = Path(__file__).parent.parent.parent.parent.parent
+        template_dir = ace_toolkit_root / "templates" / template
+
+        if not template_dir.exists():
+            raise ValueError(f"Template '{template}' not found")
+
+        # Copy template contents to project data directory
+        data_dir = project_path / "data"
+
+        def copy_tree(src: Path, dst: Path):
+            """Recursively copy directory tree."""
+            for item in src.iterdir():
+                src_item = item
+                # Skip CLAUDE.md as it will be in .claude/
+                if item.name == "CLAUDE.md":
+                    continue
+                dst_item = dst / item.name
+
+                if item.is_dir():
+                    dst_item.mkdir(parents=True, exist_ok=True)
+                    copy_tree(src_item, dst_item)
+                else:
+                    shutil.copy2(src_item, dst_item)
+
+        # Run synchronously since shutil doesn't have async version
+        import asyncio
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, copy_tree, template_dir, data_dir)
+
+        # Create .claude directory with CLAUDE.md
+        claude_dir = project_path / ".claude"
+        await aiofiles.os.makedirs(claude_dir, exist_ok=True)
+
+        # Copy CLAUDE.md to .claude directory
+        template_claude_md = template_dir / "CLAUDE.md"
+        if template_claude_md.exists():
+            async with aiofiles.open(template_claude_md, 'r') as f:
+                claude_md_content = await f.read()
+            async with aiofiles.open(claude_dir / "CLAUDE.md", 'w') as f:
+                await f.write(claude_md_content)
+
     # ==================== PROJECT OPERATIONS ====================
 
     async def list_projects(self) -> List[Dict[str, Any]]:
@@ -91,8 +140,13 @@ class WorkspaceManager:
         projects.sort(key=lambda x: x.get("updatedAt", ""), reverse=True)
         return projects
 
-    async def create_project(self, name: str) -> Dict[str, Any]:
-        """Create a new project with directory structure."""
+    async def create_project(self, name: str, template: Optional[str] = None) -> Dict[str, Any]:
+        """Create a new project with directory structure.
+
+        Args:
+            name: Project name
+            template: Optional template name ("finance", "legal", "realestate")
+        """
         await self.ensure_base_dir()
         project_path = self._get_project_path(name)
 
@@ -104,6 +158,10 @@ class WorkspaceManager:
         await aiofiles.os.makedirs(project_path / "images", exist_ok=True)
         await aiofiles.os.makedirs(project_path / "data", exist_ok=True)
 
+        # Copy template files if specified
+        if template:
+            await self._copy_template_files(project_path, template)
+
         # Create metadata
         now = datetime.now().isoformat()
         meta = {
@@ -111,10 +169,17 @@ class WorkspaceManager:
             "createdAt": now,
             "updatedAt": now,
             "noteCount": 0,
-            "dataSize": "0 B"
+            "dataSize": "0 B",
+            "template": template
         }
 
         await self._write_project_meta(meta["name"], meta)
+
+        # Update counts after template copy
+        if template:
+            meta["noteCount"] = await self._count_notes(meta["name"])
+            meta["dataSize"] = await self._calculate_data_size(meta["name"])
+
         return meta
 
     async def get_project(self, name: str) -> Optional[Dict[str, Any]]:
@@ -582,11 +647,37 @@ class WorkspaceManager:
         return entries
 
     def _sanitize_path(self, path: str) -> str:
-        """Sanitize a path to prevent path traversal attacks."""
-        # Normalize and remove any attempts to go up directories
+        """Sanitize a path to prevent path traversal attacks.
+
+        Security measures:
+        1. Reject absolute paths
+        2. Remove . and .. components
+        3. Validate the resolved path stays within base_dir
+        """
+        # Reject absolute paths
+        if path and (path.startswith('/') or path.startswith('\\')):
+            raise ValueError("Absolute paths not allowed")
+
+        # Also check for Windows absolute paths
+        if len(path) >= 2 and path[1] == ':':
+            raise ValueError("Absolute paths not allowed")
+
+        # Normalize and remove any traversal attempts
         parts = Path(path).parts
-        safe_parts = [p for p in parts if p not in ('.', '..')]
-        return str(Path(*safe_parts)) if safe_parts else ""
+        safe_parts = [p for p in parts if p not in ('.', '..') and '/' not in p and '\\' not in p]
+        safe_path = str(Path(*safe_parts)) if safe_parts else ""
+
+        # Final validation: ensure resolved path stays within base_dir
+        if safe_path:
+            try:
+                resolved = (self.base_dir / safe_path).resolve()
+                base_resolved = self.base_dir.resolve()
+                if not str(resolved).startswith(str(base_resolved)):
+                    raise ValueError("Path escapes project directory")
+            except (ValueError, OSError):
+                raise ValueError("Invalid path")
+
+        return safe_path
 
     async def upload_data(self, project_name: str, file_content: bytes,
                           filename: str, subpath: str = "") -> Dict[str, Any]:

@@ -28,6 +28,7 @@ import {
 import { workspaceApi, WorkspaceDataItem } from '@/lib/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import DOMPurify from 'isomorphic-dompurify';
 import rehypeRaw from 'rehype-raw';
 import mermaid from 'mermaid';
 
@@ -165,7 +166,7 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
   return (
     <div
       className="bg-slate-900/50 rounded-lg p-4 my-3 overflow-x-auto"
-      dangerouslySetInnerHTML={{ __html: svg }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }) }}
     />
   );
 }

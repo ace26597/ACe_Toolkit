@@ -225,12 +225,15 @@ export const workspaceApi = {
         return res.json();
     },
 
-    createProject: async (name: string): Promise<WorkspaceProject> => {
+    createProject: async (name: string, template?: string): Promise<WorkspaceProject> => {
+        const body: { name: string; template?: string } = { name };
+        if (template) body.template = template;
+
         const res = await fetch(`${getApiUrl()}/workspace/projects`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify({ name }),
+            body: JSON.stringify(body),
         });
         if (!res.ok) {
             const error = await res.json().catch(() => ({ detail: 'Failed to create project' }));

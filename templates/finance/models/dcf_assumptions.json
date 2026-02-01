@@ -1,0 +1,27 @@
+{
+  "model_name": "Basic DCF Template",
+  "assumptions": {
+    "risk_free_rate": 0.045,
+    "market_risk_premium": 0.055,
+    "terminal_growth_rate": 0.025,
+    "projection_years": 5,
+    "tax_rate": 0.21
+  },
+  "company_specific": {
+    "ticker": "AAPL",
+    "beta": 1.25,
+    "cost_of_debt": 0.04,
+    "debt_to_equity": 1.5,
+    "revenue_growth_rates": [0.05, 0.04, 0.03, 0.03, 0.02],
+    "operating_margin": 0.30,
+    "capex_as_percent_revenue": 0.03,
+    "depreciation_as_percent_revenue": 0.04,
+    "nwc_as_percent_revenue": 0.05
+  },
+  "output": {
+    "wacc": null,
+    "enterprise_value": null,
+    "equity_value": null,
+    "implied_share_price": null
+  }
+}

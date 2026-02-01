@@ -1,0 +1,92 @@
+{
+  "property": "1234 Oak Street Duplex",
+  "analysis_date": "2026-01-30",
+  "purchase_assumptions": {
+    "purchase_price": 425000,
+    "closing_costs_percent": 0.03,
+    "closing_costs": 12750,
+    "renovation_budget": 15000,
+    "total_investment": 452750,
+    "down_payment_percent": 0.25,
+    "down_payment": 106250,
+    "loan_amount": 318750,
+    "interest_rate": 0.0725,
+    "loan_term_years": 30,
+    "monthly_piti": 2507
+  },
+  "income_projection": {
+    "current_monthly_rent": {
+      "unit_a": 1650,
+      "unit_b": 1600,
+      "total": 3250
+    },
+    "market_rent_after_renovation": {
+      "unit_a": 1900,
+      "unit_b": 1900,
+      "total": 3800
+    },
+    "other_income_monthly": {
+      "laundry": 50,
+      "parking": 0,
+      "pet_fees": 25
+    },
+    "gross_potential_rent_monthly": 3875,
+    "vacancy_loss_rate": 0.05,
+    "effective_gross_income_monthly": 3681
+  },
+  "expense_projection_monthly": {
+    "property_taxes": 633,
+    "insurance": 200,
+    "property_management": 294,
+    "maintenance_reserve": 200,
+    "utilities_owner_paid": 150,
+    "landscaping": 75,
+    "pest_control": 25,
+    "miscellaneous": 50,
+    "total_operating_expenses": 1627
+  },
+  "cash_flow_analysis": {
+    "effective_gross_income": 3681,
+    "operating_expenses": 1627,
+    "net_operating_income": 2054,
+    "debt_service": 2507,
+    "cash_flow_before_tax": -453,
+    "annual_cash_flow": -5436
+  },
+  "return_metrics": {
+    "cap_rate_current": 0.058,
+    "cap_rate_at_market_rents": 0.069,
+    "gross_rent_multiplier": 10.9,
+    "cash_on_cash_return_year1": -0.051,
+    "cash_on_cash_return_stabilized": 0.042,
+    "debt_coverage_ratio_current": 0.82,
+    "debt_coverage_ratio_stabilized": 1.12,
+    "break_even_occupancy": 0.89
+  },
+  "five_year_projection": {
+    "rent_growth_rate": 0.03,
+    "expense_growth_rate": 0.02,
+    "appreciation_rate": 0.04,
+    "year_5_property_value": 517324,
+    "year_5_equity": 265099,
+    "total_return_5_year": 158849,
+    "average_annual_return": 0.149
+  },
+  "investment_decision": {
+    "recommendation": "HOLD - Marginal Deal",
+    "strengths": [
+      "Below market rents provide upside",
+      "Good neighborhood with appreciation",
+      "Estate sale - motivated seller",
+      "Recent updates reduce capex"
+    ],
+    "weaknesses": [
+      "Negative cash flow Year 1",
+      "DCR below 1.0 until stabilized",
+      "Interest rates elevated",
+      "Renovation needed for market rents"
+    ],
+    "suggested_offer": 395000,
+    "rationale": "At $395K, stabilized cash-on-cash improves to 6.8% with DCR of 1.25"
+  }
+}

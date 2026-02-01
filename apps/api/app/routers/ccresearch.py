@@ -2502,6 +2502,85 @@ async def get_session_log(
     }
 
 
+@router.post("/sessions/{ccresearch_id}/export-log")
+async def export_session_log(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Export the terminal log to the project's output directory as a markdown file.
+
+    This saves a cleaned, human-readable version of the terminal session
+    to the project for demo recreation and documentation purposes.
+
+    Args:
+        ccresearch_id: Session ID
+
+    Returns:
+        Path to the exported file and line count
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # Get full cleaned log content
+    log_content = ccresearch_manager.read_full_session_log(ccresearch_id, max_lines=10000, clean=True)
+
+    if not log_content:
+        raise HTTPException(status_code=404, detail="No log content found for this session")
+
+    # Prepare export directory
+    workspace_dir = Path(session.workspace_dir)
+    output_dir = workspace_dir / "output" / "session-logs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    session_title = session.title.replace(" ", "-").lower()[:30] if session.title else "session"
+    filename = f"{session_title}_{timestamp}.md"
+    filepath = output_dir / filename
+
+    # Create markdown content with metadata header
+    md_content = f"""# Terminal Session Log
+
+**Session:** {session.title or 'Untitled'}
+**Exported:** {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
+**Session ID:** {ccresearch_id}
+
+---
+
+```
+{log_content}
+```
+"""
+
+    # Write the file
+    try:
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(md_content)
+    except Exception as e:
+        logger.error(f"Failed to export session log: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to write export file: {str(e)}")
+
+    # Get relative path for display
+    relative_path = str(filepath.relative_to(workspace_dir))
+
+    logger.info(f"Exported session log to {filepath}")
+
+    return {
+        "message": "Session log exported successfully",
+        "path": relative_path,
+        "filename": filename,
+        "lines": len(log_content.splitlines())
+    }
+
+
 @router.get("/sessions/{ccresearch_id}/buffer")
 async def get_session_buffer(
     ccresearch_id: str,

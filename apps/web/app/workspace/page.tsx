@@ -17,6 +17,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import mermaid from 'mermaid';
+import DOMPurify from 'isomorphic-dompurify';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import mammoth from 'mammoth';
@@ -114,7 +115,7 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
   return (
     <div
       className="bg-slate-900/50 rounded-lg p-4 my-3 overflow-x-auto"
-      dangerouslySetInnerHTML={{ __html: svg }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }) }}
     />
   );
 }
@@ -171,7 +172,7 @@ function JsonViewer({ content }: { content: string }) {
   return (
     <pre
       className="text-sm font-mono leading-relaxed whitespace-pre-wrap"
-      dangerouslySetInnerHTML={{ __html: highlighted }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(highlighted, { ALLOWED_TAGS: ['span'], ALLOWED_ATTR: ['class'] }) }}
     />
   );
 }
@@ -971,7 +972,7 @@ function DocxViewer({ fileUrl, fileSize = 0 }: { fileUrl: string; fileSize?: num
   return (
     <div
       className="prose prose-invert prose-sm max-w-none overflow-auto"
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
     />
   );
 }
@@ -1017,6 +1018,7 @@ function WorkspaceContent() {
   const [terminalWorkspaceDir, setTerminalWorkspaceDir] = useState<string>('');
   const [terminalConnected, setTerminalConnected] = useState(false);
   const [isStartingTerminal, setIsStartingTerminal] = useState(false);
+  const [isExportingLog, setIsExportingLog] = useState(false);
   const [browserSessionId, setBrowserSessionId] = useState('');
   const [projectSessions, setProjectSessions] = useState<any[]>([]);
   const [loadingProjectSessions, setLoadingProjectSessions] = useState(false);
@@ -1220,6 +1222,31 @@ function WorkspaceContent() {
       showToast('Terminal stopped', 'success');
     } catch (error) {
       // Ignore termination errors
+    }
+  };
+
+  // Export session log to project
+  const exportSessionLog = async () => {
+    if (!terminalSessionId) return;
+
+    setIsExportingLog(true);
+    try {
+      const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/export-log`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ detail: 'Export failed' }));
+        throw new Error(error.detail || 'Failed to export session log');
+      }
+
+      const data = await res.json();
+      showToast(`Session exported to ${data.path}`, 'success');
+    } catch (error: any) {
+      showToast(error.message || 'Failed to export session', 'error');
+    } finally {
+      setIsExportingLog(false);
     }
   };
 
@@ -2355,13 +2382,28 @@ function WorkspaceContent() {
                     </button>
                   )}
                   {terminalSessionId ? (
-                    <button
-                      onClick={stopTerminalSession}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded text-sm transition-colors"
-                    >
-                      <Power size={14} />
-                      Stop
-                    </button>
+                    <>
+                      <button
+                        onClick={exportSessionLog}
+                        disabled={isExportingLog}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition-colors disabled:opacity-50"
+                        title="Export session log to project"
+                      >
+                        {isExportingLog ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Download size={14} />
+                        )}
+                        Export
+                      </button>
+                      <button
+                        onClick={stopTerminalSession}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600/20 hover:bg-red-600/30 text-red-400 rounded text-sm transition-colors"
+                      >
+                        <Power size={14} />
+                        Stop
+                      </button>
+                    </>
                   ) : (
                     <button
                       onClick={() => startTerminalSession(terminalMode, accessKey)}

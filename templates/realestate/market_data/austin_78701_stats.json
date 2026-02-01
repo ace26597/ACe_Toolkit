@@ -1,0 +1,71 @@
+{
+  "location": {
+    "zip": "78701",
+    "city": "Austin",
+    "state": "TX",
+    "neighborhood": "Downtown Austin"
+  },
+  "demographics": {
+    "population": 12500,
+    "median_age": 34,
+    "median_household_income": 95000,
+    "percent_renters": 0.72,
+    "percent_college_educated": 0.68,
+    "population_growth_5yr": 0.15
+  },
+  "housing_market": {
+    "median_home_price": 485000,
+    "median_price_per_sqft": 325,
+    "yoy_price_change": 0.04,
+    "median_days_on_market": 28,
+    "inventory_months_supply": 2.8,
+    "homes_sold_last_month": 45,
+    "median_rent_1br": 1650,
+    "median_rent_2br": 2200,
+    "rent_yoy_change": 0.05,
+    "vacancy_rate": 0.06
+  },
+  "economic_indicators": {
+    "unemployment_rate": 0.032,
+    "job_growth_yoy": 0.038,
+    "major_employers": [
+      "University of Texas",
+      "State of Texas",
+      "Dell Technologies",
+      "Apple",
+      "Tesla",
+      "Samsung"
+    ],
+    "crime_index": 45,
+    "school_rating": 7
+  },
+  "investment_metrics": {
+    "avg_cap_rate_multifamily": 0.055,
+    "avg_grm": 12.5,
+    "rent_to_price_ratio": 0.0045,
+    "appreciation_10yr_avg": 0.072
+  },
+  "market_outlook": {
+    "rating": "Strong",
+    "summary": "Austin continues to benefit from tech sector growth and population influx. Downtown area sees premium rents but limited inventory. Cap rates compressed but strong fundamentals support long-term investment.",
+    "risks": [
+      "Tech sector volatility",
+      "Rising property taxes",
+      "New construction adding supply",
+      "Interest rate sensitivity"
+    ],
+    "opportunities": [
+      "Strong rental demand",
+      "Population growth",
+      "Diverse economy",
+      "Limited land downtown"
+    ]
+  },
+  "data_sources": [
+    "US Census Bureau",
+    "Zillow Research",
+    "Austin Board of Realtors",
+    "CoStar"
+  ],
+  "last_updated": "2026-01-15"
+}
