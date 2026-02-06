@@ -1,6 +1,6 @@
 # CLAUDE.md - ACe_Toolkit
 
-**Last Updated:** January 29, 2026 | **Status:** Active | **Deployment:** Raspberry Pi + Cloudflare Tunnel
+**Last Updated:** February 6, 2026 | **Status:** Active | **Deployment:** Mac Mini + Cloudflare Tunnel
 
 ---
 
@@ -11,7 +11,7 @@ All Claude Code extensions are configured at **user scope** (`~/.claude/`) for g
 | Component | Count | Location |
 |-----------|-------|----------|
 | **MCP Servers** | 34 | `~/.claude.json` |
-| **Skills** | 14 | `~/.claude/skills/` |
+| **Skills** | 25 | `~/.claude/skills/` |
 | **Agents** | 13 | `~/.claude/agents/` |
 | **Plugins** | 15 | `~/.claude/settings.json` |
 
@@ -39,11 +39,11 @@ This means all C3 Researcher, Data Studio, and Video Studio sessions automatical
 | Backend (FastAPI) | **8000** | ACe_Toolkit API |
 | 3001, 8001 | **DO NOT TOUCH** | Other applications |
 
-**Safe Commands:**
+**Safe Commands (Mac):**
 ```bash
-fuser -k 3000/tcp    # Kill frontend only
-fuser -k 8000/tcp    # Kill backend only
-lsof -i :3000 -i :8000  # Check our ports
+lsof -ti :3000 | xargs kill    # Kill frontend only
+lsof -ti :8000 | xargs kill    # Kill backend only
+lsof -i :3000 -i :8000         # Check our ports
 ```
 
 ---
@@ -61,6 +61,7 @@ lsof -i :3000 -i :8000  # Check our ports
 - Access to 30+ databases: PubMed, ChEMBL, AACT (566K+ trials), UniProt, etc.
 - Claude Code terminal with SSH mode option
 - Project-based workspace with notes and file management
+- **Project persistence**: Last opened project auto-restores on page refresh (per-browser)
 - Welcome page shows all capabilities when no project selected
 - `/ccresearch` redirects to `/workspace?tab=terminal`
 
@@ -165,22 +166,39 @@ cd apps/web && npm run dev
 
 ---
 
-## Deployment (Raspberry Pi)
+## Deployment (Mac Mini) - PM2
 
-**Management:**
+Services are managed with **PM2** (process manager) for reliable auto-restart and boot startup.
+
+**Quick Commands:**
 ```bash
-./infra/scripts/status.sh       # Check status
-./infra/scripts/start_all.sh    # Start services
-./infra/scripts/stop_all.sh     # Stop services
+pm2 status              # Check all services
+pm2 logs                # Tail all logs
+pm2 restart all         # Restart everything
+pm2 monit               # Real-time monitoring dashboard
 ```
 
-**Auto-Start:** `@reboot sleep 30 && /home/ace/dev/ACe_Toolkit/infra/scripts/start_all.sh`
+**Management Script:**
+```bash
+./infra/scripts/pm2-manage.sh status    # Status + health check
+./infra/scripts/pm2-manage.sh start     # Start all
+./infra/scripts/pm2-manage.sh stop      # Stop all
+./infra/scripts/pm2-manage.sh restart   # Restart all
+./infra/scripts/pm2-manage.sh logs      # Tail logs
+./infra/scripts/pm2-manage.sh monit     # Monitoring dashboard
+./infra/scripts/pm2-manage.sh health    # Health check only
+```
+
+**Auto-Start:** PM2 starts on boot via LaunchAgent (`~/Library/LaunchAgents/pm2.blest.plist`)
+
+**Configuration:** `ecosystem.config.js` defines all services (backend, frontend, cloudflared)
 
 **Logs:**
 ```bash
-tail -f logs/backend-*.log
-tail -f logs/frontend-*.log
-journalctl -u cloudflared -f
+pm2 logs backend        # Backend logs only
+pm2 logs frontend       # Frontend logs only
+pm2 logs cloudflared    # Tunnel logs only
+# Or: ~/dev/ACe_Toolkit/logs/pm2-*.log
 ```
 
 ---
@@ -219,14 +237,14 @@ journalctl -u cloudflared -f
 
 | Component | Details |
 |-----------|---------|
-| Platform | Raspberry Pi 5 (Linux ARM64) |
-| Tunnel | Cloudflare Tunnel (active) |
+| Platform | Mac Mini (macOS Darwin ARM64) |
+| Tunnel | Cloudflare Tunnel (via Homebrew) |
 | Database | SQLite (`apps/api/app.db`) |
-| SSD | Samsung T7 1.8TB at `/data` |
+| SSD | Samsung T7 1.8TB at `/Volumes/T7` |
 
 **SSD Directories:**
 ```
-/data/
+/Volumes/T7/dev/
 ├── users/              # Per-user data
 │   └── {user-id}/
 │       ├── projects/   # Unified project storage (CCResearch + Workspace)
@@ -259,6 +277,19 @@ See `~/.secrets/README.md` for usage. CLI: `secrets get api_keys.openai`
 
 | Date | Change |
 |------|--------|
+| 2026-02-06 | **AUDIT: Comprehensive Codebase Audit** - Security hardening (CSRF, path traversal, JWT fail-fast, rate limiting, CSP headers), bug fixes (DB session leak, file handle leaks, subprocess cleanup, race conditions), code quality (split api.ts into modules, ErrorBoundary, type safety, lazy loading, ARIA labels) - 42 fixes across 40 files |
+| 2026-02-05 | **NEW: Skills** - Installed 9 new skills (agent-factory, prompt-factory, claude-md-enhancer, senior-data-scientist, senior-data-engineer, senior-ml-engineer, code-reviewer, tdd-guide, senior-backend) |
+| 2026-02-05 | **Workspace:** SSH directory selection - choose starting directory when using SSH terminal mode |
+| 2026-02-05 | **Workspace:** Image paste in terminal - Ctrl+V to paste screenshots, auto-upload to project |
+| 2026-02-04 | **FIX: Mobile Cookies** - Changed SameSite from `lax` to `none` (required for cross-origin fetch) |
+| 2026-02-04 | **FIX: Mobile Auth** - Added viewport meta tag for proper mobile rendering |
+| 2026-02-04 | **FIX: Session Logout** - AuthProvider token refresh now uses ref to avoid stale closure (was checking null) |
+| 2026-02-04 | **FIX: Token Refresh Interval** - Changed from 12 hours to 10 minutes (tokens can expire in 15 min) |
+| 2026-02-04 | **FIX: Cookie Domain** - Added leading dot `.orpheuscore.uk` for proper subdomain cookie sharing |
+| 2026-02-04 | **FIX: API Error Handling** - getStatus/getCurrentUser now properly detect trial_expired errors |
+| 2026-02-03 | **Workspace:** Project persistence - last opened project auto-restores on refresh (localStorage + URL) |
+| 2026-02-01 | **MIGRATION: Mac Mini** - Migrated from Raspberry Pi, updated all paths and commands |
+| 2026-02-01 | **Cleanup:** Removed dead bwrap sandbox code (~100 lines) - Linux-only, never called |
 | 2026-01-29 | **NEW: Centralized Secrets Manager** - `~/.secrets/credentials.json` + CLI tool (`secrets get/set`) |
 | 2026-01-29 | **SECURITY: Secrets Management** - Moved all secrets to centralized manager (600 perms) |
 | 2026-01-29 | **SECURITY: CORS Hardened** - Removed wildcard, only allow specific origins |

@@ -1,6 +1,6 @@
 # CLAUDE.md - Frontend (Next.js)
 
-**Location:** `apps/web/` | **Port:** 3000 | **Framework:** Next.js 16 (App Router)
+**Location:** `apps/web/` | **Port:** 3000 | **Framework:** Next.js 16 (App Router) | **Updated:** February 6, 2026
 
 ---
 
@@ -53,10 +53,17 @@ apps/web/
 │   │   ├── NoteCard.tsx
 │   │   ├── NoteEditor.tsx
 │   │   └── DataBrowser.tsx
-│   └── ui/
-│       └── ToastProvider.tsx
+│   ├── ui/
+│   │   └── ToastProvider.tsx
+│   └── ErrorBoundary.tsx          # React error boundary with fallback UI
 ├── lib/
-│   ├── api.ts                     # API client
+│   ├── api/                       # Modular API client (split from api.ts)
+│   │   ├── client.ts              # Shared CSRF headers, getApiUrl()
+│   │   ├── auth.ts                # authApi
+│   │   ├── workspace.ts           # workspaceApi
+│   │   ├── dataStudio.ts          # dataStudioApi, dataStudioV2Api
+│   │   ├── types.ts               # Shared API types
+│   │   └── index.ts               # Re-exports (backward compatible)
 │   └── types.ts                   # TypeScript types
 ├── data/
 │   └── ccresearch/
@@ -82,14 +89,26 @@ Legacy share links still work at `/ccresearch/share/[token]`.
 Claude Code Custom Researcher - AI-powered research terminal with comprehensive scientific capabilities.
 
 **Features:**
-- 145+ scientific skills, 34 MCP servers, 14 plugins
+- 145+ scientific skills, 34 MCP servers, 15 plugins
 - Access to 30+ databases: PubMed, ChEMBL, AACT (566K+ trials), UniProt, etc.
 - Project organization with unified storage
+- **Project persistence**: Last opened project auto-restores on page refresh
 - Markdown notes with live preview (GFM tables, Mermaid)
 - File browser with sort by name/date/size
 - File preview (markdown, images, CSV, Excel, DOCX, PDF, code files)
 - Inline file editing
 - Auto-refresh every 10s
+
+**State Persistence (localStorage):**
+| Key | Description |
+|-----|-------------|
+| `workspace_selected_project` | Last opened project name |
+| `workspace_view_mode` | Active tab (terminal/notes/data) |
+| `workspace_terminal_mode` | Terminal type (claude/ssh) |
+| `workspace_file_browser_open` | File browser sidebar state |
+| `workspace_sidebar_collapsed` | Project sidebar collapsed state |
+
+URL params (`?project=name&tab=notes`) take priority over localStorage on load.
 
 **Welcome Page (No Project Selected):**
 When no project is selected, displays comprehensive capabilities overview:
@@ -108,7 +127,7 @@ When no project is selected, displays comprehensive capabilities overview:
 - **Terminal:** Full Claude Code terminal (merged from CCResearch)
   - Terminal mode selection: Claude Code (default) or SSH mode
   - SSH mode requires access key
-  - Stats bar: 145+ skills, 34 MCP servers, 14 plugins, 566K+ clinical trials
+  - Stats bar: 145+ skills, 34 MCP servers, 15 plugins, 566K+ clinical trials
   - File browser sidebar with upload and refresh
   - Import Data modal (GitHub clone, Web URL fetch)
   - Session list with Resume option
@@ -293,6 +312,7 @@ AI-powered video creation using a real Claude Code PTY terminal with full skill/
 | `LoginModal` | Login/Signup with trial info |
 | `ProtectedRoute` | Wrapper for authenticated pages |
 | `ExperimentalBanner` | Disclaimer banner |
+| `ErrorBoundary` | React error boundary with fallback UI (catches render errors gracefully) |
 
 ### Usage
 
@@ -318,14 +338,28 @@ fetch(url, {
 
 ---
 
-## API Client (`lib/api.ts`)
+## API Client (`lib/api/`)
 
-Centralized API methods for all backends.
+Modular API client split into separate files (2026-02-06 audit). All existing `import { ... } from '@/lib/api'` imports still work via `index.ts` re-exports.
+
+**Directory Structure:**
+```
+lib/api/
+├── client.ts      # Shared CSRF_HEADERS, getApiUrl()
+├── auth.ts        # authApi + auth types
+├── workspace.ts   # workspaceApi + workspace types
+├── dataStudio.ts  # dataStudioApi, dataStudioV2Api + types
+├── types.ts       # Shared types (DashboardInfo, etc.)
+└── index.ts       # Re-exports everything (backward compatible)
+```
 
 **Active Exports:**
 - `authApi` - Authentication (login, register, logout, refresh)
 - `workspaceApi` - Projects, notes, files, sessions
 - `dataStudioApi` - Data Studio sessions, dashboards, WebSocket
+- `dataStudioV2Api` - Data Studio V2 projects, analysis, dashboards, NLP
+- `CSRF_HEADERS` - Shared `X-Requested-With` header for CSRF protection
+- `getApiUrl()` - Centralized API base URL helper
 
 **Removed Exports (2026-01-22):**
 - `analystApi` - Data Analyst (app removed)
@@ -337,7 +371,7 @@ Centralized API methods for all backends.
 - `fetchWithAuth` - Legacy auth wrapper (unused)
 
 ```typescript
-// Example usage
+// Example usage (unchanged - backward compatible)
 import { authApi, workspaceApi } from '@/lib/api';
 
 // Authentication
@@ -504,6 +538,15 @@ npm run start
 
 | Date | Change |
 |------|--------|
+| 2026-02-06 | **AUDIT: Quality & Security** - Split api.ts into modular lib/api/ directory, ErrorBoundary component, fixed 25 any-type violations, hardened DOMPurify config, fixed dynamic Tailwind classes, added ARIA labels, lazy loading for heavy deps, removed 24 console statements, next/image optimization, CSRF headers on all mutation requests |
+| 2026-02-04 | **FIX: Mobile Viewport** - Added viewport meta tag for proper mobile device scaling |
+| 2026-02-04 | **FIX: Auth Token Refresh** - AuthProvider now uses ref to track login state, avoiding stale closure |
+| 2026-02-04 | **FIX: Refresh Interval** - Changed from 12 hours to 10 minutes to prevent token expiry issues |
+| 2026-02-04 | **FIX: API Error Detection** - getStatus/getCurrentUser properly detect trial_expired errors |
+| 2026-02-04 | **Cleanup:** Removed duplicate `refreshToken` function from api.ts (only `refresh` used) |
+| 2026-02-03 | **Workspace:** Project persistence - last opened project auto-restores on refresh |
+| 2026-02-03 | **Workspace:** State persisted to localStorage (project, view mode, terminal mode, sidebar) |
+| 2026-02-03 | **Workspace:** URL params take priority over localStorage for deep linking |
 | 2026-01-28 | **NEW: Remotion Video Studio** - Real PTY terminal + Remotion for video creation |
 | 2026-01-28 | **REMOVED: Video Factory** - Old headless approach deleted |
 | 2026-01-23 | **Data Studio:** Fix empty stat cards - support alternate field names (value/stat_value) |

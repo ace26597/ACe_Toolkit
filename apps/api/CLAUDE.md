@@ -47,7 +47,8 @@ apps/api/
 │       ├── workspace_manager.py   # Workspace file manager
 │       ├── session_manager.py     # Session management
 │       ├── notifications.py       # Discord/ntfy alerts
-│       └── user_access.py         # Per-user data access
+│       ├── user_access.py         # Per-user data access
+│       └── utils.py               # Shared utilities (sanitize_name)
 ├── requirements.txt
 ├── .env                           # Environment variables
 └── app.db                         # SQLite database
@@ -381,6 +382,19 @@ Blocked via `.claude/settings.local.json`:
 - Container: `docker`, `podman`
 - Package: `apt`, `dpkg`, `yum`
 
+### API Security (2026-02-06 Audit)
+
+| Feature | Details |
+|---------|---------|
+| **CSRF Protection** | `X-Requested-With` header required on all mutation requests. Exempt paths: login, register, OAuth, health, public API |
+| **Account Lockout** | 5 failed login attempts triggers 15-minute lockout per account |
+| **Path Traversal** | `pathlib.relative_to()` with symlink rejection on all file operations |
+| **Magic Byte Validation** | File uploads validated by magic bytes (not just extension) |
+| **Health Endpoints** | `/health` (public, minimal) and `/health/detailed` (admin-only with DB/disk checks) |
+| **CSP Headers** | Content-Security-Policy and Permissions-Policy headers on all responses |
+| **WebSocket Auth** | JWT expiry validated on WebSocket connections |
+| **Error Sanitization** | Internal error details stripped from client-facing responses |
+
 ---
 
 ## Environment Variables
@@ -542,6 +556,8 @@ The following modules were removed during cleanup:
 
 | Module | Date | Reason |
 |--------|------|--------|
+| `_build_sandbox_command` (ccresearch_manager.py) | 2026-02-01 | Dead code - bwrap sandbox never called (Linux-only) |
+| `CCRESEARCH_SANDBOX_ENABLED` (config.py) | 2026-02-01 | Unused config setting |
 | `routers/video_factory.py` | 2026-01-28 | Video Factory app removed |
 | `core/simple_video_generator.py` | 2026-01-28 | Video Factory app removed |
 | `core/video_script_generator.py` | 2026-01-28 | Video Factory app removed |
@@ -567,11 +583,26 @@ The following modules were removed during cleanup:
 - All authenticated endpoints require `credentials: 'include'` in fetch
 - Cookies are HTTP-only (not JS accessible)
 - **Cookie Configuration (Production vs Development):**
-  - Production: `secure=True`, `samesite=none`, `domain=.orpheuscore.uk`
+  - Production: `secure=True`, `samesite=none`, `domain=.orpheuscore.uk` (required for cross-origin fetch)
   - Development: `secure=False`, `samesite=lax`, no domain
   - Cross-subdomain support: orpheuscore.uk ↔ api.orpheuscore.uk
+  - Note: `SameSite=None` is required for `fetch()` with `credentials: 'include'` across subdomains
 - Access tokens expire based on user type (30 days approved, 1 day trial)
 - AACT passwords with special chars need `quote_plus()` encoding
 - Session rename updates DB only, not filesystem (preserves `--continue`)
 - Project names sanitized with hyphens (not spaces) for directory compatibility
 - GitHub clone uses module-level `re` import (not inside conditionals - Python 3.13 scoping)
+
+---
+
+## Recent Changes
+
+| Date | Change |
+|------|--------|
+| 2026-02-06 | **AUDIT: Security & Quality** - CSRF middleware, path traversal fix (relative_to), JWT fail-fast, account lockout, magic byte validation, health endpoint split, error message sanitization, DB session fix, file handle leak fix, subprocess cleanup, OAuth state cleanup, race condition fix, rate limiting, DB indexes, connection pool, shared utils, config centralization, logging levels |
+| 2026-02-04 | **FIX: Mobile Cookies** - Changed `SameSite` from `lax` to `none` (required for cross-origin fetch) |
+| 2026-02-04 | **FIX: Cookie Domain** - Changed to `.orpheuscore.uk` (leading dot) for proper subdomain sharing |
+| 2026-02-04 | **FIX: Logout Cookie** - Logout now uses matching cookie domain for deletion |
+| 2026-02-01 | **MIGRATION: Mac Mini** - Updated all paths from Raspberry Pi |
+| 2026-01-29 | **SECURITY:** Rate limiting, password policy, CORS hardening |
+| 2026-01-23 | **Data Studio V2:** claude_runner.py replaces data_analyzer.py + dashboard_generator.py |
