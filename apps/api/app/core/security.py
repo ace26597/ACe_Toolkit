@@ -32,3 +32,33 @@ def create_refresh_token(subject: Union[str, Any]) -> str:
 def hash_token(token: str) -> str:
     import hashlib
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def mask_email(email: str) -> str:
+    """Mask an email address for safe logging.
+
+    Examples:
+        admin@example.com -> a***n@example.com
+        jo@test.org -> j***o@test.org
+        a@b.com -> a***@b.com
+    """
+    if not email or '@' not in email:
+        return '***'
+    local, domain = email.rsplit('@', 1)
+    if len(local) <= 1:
+        masked_local = local[0] + '***'
+    elif len(local) == 2:
+        masked_local = local[0] + '***' + local[-1]
+    else:
+        masked_local = local[0] + '***' + local[-1]
+    return f"{masked_local}@{domain}"
+
+
+def mask_user_id(user_id: str) -> str:
+    """Mask a user UUID for safe logging, showing only last 4 characters.
+
+    Example: 550e8400-e29b-41d4-a716-446655440000 -> ***0000
+    """
+    if not user_id:
+        return '***'
+    return f"***{user_id[-4:]}"

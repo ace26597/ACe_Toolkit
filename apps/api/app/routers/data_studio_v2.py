@@ -17,11 +17,13 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from jose import jwt, JWTError
 from sqlalchemy.future import select
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from app.core.claude_runner import claude_runner
 from app.core.user_access import require_valid_access
@@ -32,8 +34,11 @@ from app.models.models import User
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/data-studio/v2", tags=["data-studio-v2"])
 
-# Base directory for Data Studio projects
-DATA_STUDIO_BASE = "/data/users"
+# Rate limiter for expensive endpoints
+limiter = Limiter(key_func=get_remote_address)
+
+# Base directory for Data Studio projects (uses config for Mac/Pi compatibility)
+DATA_STUDIO_BASE = os.path.join(settings.DATA_BASE_DIR, "users")
 
 
 def get_user_projects_dir(user_id: str) -> str:
@@ -373,9 +378,11 @@ async def delete_file(
 # ==================== Analysis (Claude Code) ====================
 
 @router.post("/projects/{project_name}/analyze")
+@limiter.limit("3/minute")
 async def analyze_project(
+    request: Request,
     project_name: str,
-    request: AnalyzeRequest = AnalyzeRequest(),
+    analyze_request: AnalyzeRequest = AnalyzeRequest(),
     user: User = Depends(require_valid_access)
 ):
     """
@@ -391,7 +398,7 @@ async def analyze_project(
         raise HTTPException(status_code=404, detail="Project not found")
 
     # Check for cached analysis if not forcing
-    if not request.force:
+    if not analyze_request.force:
         metadata_path = os.path.join(project_dir, ".analysis", "metadata.json")
         if os.path.exists(metadata_path):
             with open(metadata_path, 'r') as f:
@@ -403,8 +410,8 @@ async def analyze_project(
             user_id=user_id,
             project_name=project_name,
             project_dir=project_dir,
-            mode=request.mode,
-            analysis_mode=request.analysis_mode
+            mode=analyze_request.mode,
+            analysis_mode=analyze_request.analysis_mode
         ):
             yield f"data: {json.dumps(event)}\n\n"
 
@@ -515,9 +522,11 @@ async def get_dashboard(
 
 
 @router.post("/projects/{project_name}/dashboards/generate")
+@limiter.limit("5/minute")
 async def generate_dashboard(
+    request: Request,
     project_name: str,
-    request: GenerateDashboardRequest = GenerateDashboardRequest(),
+    gen_request: GenerateDashboardRequest = GenerateDashboardRequest(),
     user: User = Depends(require_valid_access)
 ):
     """
@@ -542,8 +551,8 @@ async def generate_dashboard(
             user_id=user_id,
             project_name=project_name,
             project_dir=project_dir,
-            dashboard_name=request.name,
-            mode=request.mode
+            dashboard_name=gen_request.name,
+            mode=gen_request.mode
         ):
             yield f"data: {json.dumps(event)}\n\n"
 

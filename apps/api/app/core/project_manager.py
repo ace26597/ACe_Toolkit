@@ -19,6 +19,7 @@ import json
 import uuid
 import shutil
 import logging
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
@@ -26,8 +27,38 @@ import aiofiles
 import aiofiles.os
 
 from .config import settings
+from .utils import sanitize_name as _shared_sanitize_name, RESERVED_NAMES, MAX_NAME_LENGTH
 
 logger = logging.getLogger("project_manager")
+
+# Re-export from utils for backwards compatibility (used by workspace_manager)
+MAX_PROJECT_NAME_LENGTH = MAX_NAME_LENGTH
+
+
+def validate_project_name(name: str) -> tuple:
+    """Validate a project name for security and compatibility.
+
+    Returns (is_valid, error_message).
+    """
+    if not name or not name.strip():
+        return False, "Project name cannot be empty"
+
+    # Unicode normalization (NFKC) to prevent homograph attacks
+    # e.g., fullwidth characters or confusables
+    normalized = unicodedata.normalize("NFKC", name).strip()
+
+    if len(normalized) > MAX_PROJECT_NAME_LENGTH:
+        return False, f"Project name must be {MAX_PROJECT_NAME_LENGTH} characters or fewer"
+
+    if not normalized[0].isalnum():
+        return False, "Project name must start with an alphanumeric character"
+
+    # Check reserved names (case-insensitive, ignoring extension)
+    base_name = normalized.split('.')[0].lower()
+    if base_name in RESERVED_NAMES or normalized.lower() in RESERVED_NAMES:
+        return False, f"'{name}' is a reserved name and cannot be used"
+
+    return True, ""
 
 
 class ProjectManager:
@@ -47,16 +78,12 @@ class ProjectManager:
         await aiofiles.os.makedirs(self.base_dir, exist_ok=True)
 
     def _sanitize_name(self, name: str) -> str:
-        """Sanitize a name for use as a directory name."""
-        # Replace non-alphanumeric (except hyphen, underscore) with hyphen
-        safe = "".join(c if c.isalnum() or c in ('-', '_') else '-' for c in name)
-        # Collapse multiple hyphens into one
-        while '--' in safe:
-            safe = safe.replace('--', '-')
-        safe = safe.strip('-').strip()
-        if not safe or safe in ('.', '..'):
-            safe = f"project-{uuid.uuid4().hex[:8]}"
-        return safe
+        """Sanitize a name for use as a directory name.
+
+        Delegates to the shared sanitize_name() in utils.py.
+        Does not allow dots (directory names only).
+        """
+        return _shared_sanitize_name(name, allow_dots=False)
 
     def _get_project_path(self, project_name: str) -> Path:
         """Get the path to a project directory."""
@@ -122,6 +149,11 @@ class ProjectManager:
             Project metadata dict
         """
         await self.ensure_base_dir()
+
+        # Validate project name
+        is_valid, error_msg = validate_project_name(name)
+        if not is_valid:
+            raise ValueError(error_msg)
 
         safe_name = self._sanitize_name(name)
         project_path = self.base_dir / safe_name
@@ -298,31 +330,31 @@ class ProjectManager:
                 "deny": [
                     # ===== SENSITIVE FILES =====
                     # Credentials and keys
-                    "Read(/home/ace/.ccresearch_allowed_emails.json)",
-                    "Read(/home/ace/.secrets/**)",
-                    "Read(/home/ace/.credentials/**)",
-                    "Read(/home/ace/.ssh/**)",
-                    "Read(/home/ace/.gnupg/**)",
-                    "Read(/home/ace/.aws/**)",
-                    "Read(/home/ace/.config/gcloud/**)",
-                    "Read(/home/ace/.kube/**)",
-                    "Read(/home/ace/.env)",
-                    "Read(/home/ace/.env.*)",
-                    "Read(/home/ace/.bashrc)",
-                    "Read(/home/ace/.bash_history)",
-                    "Read(/home/ace/.zshrc)",
-                    "Read(/home/ace/.zsh_history)",
-                    "Read(/home/ace/.netrc)",
-                    "Read(/home/ace/.npmrc)",
-                    "Read(/home/ace/.pypirc)",
+                    "Read(~/.ccresearch_allowed_emails.json)",
+                    "Read(~/.secrets/**)",
+                    "Read(~/.credentials/**)",
+                    "Read(~/.ssh/**)",
+                    "Read(~/.gnupg/**)",
+                    "Read(~/.aws/**)",
+                    "Read(~/.config/gcloud/**)",
+                    "Read(~/.kube/**)",
+                    "Read(~/.env)",
+                    "Read(~/.env.*)",
+                    "Read(~/.bashrc)",
+                    "Read(~/.bash_history)",
+                    "Read(~/.zshrc)",
+                    "Read(~/.zsh_history)",
+                    "Read(~/.netrc)",
+                    "Read(~/.npmrc)",
+                    "Read(~/.pypirc)",
                     # Application source code
-                    "Read(/home/ace/dev/**)",
-                    "Write(/home/ace/dev/**)",
-                    "Edit(/home/ace/dev/**)",
+                    "Read(~/dev/**)",
+                    "Write(~/dev/**)",
+                    "Edit(~/dev/**)",
                     # Claude config (prevent meta-attacks)
-                    "Read(/home/ace/.claude/CLAUDE.md)",
-                    "Read(/home/ace/.claude.json)",
-                    "Read(/home/ace/.claude/settings.json)",
+                    "Read(~/.claude/CLAUDE.md)",
+                    "Read(~/.claude.json)",
+                    "Read(~/.claude/settings.json)",
                     # System files
                     "Read(/etc/shadow)",
                     "Read(/etc/passwd)",

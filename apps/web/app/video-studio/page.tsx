@@ -87,7 +87,7 @@ function VideoStudioContent() {
         setProjects(data.projects || []);
       }
     } catch (err) {
-      console.error('Failed to fetch projects:', err);
+      // Failed to fetch projects - silently handled
     } finally {
       setIsLoading(false);
     }
@@ -106,7 +106,7 @@ function VideoStudioContent() {
         setSessionActive(data.has_terminal);
       }
     } catch (err) {
-      console.error('Failed to fetch project details:', err);
+      // Failed to fetch project details - silently handled
     }
   }, []);
 
@@ -262,7 +262,7 @@ function VideoStudioContent() {
     try {
       const res = await fetch(`${getApiUrl()}/video-studio/projects`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
         body: JSON.stringify({ name: newProjectName })
       });
@@ -289,6 +289,7 @@ function VideoStudioContent() {
     try {
       await fetch(`${getApiUrl()}/video-studio/projects/${projectName}`, {
         method: 'DELETE',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include'
       });
       if (selectedProject === projectName) {
@@ -316,7 +317,7 @@ function VideoStudioContent() {
       // Start session
       const res = await fetch(`${getApiUrl()}/video-studio/projects/${selectedProject}/session`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
         body: JSON.stringify({
           rows: xtermRef.current?.rows || 30,
@@ -385,9 +386,10 @@ function VideoStudioContent() {
 
       wsRef.current = ws;
 
-    } catch (err: any) {
-      setError(err.message);
-      xtermRef.current?.writeln(`\r\n\x1b[31mError: ${err.message}\x1b[0m`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      setError(message);
+      xtermRef.current?.writeln(`\r\n\x1b[31mError: ${message}\x1b[0m`);
       setIsStartingSession(false);
     }
   };
@@ -401,6 +403,7 @@ function VideoStudioContent() {
 
     await fetch(`${getApiUrl()}/video-studio/projects/${selectedProject}/session/terminate`, {
       method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
       credentials: 'include'
     });
 
@@ -414,6 +417,7 @@ function VideoStudioContent() {
 
     await fetch(`${getApiUrl()}/video-studio/projects/${selectedProject}/videos/${filename}`, {
       method: 'DELETE',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
       credentials: 'include'
     });
 

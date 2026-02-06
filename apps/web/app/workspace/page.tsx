@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, ChevronDown, Clock, Download, Terminal, Plus, FileCode, FileJson, Image, Video, Music, FileType, Upload, Table, FileSpreadsheet, Loader2, Lightbulb, Play, Power, Github, Globe, Link as LinkIcon, Key, Database, Server, Sparkles, Wrench, Dna, Pill, Brain, BarChart3, BookOpen, Zap, Copy, Check, ExternalLink, Beaker, Menu } from 'lucide-react';
 import Link from 'next/link';
+import NextImage from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ProtectedRoute, useAuth } from '@/components/auth';
 import ProjectSidebar from '@/components/workspace/ProjectSidebar';
@@ -18,9 +19,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
 import mermaid from 'mermaid';
 import DOMPurify from 'isomorphic-dompurify';
-import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
-import mammoth from 'mammoth';
+// papaparse, xlsx, and mammoth are dynamically imported where used
 
 // Import capabilities data for welcome view
 import capabilitiesData from '@/data/ccresearch/capabilities.json';
@@ -115,7 +114,7 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
   return (
     <div
       className="bg-slate-900/50 rounded-lg p-4 my-3 overflow-x-auto"
-      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }) }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true }, FORBID_TAGS: ['script', 'style'], FORBID_ATTR: ['onerror', 'onload', 'onclick'] }) }}
     />
   );
 }
@@ -382,15 +381,15 @@ function WelcomeContent() {
                 </h2>
                 <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
-                    { step: 1, title: 'Create Project', desc: 'Click "New Project" in sidebar', icon: <FolderOpen className="w-5 h-5" />, color: 'emerald' },
-                    { step: 2, title: 'Start Terminal', desc: 'Open Terminal tab, click Start', icon: <Terminal className="w-5 h-5" />, color: 'blue' },
-                    { step: 3, title: 'Ask Questions', desc: 'Type natural language queries', icon: <Sparkles className="w-5 h-5" />, color: 'purple' },
-                    { step: 4, title: 'Review Results', desc: 'View in Notes & Files tabs', icon: <FileText className="w-5 h-5" />, color: 'amber' },
+                    { step: 1, title: 'Create Project', desc: 'Click "New Project" in sidebar', icon: <FolderOpen className="w-5 h-5" />, glowClass: 'from-emerald-500/50 to-emerald-500/0', iconBgClass: 'bg-emerald-500/20 text-emerald-400' },
+                    { step: 2, title: 'Start Terminal', desc: 'Open Terminal tab, click Start', icon: <Terminal className="w-5 h-5" />, glowClass: 'from-blue-500/50 to-blue-500/0', iconBgClass: 'bg-blue-500/20 text-blue-400' },
+                    { step: 3, title: 'Ask Questions', desc: 'Type natural language queries', icon: <Sparkles className="w-5 h-5" />, glowClass: 'from-purple-500/50 to-purple-500/0', iconBgClass: 'bg-purple-500/20 text-purple-400' },
+                    { step: 4, title: 'Review Results', desc: 'View in Notes & Files tabs', icon: <FileText className="w-5 h-5" />, glowClass: 'from-amber-500/50 to-amber-500/0', iconBgClass: 'bg-amber-500/20 text-amber-400' },
                   ].map((item) => (
                     <div key={item.step} className="relative group">
-                      <div className={`absolute -inset-0.5 bg-gradient-to-r from-${item.color}-500/50 to-${item.color}-500/0 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity`} />
+                      <div className={`absolute -inset-0.5 bg-gradient-to-r ${item.glowClass} rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity`} />
                       <div className="relative bg-slate-900/50 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors">
-                        <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl bg-${item.color}-500/20 text-${item.color}-400 mb-4`}>
+                        <div className={`inline-flex items-center justify-center w-10 h-10 rounded-xl ${item.iconBgClass} mb-4`}>
                           {item.icon}
                         </div>
                         <div className="flex items-center gap-2 mb-2">
@@ -619,15 +618,15 @@ function WelcomeContent() {
                 </h2>
                 <div className="grid md:grid-cols-3 gap-4">
                   {[
-                    { name: 'PubMed', count: '36M+', desc: 'Biomedical literature', color: 'blue' },
-                    { name: 'ChEMBL', count: '2.4M', desc: 'Bioactive compounds', color: 'pink' },
-                    { name: 'AACT', count: '566K+', desc: 'Clinical trials', color: 'emerald' },
+                    { name: 'PubMed', count: '36M+', desc: 'Biomedical literature', cardClass: 'from-blue-500/10 to-transparent border-blue-500/20', blurClass: 'bg-blue-500/10', countClass: 'text-blue-400' },
+                    { name: 'ChEMBL', count: '2.4M', desc: 'Bioactive compounds', cardClass: 'from-pink-500/10 to-transparent border-pink-500/20', blurClass: 'bg-pink-500/10', countClass: 'text-pink-400' },
+                    { name: 'AACT', count: '566K+', desc: 'Clinical trials', cardClass: 'from-emerald-500/10 to-transparent border-emerald-500/20', blurClass: 'bg-emerald-500/10', countClass: 'text-emerald-400' },
                   ].map((db) => (
-                    <div key={db.name} className={`relative overflow-hidden bg-gradient-to-br from-${db.color}-500/10 to-transparent border border-${db.color}-500/20 rounded-xl p-5`}>
-                      <div className={`absolute top-0 right-0 w-20 h-20 bg-${db.color}-500/10 rounded-full blur-2xl`} />
+                    <div key={db.name} className={`relative overflow-hidden bg-gradient-to-br ${db.cardClass} rounded-xl p-5`}>
+                      <div className={`absolute top-0 right-0 w-20 h-20 ${db.blurClass} rounded-full blur-2xl`} />
                       <div className="relative">
                         <h3 className="font-bold text-white text-lg mb-1">{db.name}</h3>
-                        <div className={`text-2xl font-bold text-${db.color}-400 mb-2`}>{db.count}</div>
+                        <div className={`text-2xl font-bold ${db.countClass} mb-2`}>{db.count}</div>
                         <p className="text-sm text-slate-400">{db.desc}</p>
                       </div>
                     </div>
@@ -738,7 +737,8 @@ function SpreadsheetViewer({
 
     try {
       if (isCsvFile(filename) && content) {
-        // Parse CSV content
+        // Parse CSV content (dynamically imported)
+        const Papa = (await import('papaparse')).default;
         const result = Papa.parse(content, {
           skipEmptyLines: true,
         });
@@ -754,6 +754,8 @@ function SpreadsheetViewer({
         // Fetch and parse Excel file
         const response = await fetch(fileUrl);
         const arrayBuffer = await response.arrayBuffer();
+        // Dynamically import xlsx
+        const XLSX = await import('xlsx');
         const workbook = XLSX.read(arrayBuffer, { type: 'array', sheetRows: SPREADSHEET_ROW_LIMIT + 1 });
 
         // Get first sheet
@@ -903,12 +905,12 @@ function DocxViewer({ fileUrl, fileSize = 0 }: { fileUrl: string; fileSize?: num
       const response = await fetch(fileUrl);
       const arrayBuffer = await response.arrayBuffer();
 
+      // Dynamically import mammoth
+      const mammoth = (await import('mammoth')).default;
       const result = await mammoth.convertToHtml({ arrayBuffer });
       setHtml(result.value);
 
-      if (result.messages.length > 0) {
-        console.log('DOCX conversion messages:', result.messages);
-      }
+      // DOCX conversion messages are informational only
     } catch (err) {
       setError(`Failed to parse document: ${err}`);
     } finally {
@@ -972,7 +974,7 @@ function DocxViewer({ fileUrl, fileSize = 0 }: { fileUrl: string; fileSize?: num
   return (
     <div
       className="prose prose-invert prose-sm max-w-none overflow-auto"
-      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html, { FORBID_TAGS: ['script', 'style'], FORBID_ATTR: ['onerror', 'onload', 'onclick'] }) }}
     />
   );
 }
@@ -1041,8 +1043,18 @@ function WorkspaceContent() {
   // Terminal mode state
   const [terminalMode, setTerminalMode] = useState<'claude' | 'ssh'>('claude');
   const [accessKey, setAccessKey] = useState('');
+  const [sshWorkingDir, setSshWorkingDir] = useState('project'); // 'project' = use project dir, or custom path
   const [showUseCases, setShowUseCases] = useState(false);
   const [showTips, setShowTips] = useState(false);
+
+  // SSH directory presets
+  const SSH_DIR_PRESETS = [
+    { label: 'Project Directory', value: 'project', description: 'Start in the selected project folder' },
+    { label: 'Home Directory', value: '/Users/blest', description: 'Your home folder' },
+    { label: 'Unity Projects', value: '/Users/blest/Unity', description: 'Unity game development projects' },
+    { label: 'Data Directory', value: '/Volumes/T7/dev', description: 'External SSD data folder' },
+    { label: 'Dev Projects', value: '/Users/blest/dev', description: 'All development projects' },
+  ];
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -1181,13 +1193,19 @@ function WorkspaceContent() {
       formData.append('project_name', selectedProject);
       formData.append('title', selectedProject);
 
-      // Add access key for SSH mode
+      // Add access key and working directory for SSH mode
       if (mode === 'ssh' && key) {
         formData.append('access_key', key);
+        // Pass working directory if not 'project' (which uses the default project dir)
+        if (sshWorkingDir && sshWorkingDir !== 'project') {
+          formData.append('working_directory', sshWorkingDir);
+        }
       }
 
       const res = await fetch(`${getApiUrl()}/ccresearch/sessions`, {
         method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'include',
         body: formData,
       });
 
@@ -1198,7 +1216,8 @@ function WorkspaceContent() {
 
       const session = await res.json();
       setTerminalSessionId(session.id);
-      setTerminalWorkspaceDir(session.workspace_dir || '');
+      // Use effective_working_dir for SSH mode (shows custom directory), otherwise workspace_dir
+      setTerminalWorkspaceDir(session.effective_working_dir || session.workspace_dir || '');
       setAccessKey(''); // Clear access key after successful start
       showToast(`${mode === 'ssh' ? 'SSH' : 'Claude Code'} terminal started`, 'success');
     } catch (error) {
@@ -1215,6 +1234,8 @@ function WorkspaceContent() {
     try {
       await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/terminate`, {
         method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'include',
       });
       setTerminalSessionId(null);
       setTerminalWorkspaceDir('');
@@ -1233,6 +1254,7 @@ function WorkspaceContent() {
     try {
       const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/export-log`, {
         method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
       });
 
@@ -1243,8 +1265,8 @@ function WorkspaceContent() {
 
       const data = await res.json();
       showToast(`Session exported to ${data.path}`, 'success');
-    } catch (error: any) {
-      showToast(error.message || 'Failed to export session', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to export session', 'error');
     } finally {
       setIsExportingLog(false);
     }
@@ -1264,7 +1286,8 @@ function WorkspaceContent() {
       for (const url of validUrls) {
         const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/clone-repo`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'include',
           body: JSON.stringify({
             repo_url: url.trim(),
             branch: importBranch.trim() || undefined,
@@ -1307,7 +1330,8 @@ function WorkspaceContent() {
       for (const url of validUrls) {
         const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/fetch-url`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          credentials: 'include',
           body: JSON.stringify({
             url: url.trim(),
           }),
@@ -1416,7 +1440,7 @@ function WorkspaceContent() {
     const endpoint = useLocalUpload ? 'upload-local' : 'upload';
 
     if (useLocalUpload) {
-      console.log(`Large upload (${(totalSize / 1024 / 1024).toFixed(0)}MB) - using local network endpoint`);
+      // Using local network endpoint for large upload
     }
 
     const formData = new FormData();
@@ -1428,6 +1452,8 @@ function WorkspaceContent() {
     try {
       const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/${endpoint}`, {
         method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'include',
         body: formData,
       });
 
@@ -1435,9 +1461,11 @@ function WorkspaceContent() {
         const error = await res.json().catch(() => ({ detail: 'Upload failed' }));
         // If local upload fails due to IP check, fall back to regular upload
         if (useLocalUpload && error.detail?.includes('local network')) {
-          console.log('Falling back to regular upload (not on local network)');
+          // Falling back to regular upload (not on local network)
           const fallbackRes = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/upload`, {
             method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            credentials: 'include',
             body: formData,
           });
           if (!fallbackRes.ok) {
@@ -1466,7 +1494,8 @@ function WorkspaceContent() {
     try {
       const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/clone-repo`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'include',
         body: JSON.stringify({
           repo_url: repoUrl,
           target_path: targetPath || 'data',
@@ -1484,6 +1513,39 @@ function WorkspaceContent() {
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to clone repository', 'error');
       throw error;
+    }
+  };
+
+  // Handle pasted image from clipboard - upload to workspace and return path
+  const handleImagePaste = async (file: File): Promise<string | null> => {
+    if (!terminalSessionId) return null;
+
+    const formData = new FormData();
+    formData.append('files', file);
+    formData.append('target_path', 'data/images'); // Store pasted images in data/images/
+
+    try {
+      const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${terminalSessionId}/upload`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData,
+        credentials: 'include', // Required for CORS with cookies
+      });
+
+      if (!res.ok) {
+        const error = await res.json().catch(() => ({ detail: 'Upload failed' }));
+        throw new Error(error.detail || 'Failed to upload image');
+      }
+
+      const result = await res.json();
+      if (result.uploaded_files?.length > 0) {
+        // Return the full path relative to workspace
+        return `data/images/${result.uploaded_files[0]}`;
+      }
+      return null;
+    } catch (error) {
+      // Image paste upload failed - error is handled by returning null
+      return null;
     }
   };
 
@@ -1505,7 +1567,7 @@ function WorkspaceContent() {
         setProjectSessions(projectMatches);
       }
     } catch (error) {
-      console.error('Failed to load project sessions:', error);
+      // Failed to load project sessions - silently handled
     } finally {
       setLoadingProjectSessions(false);
     }
@@ -1540,12 +1602,21 @@ function WorkspaceContent() {
       const data = await workspaceApi.listProjects();
       setProjects(data);
 
-      // Don't auto-select any project - show welcome screen instead
-      // User must explicitly select a project
-      setSelectedProject(null);
+      // Check if there's a persisted project from URL or localStorage
+      // Only clear if the persisted project doesn't exist in the list
+      setSelectedProject(prev => {
+        if (prev) {
+          const projectExists = data.some(p => p.name === prev);
+          if (projectExists) {
+            return prev; // Keep the restored project
+          }
+          // Project was deleted or doesn't exist - clear localStorage too
+          localStorage.removeItem('workspace_selected_project');
+        }
+        return null; // Show welcome screen if no valid project
+      });
     } catch (error) {
       showToast('Failed to load projects', 'error');
-      console.error('Failed to load projects:', error);
     } finally {
       setLoadingProjects(false);
     }
@@ -1564,7 +1635,6 @@ function WorkspaceContent() {
       setTextFiles(data);
     } catch (error) {
       // Don't show toast for empty projects - just set empty array
-      console.error('Failed to load text files:', error);
       setTextFiles([]);
     } finally {
       setLoadingTextFiles(false);
@@ -1591,7 +1661,6 @@ function WorkspaceContent() {
       setTextFileContent(content);
     } catch (error) {
       showToast('Failed to load file content', 'error');
-      console.error('Failed to load file content:', error);
       setTextFileContent('');
     } finally {
       setLoadingContent(false);
@@ -1633,7 +1702,7 @@ function WorkspaceContent() {
           }
           return prev;
         });
-      }).catch(console.error);
+      }).catch(() => {});
     }, 10000);
 
     return () => clearInterval(interval);
@@ -1646,8 +1715,8 @@ function WorkspaceContent() {
       setProjects(prev => [project, ...prev]);
       setSelectedProject(project.name);
       showToast('Project created');
-    } catch (error: any) {
-      showToast(error.message || 'Failed to create project', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to create project', 'error');
     }
   };
 
@@ -1662,8 +1731,8 @@ function WorkspaceContent() {
         setSelectedProject(projects.length > 1 ? projects.find(p => p.name !== name)?.name || null : null);
       }
       showToast('Project deleted');
-    } catch (error: any) {
-      showToast(error.message || 'Failed to delete project', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to delete project', 'error');
     }
   };
 
@@ -1713,8 +1782,8 @@ function WorkspaceContent() {
       setNewNoteFilename('');
       setNewNoteContent('');
       loadTextFiles(); // Refresh the file list
-    } catch (error: any) {
-      showToast(error.message || 'Failed to create note', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to create note', 'error');
     } finally {
       setIsCreatingNote(false);
     }
@@ -2265,11 +2334,14 @@ function WorkspaceContent() {
                       </pre>
                     ) : isImageFile(selectedTextFile.name) ? (
                       /* Image Preview */
-                      <div className="flex items-center justify-center h-full">
-                        <img
+                      <div className="relative flex items-center justify-center h-full">
+                        <NextImage
                           src={`${getApiUrl()}/workspace/projects/${encodeURIComponent(selectedProject)}/data/download?path=${encodeURIComponent(selectedTextFile.path)}`}
                           alt={selectedTextFile.name}
-                          className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                          fill
+                          className="object-contain rounded-lg shadow-lg"
+                          sizes="(max-width: 768px) 100vw, 50vw"
+                          unoptimized
                         />
                       </div>
                     ) : isVideoFile(selectedTextFile.name) ? (
@@ -2430,6 +2502,7 @@ function WorkspaceContent() {
                       <CCResearchTerminal
                         sessionId={terminalSessionId}
                         onStatusChange={(connected) => setTerminalConnected(connected)}
+                        onImagePaste={handleImagePaste}
                         inputRef={terminalInputRef}
                       />
                     </div>
@@ -2501,23 +2574,45 @@ function WorkspaceContent() {
                         </button>
                       </div>
 
-                      {/* Access Key Input (SSH mode only) */}
+                      {/* SSH Mode Options */}
                       {terminalMode === 'ssh' && (
-                        <div className="mb-4">
-                          <label className="block text-sm font-medium text-slate-300 mb-1.5">
-                            Access Key
-                          </label>
-                          <input
-                            type="password"
-                            value={accessKey}
-                            onChange={(e) => setAccessKey(e.target.value)}
-                            placeholder="Enter access key for SSH terminal"
-                            className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                          />
-                          <p className="text-xs text-slate-500 mt-1">
-                            SSH mode provides direct bash access without Claude
-                          </p>
-                        </div>
+                        <>
+                          {/* Access Key Input */}
+                          <div className="mb-3">
+                            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                              Access Key
+                            </label>
+                            <input
+                              type="password"
+                              value={accessKey}
+                              onChange={(e) => setAccessKey(e.target.value)}
+                              placeholder="Enter access key for SSH terminal"
+                              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                            />
+                          </div>
+
+                          {/* Working Directory Selection */}
+                          <div className="mb-4">
+                            <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                              Starting Directory
+                            </label>
+                            <select
+                              value={sshWorkingDir}
+                              onChange={(e) => setSshWorkingDir(e.target.value)}
+                              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent appearance-none cursor-pointer"
+                              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M2 4l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
+                            >
+                              {SSH_DIR_PRESETS.map((preset) => (
+                                <option key={preset.value} value={preset.value}>
+                                  {preset.label}
+                                </option>
+                              ))}
+                            </select>
+                            <p className="text-xs text-slate-500 mt-1">
+                              {SSH_DIR_PRESETS.find(p => p.value === sshWorkingDir)?.description || 'Select where to start the terminal'}
+                            </p>
+                          </div>
+                        </>
                       )}
 
                       {/* Start Button */}

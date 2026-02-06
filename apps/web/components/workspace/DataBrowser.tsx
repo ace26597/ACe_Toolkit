@@ -166,7 +166,7 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
   return (
     <div
       className="bg-slate-900/50 rounded-lg p-4 my-3 overflow-x-auto"
-      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }) }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true }, FORBID_TAGS: ['script', 'style'], FORBID_ATTR: ['onerror', 'onload', 'onclick'] }) }}
     />
   );
 }
@@ -200,8 +200,8 @@ function FilePreviewPanel({
         setContent(text);
         setEditContent(text);
         setMermaidKey(prev => prev + 1);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load file');
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load file');
       } finally {
         setLoading(false);
       }
@@ -217,8 +217,8 @@ function FilePreviewPanel({
       setContent(editContent);
       setIsEditing(false);
       setMermaidKey(prev => prev + 1);
-    } catch (err: any) {
-      setError(err.message || 'Failed to save file');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save file');
     } finally {
       setSaving(false);
     }
@@ -248,6 +248,7 @@ function FilePreviewPanel({
                   : 'text-slate-400 hover:text-white hover:bg-slate-700'
               }`}
               title={isEditing ? 'Preview' : 'Edit'}
+              aria-label={isEditing ? 'Switch to preview mode' : 'Switch to edit mode'}
             >
               {isEditing ? <Eye size={16} /> : <Edit3 size={16} />}
             </button>
@@ -255,6 +256,7 @@ function FilePreviewPanel({
           <button
             onClick={onClose}
             className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+            aria-label="Close file preview"
           >
             <X size={16} />
           </button>
@@ -468,7 +470,6 @@ export default function DataBrowser({ projectName }: DataBrowserProps) {
       setSelectedItems(new Set());
     } catch (error) {
       showToast('Failed to load files', 'error');
-      console.error('Failed to load files:', error);
     } finally {
       setLoading(false);
     }
@@ -487,7 +488,7 @@ export default function DataBrowser({ projectName }: DataBrowserProps) {
           }
           return prev;
         });
-      }).catch(console.error);
+      }).catch(() => {});
     }, 10000);
 
     return () => clearInterval(interval);
@@ -530,8 +531,8 @@ export default function DataBrowser({ projectName }: DataBrowserProps) {
       }
 
       loadItems();
-    } catch (error: any) {
-      showToast(error.message || 'Failed to upload files', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to upload files', 'error');
     } finally {
       setUploading(false);
     }
@@ -554,8 +555,8 @@ export default function DataBrowser({ projectName }: DataBrowserProps) {
       setNewFolderName('');
       setShowNewFolder(false);
       loadItems();
-    } catch (error: any) {
-      showToast(error.message || 'Failed to create folder', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to create folder', 'error');
     }
   };
 
@@ -568,8 +569,8 @@ export default function DataBrowser({ projectName }: DataBrowserProps) {
       showToast('Deleted');
       if (selectedFile?.path === path) setSelectedFile(null);
       loadItems();
-    } catch (error: any) {
-      showToast(error.message || 'Failed to delete', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to delete', 'error');
     }
   };
 
@@ -585,8 +586,8 @@ export default function DataBrowser({ projectName }: DataBrowserProps) {
       showToast(`Deleted ${selectedItems.size} item(s)`);
       setSelectedFile(null);
       loadItems();
-    } catch (error: any) {
-      showToast(error.message || 'Failed to delete', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to delete', 'error');
     }
   };
 
@@ -686,7 +687,7 @@ export default function DataBrowser({ projectName }: DataBrowserProps) {
                         : 'text-slate-400'
                     }`}
                   >
-                    {index === 0 ? <Home size={14} /> : crumb.name}
+                    {index === 0 ? <><Home size={14} /><span className="sr-only">Root</span></> : crumb.name}
                   </button>
                 </div>
               ))}
@@ -715,6 +716,7 @@ export default function DataBrowser({ projectName }: DataBrowserProps) {
               onClick={loadItems}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
               title="Refresh"
+              aria-label="Refresh file list"
             >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             </button>
@@ -917,6 +919,7 @@ export default function DataBrowser({ projectName }: DataBrowserProps) {
                             }}
                             className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-700 rounded transition-colors"
                             title="Download"
+                            aria-label={`Download ${item.name}`}
                           >
                             <Download size={14} />
                           </button>
@@ -927,6 +930,7 @@ export default function DataBrowser({ projectName }: DataBrowserProps) {
                             }}
                             className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-slate-700 rounded transition-colors"
                             title="Delete"
+                            aria-label={`Delete ${item.name}`}
                           >
                             <Trash2 size={14} />
                           </button>

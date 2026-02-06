@@ -64,8 +64,8 @@ export default function AdminDashboard() {
       const data = await response.json();
       setUsers(data.users || []);
       setStats(data.stats || null);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -76,6 +76,7 @@ export default function AdminDashboard() {
     try {
       const response = await fetch(`${API_BASE}/auth/admin/users/${userId}/approve`, {
         method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
       });
       if (!response.ok) {
@@ -83,8 +84,8 @@ export default function AdminDashboard() {
         throw new Error(errorData.detail || 'Failed to approve user');
       }
       await fetchUsers();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setActionLoading(null);
     }
@@ -95,6 +96,7 @@ export default function AdminDashboard() {
     try {
       const response = await fetch(`${API_BASE}/auth/admin/users/${userId}/revoke`, {
         method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
       });
       if (!response.ok) {
@@ -102,8 +104,8 @@ export default function AdminDashboard() {
         throw new Error(errorData.detail || 'Failed to revoke access');
       }
       await fetchUsers();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setActionLoading(null);
     }
@@ -117,6 +119,7 @@ export default function AdminDashboard() {
     try {
       const response = await fetch(`${API_BASE}/auth/admin/users/${userId}`, {
         method: 'DELETE',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'include',
       });
       if (!response.ok) {
@@ -124,8 +127,8 @@ export default function AdminDashboard() {
         throw new Error(errorData.detail || 'Failed to delete user');
       }
       await fetchUsers();
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setActionLoading(null);
     }

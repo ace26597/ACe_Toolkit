@@ -68,25 +68,24 @@ class Settings(BaseSettings):
     TAVILY_API_KEY: Optional[str] = get_api_key("tavily") or os.getenv("TAVILY_API_KEY")
 
     # Storage Paths (SSD-backed for data persistence)
-    DATA_BASE_DIR: str = "/data"
-    MERMAID_DATA_DIR: str = "/data/mermaid-projects"
-    CLAUDE_WORKSPACES_DIR: str = "/data/claude-workspaces"
-    WORKSPACE_DATA_DIR: str = "/data/workspace"
+    # On Mac: /Volumes/T7/dev, On Pi: /data
+    DATA_BASE_DIR: str = os.getenv("DATA_BASE_DIR", "/Volumes/T7/dev")
+    MERMAID_DATA_DIR: str = os.getenv("MERMAID_DATA_DIR", f"{os.getenv('DATA_BASE_DIR', '/Volumes/T7/dev')}/mermaid-projects")
+    CLAUDE_WORKSPACES_DIR: str = os.getenv("CLAUDE_WORKSPACES_DIR", f"{os.getenv('DATA_BASE_DIR', '/Volumes/T7/dev')}/claude-workspaces")
+    WORKSPACE_DATA_DIR: str = os.getenv("WORKSPACE_DATA_DIR", f"{os.getenv('DATA_BASE_DIR', '/Volumes/T7/dev')}/workspace")
 
     # Per-user data storage (auth system)
-    USER_DATA_BASE_DIR: str = "/data/users"
-    WORKSPACE_PROJECTS_DIR: str = "/data/workspace"
+    USER_DATA_BASE_DIR: str = os.getenv("USER_DATA_BASE_DIR", f"{os.getenv('DATA_BASE_DIR', '/Volumes/T7/dev')}/users")
+    WORKSPACE_PROJECTS_DIR: str = os.getenv("WORKSPACE_PROJECTS_DIR", f"{os.getenv('DATA_BASE_DIR', '/Volumes/T7/dev')}/workspace")
 
     # CCResearch (Claude Code Research Platform) Settings
-    CCRESEARCH_DATA_DIR: str = "/data/ccresearch-projects"
-    CCRESEARCH_LOGS_DIR: str = "/data/ccresearch-logs"
-    CCRESEARCH_SANDBOX_ENABLED: bool = True
+    CCRESEARCH_DATA_DIR: str = os.getenv("CCRESEARCH_DATA_DIR", f"{os.getenv('DATA_BASE_DIR', '/Volumes/T7/dev')}/ccresearch-projects")
+    CCRESEARCH_LOGS_DIR: str = os.getenv("CCRESEARCH_LOGS_DIR", f"{os.getenv('DATA_BASE_DIR', '/Volumes/T7/dev')}/ccresearch-logs")
     CCRESEARCH_ACCESS_CODE: Optional[str] = None
 
     # Legacy aliases
-    MEDRESEARCH_DATA_DIR: str = "/data/ccresearch-projects"
-    MEDRESEARCH_LOGS_DIR: str = "/data/ccresearch-logs"
-    MEDRESEARCH_SANDBOX_ENABLED: bool = True
+    MEDRESEARCH_DATA_DIR: str = os.getenv("MEDRESEARCH_DATA_DIR", f"{os.getenv('DATA_BASE_DIR', '/Volumes/T7/dev')}/ccresearch-projects")
+    MEDRESEARCH_LOGS_DIR: str = os.getenv("MEDRESEARCH_LOGS_DIR", f"{os.getenv('DATA_BASE_DIR', '/Volumes/T7/dev')}/ccresearch-logs")
 
     # AACT Clinical Trials Database - from centralized secrets
     AACT_DB_HOST: Optional[str] = get_secret("databases.aact.host") or os.getenv("AACT_DB_HOST")
@@ -110,8 +109,17 @@ class Settings(BaseSettings):
     OAUTH_REDIRECT_BASE: str = "https://api.orpheuscore.uk"  # Production callback base URL
     FRONTEND_URL: str = "https://orpheuscore.uk"  # Where to redirect after OAuth
 
+    # Trial and upload limits
+    TRIAL_DURATION_HOURS: int = 24  # How long new user trials last
+    MAX_UPLOAD_SIZE_MB: int = 50  # Max upload size for remote requests (MB)
+
+    # CCResearch resource limits (per session)
+    CCRESEARCH_MEMORY_LIMIT_MB: int = 6000  # Virtual address space limit
+    CCRESEARCH_MAX_PROCESSES: int = 150  # Max child processes per session
+    CCRESEARCH_MAX_OPEN_FILES: int = 2048  # Max open file descriptors
+
     class Config:
-        env_file = ".env"
+        env_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
         case_sensitive = True
 
     def __init__(self, **kwargs):
@@ -126,9 +134,10 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Validate critical settings on startup
+# Validate critical settings on startup - FAIL FAST if insecure
 if settings.SECRET_KEY == "INSECURE_DEFAULT_CHANGE_ME":
-    print("=" * 60)
-    print("SECURITY WARNING: Using insecure default SECRET_KEY!")
-    print("Set it in ~/.secrets/credentials.json at apps.ace_toolkit.jwt_secret")
-    print("=" * 60)
+    raise RuntimeError(
+        "CRITICAL: JWT SECRET_KEY not configured! "
+        "Set 'apps.ace_toolkit.jwt_secret' in ~/.secrets/credentials.json. "
+        "The application will NOT start with the default insecure key."
+    )

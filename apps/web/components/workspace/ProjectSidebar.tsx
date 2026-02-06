@@ -78,6 +78,7 @@ export default function ProjectSidebar({
             onClick={toggleCollapse}
             className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
             title="Expand sidebar"
+            aria-label="Expand sidebar"
           >
             <PanelLeft size={18} />
           </button>
@@ -88,6 +89,7 @@ export default function ProjectSidebar({
             }}
             className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
             title="New Project"
+            aria-label="New Project"
           >
             <Plus size={18} />
           </button>
@@ -146,6 +148,7 @@ export default function ProjectSidebar({
               onClick={() => setIsCreating(true)}
               className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
               title="New Project"
+              aria-label="New Project"
             >
               <Plus size={18} />
             </button>
@@ -153,6 +156,7 @@ export default function ProjectSidebar({
               onClick={toggleCollapse}
               className="p-1 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
               title="Collapse sidebar"
+              aria-label="Collapse sidebar"
             >
               <PanelLeftClose size={18} />
             </button>
@@ -244,6 +248,7 @@ export default function ProjectSidebar({
                     }}
                     className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-400 transition-all"
                     title="Delete project"
+                    aria-label={`Delete project ${project.name}`}
                   >
                     <Trash2 size={14} />
                   </button>

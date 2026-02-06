@@ -22,7 +22,7 @@ class User(Base):
     is_admin = Column(Boolean, default=False, nullable=False)
     is_approved = Column(Boolean, default=False, nullable=False)
     approved_at = Column(DateTime, nullable=True)
-    trial_expires_at = Column(DateTime, nullable=True)  # 24h from signup for non-approved users
+    trial_expires_at = Column(DateTime, nullable=True, index=True)  # 24h from signup for non-approved users
     last_login_at = Column(DateTime, nullable=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -299,6 +299,7 @@ class CCResearchSession(Base):
     pid = Column(Integer, nullable=True)  # pexpect process ID
     status = Column(String, nullable=False, default="created")  # created|active|disconnected|terminated|error
     session_mode = Column(String, nullable=False, default="claude")  # "claude" or "terminal" (direct Pi access)
+    custom_working_dir = Column(String, nullable=True)  # Optional: custom working directory for SSH terminal mode
 
     # Terminal dimensions (for PTY)
     terminal_rows = Column(Integer, default=24)
@@ -317,7 +318,7 @@ class CCResearchSession(Base):
     # Sharing - public read-only access via token
     share_token = Column(String, nullable=True, unique=True, index=True)  # Random token for public sharing
     shared_at = Column(DateTime, nullable=True)  # When sharing was enabled
-    share_expires_at = Column(DateTime, nullable=True)  # When share link expires (default: 7 days from shared_at)
+    share_expires_at = Column(DateTime, nullable=True, index=True)  # When share link expires (default: 7 days from shared_at)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -335,7 +336,7 @@ class MedResearchSession(Base):
     email = Column(String, nullable=True, index=True)  # User email for tracking
     title = Column(String, nullable=False, default="New Research Session")
 
-    # Session workspace: /home/ace/medresearch_sessions/{id}/
+    # Session workspace: {DATA_BASE_DIR}/users/{user_id}/projects/{project_name}/
     workspace_dir = Column(String, nullable=False)
 
     # Optional link to Workspace project (for integrated research)

@@ -33,11 +33,12 @@ export function LoginModal({ isOpen, onClose, defaultTab = 'login' }: LoginModal
     try {
       await login(email, password);
       onClose();
-    } catch (err: any) {
-      if (err.message === 'trial_expired') {
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Login failed';
+      if (message === 'trial_expired') {
         setTrialExpiredMessage(true);
       } else {
-        setError(err.message || 'Login failed');
+        setError(message);
       }
     } finally {
       setLoading(false);
@@ -64,8 +65,8 @@ export function LoginModal({ isOpen, onClose, defaultTab = 'login' }: LoginModal
     try {
       await register(name, email, password);
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Registration failed');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
       setLoading(false);
     }

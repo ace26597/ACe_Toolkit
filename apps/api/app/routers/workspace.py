@@ -102,6 +102,34 @@ def validate_upload_file(filename: str) -> tuple[bool, str]:
     return True, ""
 
 
+# Magic bytes for dangerous file types (content-level validation)
+DANGEROUS_MAGIC_BYTES = {
+    b'\x4d\x5a': 'EXE/DLL (Windows executable)',        # MZ header (PE executables)
+    b'\x7f\x45\x4c\x46': 'ELF (Linux executable)',      # ELF header
+    b'\xfe\xed\xfa\xce': 'Mach-O (macOS executable)',   # Mach-O 32-bit
+    b'\xfe\xed\xfa\xcf': 'Mach-O (macOS executable)',   # Mach-O 64-bit
+    b'\xcf\xfa\xed\xfe': 'Mach-O (macOS executable)',   # Mach-O 64-bit reversed
+    b'\xce\xfa\xed\xfe': 'Mach-O (macOS executable)',   # Mach-O 32-bit reversed
+    b'\xca\xfe\xba\xbe': 'Java class/Mach-O fat binary',  # Java class or Mach-O universal
+}
+
+
+def validate_file_content(content: bytes, filename: str) -> tuple[bool, str]:
+    """
+    Validate file content by checking magic bytes against known dangerous types.
+    Returns (is_valid, error_message).
+    """
+    if len(content) < 4:
+        return True, ""  # Too small to check
+
+    # Check against dangerous magic bytes
+    for magic, description in DANGEROUS_MAGIC_BYTES.items():
+        if content[:len(magic)] == magic:
+            return False, f"File content matches {description} - upload rejected for security"
+
+    return True, ""
+
+
 def get_user_workspace_manager(user: User) -> WorkspaceManager:
     """Get a workspace manager configured for the user's data directory."""
     user_workspace_dir = get_user_workspace_dir(user)
@@ -200,6 +228,12 @@ async def create_project(project: ProjectCreate, user: User = Depends(require_va
     - "legal": Contract review, case management
     - "realestate": Property analysis, due diligence
     """
+    # Validate project name before passing to manager
+    from app.core.project_manager import validate_project_name
+    is_valid, error_msg = validate_project_name(project.name)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
     manager = get_user_workspace_manager(user)
     try:
         result = await manager.create_project(project.name, template=project.template)
@@ -221,6 +255,12 @@ async def get_project(name: str, user: User = Depends(require_valid_access)):
 @router.put("/projects/{name}", response_model=ProjectResponse)
 async def rename_project(name: str, data: ProjectRename, user: User = Depends(require_valid_access)):
     """Rename a project."""
+    # Validate new project name
+    from app.core.project_manager import validate_project_name
+    is_valid, error_msg = validate_project_name(data.newName)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
+
     manager = get_user_workspace_manager(user)
     try:
         result = await manager.rename_project(name, data.newName)
@@ -343,6 +383,11 @@ async def upload_image(name: str, file: UploadFile = File(...), user: User = Dep
     if len(content) > 10 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Image too large (max 10MB)")
 
+    # Validate file content (magic bytes check for dangerous types)
+    is_safe, content_error = validate_file_content(content, file.filename or "image.png")
+    if not is_safe:
+        raise HTTPException(status_code=400, detail=content_error)
+
     result = await manager.upload_image(
         project_name=name,
         file_content=content,
@@ -433,13 +478,26 @@ async def upload_data(
     if len(content) > 100 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="File too large (max 100MB)")
 
-    result = await manager.upload_data(
-        project_name=name,
-        file_content=content,
-        filename=file.filename or "file",
-        subpath=path
-    )
-    return DataUploadResponse(**result)
+    # Validate file content (magic bytes check for dangerous types)
+    is_safe, content_error = validate_file_content(content, file.filename or "")
+    if not is_safe:
+        raise HTTPException(status_code=400, detail=content_error)
+
+    try:
+        result = await manager.upload_data(
+            project_name=name,
+            file_content=content,
+            filename=file.filename or "file",
+            subpath=path
+        )
+        return DataUploadResponse(**result)
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied writing to project directory")
+    except OSError as e:
+        if "No space left" in str(e) or e.errno == 28:
+            raise HTTPException(status_code=507, detail="Disk full - no space left on device")
+        logger.error(f"OS error during upload: {e}")
+        raise HTTPException(status_code=500, detail="File operation failed")
 
 
 def is_local_network(client_ip: str) -> bool:
@@ -484,7 +542,7 @@ async def upload_data_local(
         logger.warning(f"Local upload rejected from non-local IP: {client_ip}")
         raise HTTPException(
             status_code=403,
-            detail=f"This endpoint is only accessible from local network. Your IP: {client_ip}"
+            detail="This endpoint is only accessible from local network"
         )
 
     logger.info(f"Local upload from {client_ip} for project {name}")
@@ -516,12 +574,20 @@ async def upload_data_local(
 
     try:
         file_size = 0
+        first_chunk_checked = False
         async with aiofiles.open(temp_path, 'wb') as out_file:
             chunk_size = 1024 * 1024  # 1MB chunks
             while True:
                 chunk = await file.read(chunk_size)
                 if not chunk:
                     break
+                # Check magic bytes on first chunk
+                if not first_chunk_checked:
+                    first_chunk_checked = True
+                    is_safe, content_error = validate_file_content(chunk, safe_filename)
+                    if not is_safe:
+                        temp_path.unlink(missing_ok=True)
+                        raise HTTPException(status_code=400, detail=content_error)
                 file_size += len(chunk)
                 if file_size > MAX_FILE_SIZE:
                     await out_file.close()
@@ -571,33 +637,43 @@ async def download_data(name: str, path: str = Query(...), user: User = Depends(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    file_path = await manager.get_data_path(name, path)
-    if not file_path:
-        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        file_path = await manager.get_data_path(name, path)
+        if not file_path:
+            raise HTTPException(status_code=404, detail="File not found")
 
-    import aiofiles.os
-    if await aiofiles.os.path.isdir(file_path):
-        # Create zip for folder download
-        try:
-            zip_path = await manager.create_zip(name, path)
+        import aiofiles.os
+        if await aiofiles.os.path.isdir(file_path):
+            # Create zip for folder download
+            try:
+                zip_path = await manager.create_zip(name, path)
+                return FileResponse(
+                    zip_path,
+                    media_type="application/zip",
+                    filename=f"{file_path.name}.zip"
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=404, detail=str(e))
+        else:
+            # Direct file download
+            mime_type, _ = mimetypes.guess_type(str(file_path))
+            if not mime_type:
+                mime_type = "application/octet-stream"
+
             return FileResponse(
-                zip_path,
-                media_type="application/zip",
-                filename=f"{file_path.name}.zip"
+                file_path,
+                media_type=mime_type,
+                filename=file_path.name
             )
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-    else:
-        # Direct file download
-        mime_type, _ = mimetypes.guess_type(str(file_path))
-        if not mime_type:
-            mime_type = "application/octet-stream"
-
-        return FileResponse(
-            file_path,
-            media_type=mime_type,
-            filename=file_path.name
-        )
+    except HTTPException:
+        raise
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    except OSError as e:
+        logger.error(f"OS error during download: {e}")
+        raise HTTPException(status_code=500, detail="File operation failed")
 
 
 @router.get("/projects/{name}/data/content")
@@ -630,7 +706,7 @@ async def get_file_content(name: str, path: str = Query(...), user: User = Depen
     except UnicodeDecodeError:
         raise HTTPException(status_code=400, detail="File is not a text file")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read file: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to read file")
 
 
 @router.put("/projects/{name}/data/content")
@@ -686,7 +762,7 @@ async def save_file_content(
             await f.write(content)
         return {"status": "saved", "path": path, "created": not await aiofiles.os.path.exists(file_path) if not create else create}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save file")
 
 
 @router.delete("/projects/{name}/data")
@@ -698,10 +774,20 @@ async def delete_data(name: str, path: str = Query(...), user: User = Depends(re
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    deleted = await manager.delete_data(name, path)
-    if not deleted:
+    try:
+        deleted = await manager.delete_data(name, path)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="File not found")
+        return {"status": "deleted", "path": path}
+    except HTTPException:
+        raise
+    except FileNotFoundError:
         raise HTTPException(status_code=404, detail="File not found")
-    return {"status": "deleted", "path": path}
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied - cannot delete this file")
+    except OSError as e:
+        logger.error(f"OS error during delete: {e}")
+        raise HTTPException(status_code=500, detail="File operation failed")
 
 
 # ==================== UNIFIED SESSIONS ENDPOINTS ====================
@@ -825,7 +911,7 @@ async def get_session_file_content(
     except UnicodeDecodeError:
         raise HTTPException(status_code=400, detail="File is not a text file")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to read file: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to read file")
 
 
 @router.get("/sessions/{session_id}/files/download")
@@ -840,7 +926,7 @@ async def download_session_file(
         raise HTTPException(status_code=404, detail="Session not found")
 
     file_path = session_manager.get_file_path(str(user.id), session_id, path)
-    if not file_path:
+    if not file_path or not file_path.is_file():
         raise HTTPException(status_code=404, detail="File not found")
 
     mime_type, _ = mimetypes.guess_type(str(file_path))

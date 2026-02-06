@@ -59,7 +59,7 @@ function MermaidDiagram({ code, id }: { code: string; id: string }) {
     <div
       ref={containerRef}
       className="bg-slate-900/50 rounded-lg p-4 my-3 overflow-x-auto"
-      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true } }) }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true }, FORBID_TAGS: ['script', 'style'], FORBID_ATTR: ['onerror', 'onload', 'onclick'] }) }}
     />
   );
 }
@@ -154,7 +154,7 @@ export default function NoteEditor({
             setIsDirty(true);
           }
         } catch (error) {
-          console.error('Failed to upload image:', error);
+          // Image upload failed - silently handled
         }
         break;
       }
@@ -173,7 +173,7 @@ export default function NoteEditor({
           setContent(prev => prev + '\n' + result.markdown);
           setIsDirty(true);
         } catch (error) {
-          console.error('Failed to upload image:', error);
+          // Image upload failed - silently handled
         }
       }
     }

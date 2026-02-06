@@ -18,10 +18,13 @@ import uuid
 import json
 import base64
 import asyncio
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger("public_api")
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
@@ -62,8 +65,8 @@ def get_openai_client():
         _openai_client = AsyncOpenAI(api_key=api_key)
     return _openai_client
 
-# Output directory for generated files
-OUTPUT_DIR = Path("/data/api-outputs")
+# Output directory for generated files (uses config for Mac/Pi compatibility)
+OUTPUT_DIR = Path(settings.DATA_BASE_DIR) / "api-outputs"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -177,7 +180,8 @@ async def call_claude(prompt: str, system: str = "", max_tokens: int = 4096) -> 
         )
         return response.content[0].text
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI error: {str(e)}")
+        logger.error(f"AI error: {e}")
+        raise HTTPException(status_code=500, detail="AI processing failed")
 
 
 async def extract_text_from_file(file: UploadFile) -> str:
@@ -197,7 +201,7 @@ async def extract_text_from_file(file: UploadFile) -> str:
                 text += page.extract_text() + "\n"
             return text
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to parse PDF: {str(e)}")
+            raise HTTPException(status_code=400, detail="Failed to parse PDF")
     elif filename.endswith('.csv'):
         return content.decode('utf-8')
     else:
@@ -408,7 +412,7 @@ async def summarize(request: SummarizeRequest):
                 content = re.sub(r'<[^>]+>', ' ', content)
                 content = re.sub(r'\s+', ' ', content).strip()
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {str(e)}")
+            raise HTTPException(status_code=400, detail="Failed to fetch URL")
 
     # Length guidelines
     length_guide = {
@@ -647,7 +651,7 @@ async def analyze_data(
         else:
             raise HTTPException(status_code=400, detail="Unsupported file format. Use CSV or Excel.")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to parse file: {str(e)}")
+        raise HTTPException(status_code=400, detail="Failed to parse file")
 
     # Generate data summary
     data_summary = f"""Dataset Overview:

@@ -22,6 +22,9 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from urllib.parse import urlencode
 
+import hmac
+import time as _time
+
 from app.core.database import get_db
 from app.models.models import User, RefreshToken
 from app.schemas import UserCreate, UserResponse, UserAdminResponse, Token, UserLogin
@@ -36,6 +39,42 @@ router = APIRouter()
 
 # Rate limiter instance (shared from main app)
 limiter = Limiter(key_func=get_remote_address)
+
+# Account-level failed login tracking
+# Structure: { email: { "count": int, "lockout_until": float (timestamp) } }
+_failed_login_attempts: dict = {}
+MAX_FAILED_ATTEMPTS = 5
+LOCKOUT_DURATION_SECONDS = 900  # 15-minute lockout after too many failures
+
+
+def _check_account_lockout(email: str) -> bool:
+    """Check if account is locked out due to failed attempts. Returns True if locked."""
+    entry = _failed_login_attempts.get(email)
+    if not entry:
+        return False
+    if entry.get("lockout_until") and _time.time() < entry["lockout_until"]:
+        return True
+    # Lockout expired, reset
+    if entry.get("lockout_until") and _time.time() >= entry["lockout_until"]:
+        _failed_login_attempts.pop(email, None)
+        return False
+    return False
+
+
+def _record_failed_login(email: str):
+    """Record a failed login attempt. Lock account after MAX_FAILED_ATTEMPTS."""
+    entry = _failed_login_attempts.get(email, {"count": 0})
+    entry["count"] = entry.get("count", 0) + 1
+    if entry["count"] >= MAX_FAILED_ATTEMPTS:
+        entry["lockout_until"] = _time.time() + LOCKOUT_DURATION_SECONDS
+        from app.core.security import mask_email
+        logger.warning(f"Account locked for {mask_email(email)} after {entry['count']} failed attempts")
+    _failed_login_attempts[email] = entry
+
+
+def _clear_failed_login(email: str):
+    """Clear failed login attempts after successful login."""
+    _failed_login_attempts.pop(email, None)
 
 
 def validate_password_strength(password: str) -> tuple[bool, str]:
@@ -55,8 +94,8 @@ def validate_password_strength(password: str) -> tuple[bool, str]:
         return False, "Password must contain at least one special character (!@#$%^&*)"
     return True, ""
 
-# Trial duration for new users
-TRIAL_DURATION_HOURS = 24
+# Trial duration for new users (from centralized config)
+TRIAL_DURATION_HOURS = settings.TRIAL_DURATION_HOURS
 
 # Cookie durations (in days)
 TRIAL_USER_COOKIE_DAYS = 1      # Trial users stay logged in for 1 day
@@ -196,9 +235,21 @@ async def login(request: Request, response: Response, user_in: UserLogin, db: As
 
     Returns 403 with detail="trial_expired" if user's trial has ended and they're not approved.
     """
+    # Check account-level lockout before any processing
+    email_lower = user_in.email.lower()
+    if _check_account_lockout(email_lower):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed login attempts. Please try again in 15 minutes."
+        )
+
     result = await db.execute(select(User).where(User.email == user_in.email))
     user = result.scalars().first()
     if not user:
+        # Constant-time: still hash the password even if user doesn't exist
+        # to prevent timing-based user enumeration
+        get_password_hash("dummy-password-to-burn-time")
+        _record_failed_login(email_lower)
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
     # Check if user is OAuth-only (no password set - empty string or None)
@@ -210,7 +261,11 @@ async def login(request: Request, response: Response, user_in: UserLogin, db: As
         )
 
     if not verify_password(user_in.password, user.hashed_password):
+        _record_failed_login(email_lower)
         raise HTTPException(status_code=400, detail="Incorrect email or password")
+
+    # Successful login - clear failed attempts
+    _clear_failed_login(email_lower)
 
     # Check trial status (admins and approved users always have access)
     trial_info = check_trial_status(user)
@@ -275,9 +330,13 @@ async def login(request: Request, response: Response, user_in: UserLogin, db: As
 def get_cookie_kwargs():
     """Get cookie kwargs based on environment (production vs development).
 
-    IMPORTANT: Use SameSite=Lax for same-site requests (orpheuscore.uk <-> api.orpheuscore.uk).
-    SameSite=None causes issues on mobile browsers (iOS Safari ITP blocks it).
-    Since frontend and API share the same registrable domain, Lax is correct.
+    CRITICAL: Use SameSite=None for cross-origin fetch() requests.
+    - SameSite=Lax only works for top-level navigations (clicking links)
+    - SameSite=None is REQUIRED for fetch() with credentials: 'include' across subdomains
+    - Secure=True is REQUIRED when using SameSite=None
+
+    Cookie domain with leading dot ensures subdomains can access the cookie.
+    Safari ITP may still block, but same-eTLD+1 (orpheuscore.uk) should work.
     """
     is_production = settings.ADMIN_EMAIL == "ace.tech.gg@gmail.com"
     if is_production:
@@ -285,15 +344,15 @@ def get_cookie_kwargs():
             "httponly": True,
             "path": "/",
             "secure": True,
-            "samesite": "lax",  # Changed from "none" - fixes mobile browser login issues
-            "domain": "orpheuscore.uk"  # Removed leading dot (deprecated)
+            "samesite": "none",  # Required for cross-origin fetch() requests
+            "domain": ".orpheuscore.uk"  # Leading dot for explicit subdomain sharing
         }
     else:
         return {
             "httponly": True,
             "path": "/",
             "secure": False,
-            "samesite": "lax"
+            "samesite": "lax"  # Lax is fine for localhost (same origin)
         }
 
 
@@ -303,7 +362,7 @@ async def logout(response: Response):
     is_production = settings.ADMIN_EMAIL == "ace.tech.gg@gmail.com"
     delete_kwargs = {"path": "/"}
     if is_production:
-        delete_kwargs["domain"] = "orpheuscore.uk"  # Match cookie domain (no leading dot)
+        delete_kwargs["domain"] = ".orpheuscore.uk"  # Match cookie domain with leading dot
     response.delete_cookie("access_token", **delete_kwargs)
     response.delete_cookie("refresh_token", **delete_kwargs)
     return {"message": "Logged out"}
@@ -572,7 +631,8 @@ async def google_callback(
             **cookie_kwargs
         )
 
-        logger.info(f"Google OAuth login successful for {email}")
+        from app.core.security import mask_email
+        logger.info(f"Google OAuth login successful for {mask_email(email)}")
         return redirect_response
 
     except Exception as e:

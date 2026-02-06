@@ -75,8 +75,8 @@ function ProjectSelector({
             setLoading(true);
             const data = await dataStudioV2Api.listProjects();
             setProjects(data);
-        } catch (e: any) {
-            setError(e.message);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Unknown error');
         } finally {
             setLoading(false);
         }
@@ -90,8 +90,8 @@ function ProjectSelector({
             setDeleting(projectName);
             await dataStudioV2Api.deleteProject(projectName);
             setProjects(projects.filter(p => p.name !== projectName));
-        } catch (e: any) {
-            setError(e.message);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Unknown error');
         } finally {
             setDeleting(null);
         }
@@ -227,8 +227,8 @@ function CreateProjectModal({
         try {
             await onCreate(name.trim(), description.trim() || undefined);
             onClose();
-        } catch (e: any) {
-            setError(e.message);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Unknown error');
         } finally {
             setCreating(false);
         }
@@ -336,7 +336,7 @@ function DataImporter({
             const data = await dataStudioV2Api.listFiles(project.name);
             setFiles(data.files);
         } catch (e) {
-            console.error('Failed to load files:', e);
+            // Failed to load files - silently handled
         }
     };
 
@@ -345,7 +345,7 @@ function DataImporter({
             const projects = await workspaceApi.listProjects();
             setWorkspaceProjects(projects.map(p => ({ name: p.name })));
         } catch (e) {
-            console.error('Failed to load workspace projects:', e);
+            // Failed to load workspace projects - silently handled
         }
     };
 
@@ -357,8 +357,8 @@ function DataImporter({
         try {
             await dataStudioV2Api.uploadFiles(project.name, selectedFiles);
             await loadFiles();
-        } catch (e: any) {
-            alert(e.message);
+        } catch (e) {
+            alert(e instanceof Error ? e.message : 'Upload failed');
         } finally {
             setUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = '';
@@ -372,8 +372,8 @@ function DataImporter({
         try {
             await dataStudioV2Api.importFromWorkspace(project.name, selectedWorkspaceProject);
             await loadFiles();
-        } catch (e: any) {
-            alert(e.message);
+        } catch (e) {
+            alert(e instanceof Error ? e.message : 'Import failed');
         } finally {
             setImporting(false);
         }
@@ -384,8 +384,8 @@ function DataImporter({
         try {
             await dataStudioV2Api.deleteFile(project.name, path);
             await loadFiles();
-        } catch (e: any) {
-            alert(e.message);
+        } catch (e) {
+            alert(e instanceof Error ? e.message : 'Delete failed');
         }
     };
 
@@ -719,9 +719,9 @@ function AnalysisProgressView({
                 const result = await fn();
                 addLog(`✅ ${label} successful`);
                 return result;
-            } catch (e: any) {
+            } catch (e) {
                 if (attempt === maxRetries) {
-                    addLog(`❌ ${label} failed after ${maxRetries} attempts: ${e.message}`);
+                    addLog(`❌ ${label} failed after ${maxRetries} attempts: ${e instanceof Error ? e.message : 'Unknown error'}`);
                     throw e;
                 }
                 // Exponential backoff: 1s, 2s, 4s, 8s, 16s...
@@ -837,18 +837,18 @@ function AnalysisProgressView({
             await new Promise(r => setTimeout(r, 800));
 
             onComplete(metadata, dashboard);
-        } catch (e: any) {
+        } catch (e) {
             addLog('');
             addLog('═══════════════════════════════════════');
             addLog('❌ ANALYSIS FAILED');
             addLog('═══════════════════════════════════════');
-            addLog(`Error: ${e.message}`);
+            addLog(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
             addLog('');
             addLog('💡 Troubleshooting tips:');
             addLog('   - Check that data files are valid CSV/JSON/Excel');
             addLog('   - Try refreshing and running analysis again');
             addLog('   - Check backend logs for more details');
-            setError(e.message);
+            setError(e instanceof Error ? e.message : 'Unknown error');
         }
     };
 
@@ -1058,12 +1058,12 @@ function DashboardView({
 
             // Auto-close after success
             setTimeout(() => setShowNlpProgress(false), 1500);
-        } catch (e: any) {
+        } catch (e) {
             addNlpLog('');
             addNlpLog('═══════════════════════════════════════');
             addNlpLog('❌ EDIT FAILED');
             addNlpLog('═══════════════════════════════════════');
-            addNlpLog(`Error: ${e.message}`);
+            addNlpLog(`Error: ${e instanceof Error ? e.message : 'Unknown error'}`);
             addNlpLog('');
             addNlpLog('💡 Tips:');
             addNlpLog('   - Try rephrasing your request');
@@ -1336,7 +1336,7 @@ function WidgetCard({
                     const { svg } = await mermaid.render(id, widget.mermaid_code!);
                     setMermaidSvg(svg);
                 } catch (e) {
-                    console.error('Mermaid render error:', e);
+                    // Mermaid render error - silently handled
                 }
             };
             renderMermaid();
@@ -1391,7 +1391,7 @@ function WidgetCard({
                 {widget.type === 'mermaid' && mermaidSvg && (
                     <div
                         className="flex justify-center bg-gray-900/50 rounded p-4 overflow-auto"
-                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(mermaidSvg, { USE_PROFILES: { svg: true, svgFilters: true } }) }}
+                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(mermaidSvg, { USE_PROFILES: { svg: true }, FORBID_TAGS: ['script', 'style'], FORBID_ATTR: ['onerror', 'onload', 'onclick'] }) }}
                     />
                 )}
 

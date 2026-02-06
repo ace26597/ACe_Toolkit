@@ -66,7 +66,7 @@ export function useWorkspaceState() {
 
       setState(prev => ({ ...prev, ...loadedState }));
     } catch (error) {
-      console.error('Failed to load workspace state:', error);
+      // Failed to load workspace state - using defaults
     }
 
     setIsHydrated(true);
@@ -82,7 +82,7 @@ export function useWorkspaceState() {
         localStorage.setItem(STORAGE_KEYS[key], String(value));
       }
     } catch (error) {
-      console.error(`Failed to persist ${key}:`, error);
+      // Failed to persist state - silently handled
     }
   }, []);
 

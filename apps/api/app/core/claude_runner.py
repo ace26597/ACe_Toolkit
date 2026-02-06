@@ -518,11 +518,37 @@ If asked to create a visualization, output a Plotly JSON specification."""
                     if session.process.returncode is None:
                         session.process.kill()
                 except Exception as e:
-                    logger.warning(f"Error killing process: {e}")
+                    logger.error(f"Error killing process: {e}")
             # Use pop to avoid KeyError if already deleted
             self.sessions.pop(session_id, None)
             return True
         return False
+
+    async def shutdown_all(self):
+        """Terminate all active Claude runner processes gracefully on shutdown."""
+        if not self.sessions:
+            return
+        logger.info(f"Shutting down {len(self.sessions)} Claude runner session(s)...")
+        for session_id in list(self.sessions.keys()):
+            session = self.sessions.get(session_id)
+            if session and session.process and session.process.returncode is None:
+                try:
+                    session.process.terminate()
+                except Exception:
+                    pass
+        # Give processes time to exit gracefully
+        await asyncio.sleep(1.0)
+        # Force kill any remaining
+        for session_id in list(self.sessions.keys()):
+            session = self.sessions.get(session_id)
+            if session and session.process and session.process.returncode is None:
+                try:
+                    session.process.kill()
+                    logger.warning(f"Force killed Claude runner session {session_id}")
+                except Exception as e:
+                    logger.error(f"Failed to kill session {session_id}: {e}")
+            self.sessions.pop(session_id, None)
+        logger.info("Claude runner shutdown complete")
 
 
 # Singleton instance

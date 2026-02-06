@@ -18,37 +18,37 @@ const features = [
     icon: <FileText className="w-6 h-6" />,
     title: 'SEC EDGAR Integration',
     description: 'Access 10-K, 10-Q, 8-K filings directly. Search full-text content, extract XBRL financials.',
-    color: 'blue'
+    iconClass: 'bg-blue-500/10 text-blue-400'
   },
   {
     icon: <TrendingUp className="w-6 h-6" />,
     title: 'Real-Time Market Data',
     description: 'Yahoo Finance integration for current prices, historical data, and analyst ratings.',
-    color: 'green'
+    iconClass: 'bg-green-500/10 text-green-400'
   },
   {
     icon: <Users className="w-6 h-6" />,
     title: 'Insider Tracking',
     description: 'Monitor Form 4 filings for insider buying/selling activity across your watchlist.',
-    color: 'purple'
+    iconClass: 'bg-purple-500/10 text-purple-400'
   },
   {
     icon: <BarChart3 className="w-6 h-6" />,
     title: 'Portfolio Analysis',
     description: 'Track performance, calculate P&L, compare to benchmarks with natural language.',
-    color: 'amber'
+    iconClass: 'bg-amber-500/10 text-amber-400'
   },
   {
     icon: <Search className="w-6 h-6" />,
     title: 'Company Research',
     description: 'Deep dive into any public company - financials, risk factors, competitive analysis.',
-    color: 'cyan'
+    iconClass: 'bg-cyan-500/10 text-cyan-400'
   },
   {
     icon: <Target className="w-6 h-6" />,
     title: 'Valuation Models',
     description: 'Run DCF models, compare multiples, analyze fair value with AI assistance.',
-    color: 'rose'
+    iconClass: 'bg-rose-500/10 text-rose-400'
   }
 ];
 
@@ -202,7 +202,7 @@ export default function FinancePage() {
               key={i}
               className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 hover:border-slate-600 transition-all"
             >
-              <div className={`w-12 h-12 rounded-lg bg-${feature.color}-500/10 flex items-center justify-center text-${feature.color}-400 mb-4`}>
+              <div className={`w-12 h-12 rounded-lg ${feature.iconClass} flex items-center justify-center mb-4`}>
                 {feature.icon}
               </div>
               <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>

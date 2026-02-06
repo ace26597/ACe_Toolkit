@@ -46,7 +46,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.config import settings
-from app.core.ccresearch_manager import ccresearch_manager
+from app.core.ccresearch_manager import ccresearch_manager, _validate_session_id, validate_path_in_workspace
 from app.core.session_manager import session_manager, get_user_id_from_email
 from app.core.project_manager import get_project_manager
 from app.core.notifications import notify_access_request, notify_plugin_skill_request
@@ -156,6 +156,7 @@ class SessionResponse(BaseModel):
     title: str
     workspace_dir: str
     workspace_project: Optional[str] = None  # Linked Workspace project name
+    effective_working_dir: Optional[str] = None  # Actual working directory (custom for SSH mode)
     status: str
     session_mode: str = "claude"  # "claude" or "terminal" (direct Pi access)
     terminal_rows: int
@@ -320,6 +321,7 @@ async def create_session(
     title: Optional[str] = Form(None),
     project_name: Optional[str] = Form(None),  # New: Create/use unified project
     workspace_project: Optional[str] = Form(None),  # Legacy: link to old Workspace project
+    working_directory: Optional[str] = Form(None),  # Optional: custom starting directory for SSH mode
     files: List[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db)
 ):
@@ -343,21 +345,24 @@ async def create_session(
         # Access key provided - validate it
         if is_access_key_valid(access_key):
             session_mode = "terminal"  # Direct Pi terminal access
-            logger.info(f"Terminal mode session for {email}")
+            from app.core.security import mask_email
+            logger.info(f"Terminal mode session for {mask_email(email)}")
         else:
-            logger.warning(f"Invalid access key attempt from email: {email}")
+            from app.core.security import mask_email
+            logger.warning(f"Invalid access key attempt from email: {mask_email(email)}")
             raise HTTPException(
                 status_code=403,
                 detail="wrong_access_key"  # Frontend will show "Wrong code - try again"
             )
 
-    # Get next session number for this user
-    result = await db.execute(
-        select(func.coalesce(func.max(CCResearchSession.session_number), 0))
-        .where(CCResearchSession.email == email.lower())
-    )
-    max_session_number = result.scalar() or 0
-    next_session_number = max_session_number + 1
+    # Get next session number for this user (use begin() for atomicity)
+    async with db.begin_nested():
+        result = await db.execute(
+            select(func.coalesce(func.max(CCResearchSession.session_number), 0))
+            .where(CCResearchSession.email == email.lower())
+        )
+        max_session_number = result.scalar() or 0
+        next_session_number = max_session_number + 1
 
     ccresearch_id = str(uuid.uuid4())
 
@@ -483,12 +488,20 @@ Files created here will appear in the Workspace Files tab.
             file_path = data_dir / safe_filename
 
             # Save file
-            async with aiofiles.open(file_path, 'wb') as f:
-                content = await file.read()
-                await f.write(content)
+            try:
+                async with aiofiles.open(file_path, 'wb') as f:
+                    content = await file.read()
+                    await f.write(content)
 
-            uploaded_files_list.append(safe_filename)
-            logger.info(f"Uploaded file: {safe_filename} to session {ccresearch_id}")
+                uploaded_files_list.append(safe_filename)
+                logger.info(f"Uploaded file: {safe_filename} to session {ccresearch_id}")
+            except PermissionError:
+                raise HTTPException(status_code=403, detail=f"Permission denied writing file: {safe_filename}")
+            except OSError as e:
+                if "No space left" in str(e) or getattr(e, 'errno', None) == 28:
+                    raise HTTPException(status_code=507, detail="Disk full - no space left on device")
+                logger.error(f"OS error uploading {safe_filename}: {e}")
+                raise HTTPException(status_code=500, detail=f"Failed to save file: {safe_filename}")
 
     # Update CLAUDE.md with file info if files were uploaded
     if uploaded_files_list:
@@ -518,6 +531,7 @@ Files created here will appear in the Workspace Files tab.
         workspace_project=linked_project_name or workspace_project,  # Unified project or legacy
         status="created",
         session_mode=session_mode,  # "claude" or "terminal"
+        custom_working_dir=working_directory if session_mode == "terminal" else None,  # Custom SSH working dir
         uploaded_files=json.dumps(uploaded_files_list) if uploaded_files_list else None,
         auth_mode="oauth",  # Keep for database compatibility
         is_admin=session_mode == "terminal",  # Terminal mode = admin access
@@ -528,9 +542,13 @@ Files created here will appear in the Workspace Files tab.
     await db.commit()
     await db.refresh(session)
 
-    logger.info(f"Created session {ccresearch_id} for {email} with {len(uploaded_files_list)} files")
+    from app.core.security import mask_email
+    logger.info(f"Created session {ccresearch_id} for {mask_email(email)} with {len(uploaded_files_list)} files")
 
     # Convert for response
+    # Determine effective working directory (custom for SSH mode, otherwise workspace)
+    effective_dir = session.custom_working_dir if session.session_mode == "terminal" and session.custom_working_dir else session.workspace_dir
+
     response = SessionResponse(
         id=session.id,
         session_id=session.session_id,
@@ -539,6 +557,7 @@ Files created here will appear in the Workspace Files tab.
         title=session.title,
         workspace_dir=session.workspace_dir,
         workspace_project=session.workspace_project,
+        effective_working_dir=effective_dir,
         status=session.status,
         session_mode=session.session_mode,
         terminal_rows=session.terminal_rows,
@@ -569,6 +588,10 @@ async def upload_files_to_session(
     - ZIP files (auto-extracted if extract_zip=True)
     - Target directory selection
     """
+    # Validate session ID format
+    if not _validate_session_id(ccresearch_id):
+        raise HTTPException(status_code=400, detail="Invalid session ID format")
+
     # Rate limiting
     if not upload_rate_limiter.is_allowed(ccresearch_id):
         raise HTTPException(status_code=429, detail="Too many upload requests. Please wait a moment.")
@@ -582,13 +605,20 @@ async def upload_files_to_session(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    workspace = Path(session.workspace_dir)
+    # For SSH mode with custom directory, use that as the workspace
+    # Otherwise use the standard C3 project workspace
+    if session.session_mode == "terminal" and session.custom_working_dir:
+        workspace = Path(session.custom_working_dir)
+    else:
+        workspace = Path(session.workspace_dir)
 
     # Determine target directory
     if target_path:
         # Sanitize and validate target path (prevent directory traversal)
         target_dir = (workspace / target_path).resolve()
-        if not str(target_dir).startswith(str(workspace.resolve())):
+        try:
+            validate_path_in_workspace(workspace, target_dir)
+        except ValueError:
             raise HTTPException(status_code=403, detail="Invalid target path")
     else:
         target_dir = workspace / "data"
@@ -609,6 +639,12 @@ async def upload_files_to_session(
 
         content = await file.read()
 
+        # Validate file content (magic bytes check for dangerous types)
+        from app.routers.workspace import validate_file_content
+        is_safe, content_error = validate_file_content(content, file.filename)
+        if not is_safe:
+            raise HTTPException(status_code=400, detail=content_error)
+
         # Check file size
         if len(content) > MAX_FILE_SIZE:
             raise HTTPException(
@@ -628,7 +664,7 @@ async def upload_files_to_session(
                 # Extract ZIP contents with security checks
                 import io
                 MAX_ZIP_SIZE = 500 * 1024 * 1024  # 500MB max total extracted size
-                MAX_ZIP_FILES = 1000  # Max files in ZIP
+                MAX_ZIP_FILES = 100  # Max files in ZIP (reduced from 1000)
                 MAX_COMPRESSION_RATIO = 100  # Detect zip bombs
 
                 with zipfile.ZipFile(io.BytesIO(content), 'r') as zip_ref:
@@ -642,6 +678,14 @@ async def upload_files_to_session(
 
                     if len(zip_ref.infolist()) > MAX_ZIP_FILES:
                         raise HTTPException(status_code=400, detail=f"ZIP has too many files: {len(zip_ref.infolist())} exceeds {MAX_ZIP_FILES} limit")
+
+                    # Reject nested zip files (zip within zip)
+                    for zip_info in zip_ref.infolist():
+                        if zip_info.filename.lower().endswith('.zip'):
+                            raise HTTPException(status_code=400, detail="Nested ZIP files are not allowed for security reasons")
+
+                    # Track running extracted size for streaming check
+                    running_extracted_size = 0
 
                     for zip_info in zip_ref.infolist():
                         if zip_info.is_dir():
@@ -657,16 +701,26 @@ async def upload_files_to_session(
                         extracted_path = (target_dir / rel_path).resolve()
 
                         # Ensure extracted path is within target directory
-                        if not str(extracted_path).startswith(str(target_dir.resolve())):
+                        try:
+                            validate_path_in_workspace(target_dir, extracted_path)
+                        except ValueError:
                             logger.warning(f"Skipping path traversal attempt in ZIP: {zip_info.filename}")
                             continue
 
                         extracted_path.parent.mkdir(parents=True, exist_ok=True)
 
-                        # Extract file
+                        # Extract file with streaming size check
                         with zip_ref.open(zip_info) as src:
                             async with aiofiles.open(extracted_path, 'wb') as dst:
-                                await dst.write(src.read())
+                                while True:
+                                    chunk = src.read(1024 * 1024)  # 1MB chunks
+                                    if not chunk:
+                                        break
+                                    running_extracted_size += len(chunk)
+                                    if running_extracted_size > MAX_ZIP_SIZE:
+                                        # Abort: actual extracted size exceeds limit
+                                        raise HTTPException(status_code=400, detail="ZIP extraction aborted: extracted size exceeds limit (possible zip bomb)")
+                                    await dst.write(chunk)
 
                         uploaded_files_list.append(str(extracted_path.relative_to(workspace)))
                 logger.info(f"Extracted ZIP {file.filename} to {target_dir}")
@@ -715,7 +769,7 @@ async def upload_files_to_session(
 
     return UploadResponse(
         uploaded_files=uploaded_files_list,
-        data_dir=str(data_dir)
+        data_dir=str(target_dir)
     )
 
 
@@ -759,7 +813,7 @@ async def upload_files_local(
         logger.warning(f"Local upload rejected from non-local IP: {client_ip}")
         raise HTTPException(
             status_code=403,
-            detail=f"This endpoint is only accessible from local network. Your IP: {client_ip}"
+            detail="This endpoint is only accessible from local network"
         )
 
     logger.info(f"Local upload from {client_ip} for session {ccresearch_id}")
@@ -779,7 +833,9 @@ async def upload_files_local(
     # Determine target directory
     if target_path:
         target_dir = (workspace / target_path).resolve()
-        if not str(target_dir).startswith(str(workspace.resolve())):
+        try:
+            validate_path_in_workspace(workspace, target_dir)
+        except ValueError:
             raise HTTPException(status_code=403, detail="Invalid target path")
     else:
         target_dir = workspace / "data"
@@ -808,10 +864,19 @@ async def upload_files_local(
             async with aiofiles.open(temp_path, 'wb') as out_file:
                 # Stream in chunks to handle large files
                 chunk_size = 1024 * 1024  # 1MB chunks
+                first_chunk_checked = False
                 while True:
                     chunk = await file.read(chunk_size)
                     if not chunk:
                         break
+                    # Check magic bytes on first chunk
+                    if not first_chunk_checked:
+                        first_chunk_checked = True
+                        from app.routers.workspace import validate_file_content
+                        is_safe, content_error = validate_file_content(chunk, safe_filename)
+                        if not is_safe:
+                            temp_path.unlink(missing_ok=True)
+                            raise HTTPException(status_code=400, detail=content_error)
                     file_size += len(chunk)
 
                     # Check limits
@@ -838,10 +903,19 @@ async def upload_files_local(
             if extract_zip and safe_filename.lower().endswith('.zip'):
                 try:
                     MAX_ZIP_SIZE = 10 * 1024 * 1024 * 1024  # 10GB for local
-                    MAX_ZIP_FILES = 10000
+                    MAX_ZIP_FILES = 1000  # Reduced from 10000
+                    MAX_COMPRESSION_RATIO = 100  # Detect zip bombs
 
                     with zipfile.ZipFile(temp_path, 'r') as zip_ref:
                         total_uncompressed = sum(info.file_size for info in zip_ref.infolist())
+
+                        # Check compression ratio for zip bomb detection
+                        if file_size > 0 and total_uncompressed / file_size > MAX_COMPRESSION_RATIO:
+                            temp_path.unlink(missing_ok=True)
+                            raise HTTPException(
+                                status_code=400,
+                                detail="ZIP file rejected: suspicious compression ratio (possible zip bomb)"
+                            )
 
                         if total_uncompressed > MAX_ZIP_SIZE:
                             raise HTTPException(
@@ -855,6 +929,18 @@ async def upload_files_local(
                                 detail=f"ZIP has too many files: {len(zip_ref.infolist())}"
                             )
 
+                        # Reject nested zip files
+                        for zip_info in zip_ref.infolist():
+                            if zip_info.filename.lower().endswith('.zip'):
+                                temp_path.unlink(missing_ok=True)
+                                raise HTTPException(
+                                    status_code=400,
+                                    detail="Nested ZIP files are not allowed for security reasons"
+                                )
+
+                        # Track running extracted size
+                        running_extracted_size = 0
+
                         for zip_info in zip_ref.infolist():
                             if zip_info.is_dir():
                                 continue
@@ -866,11 +952,18 @@ async def upload_files_local(
 
                             with zip_ref.open(zip_info) as src:
                                 async with aiofiles.open(extracted_path, 'wb') as dst:
-                                    # Stream extraction
+                                    # Stream extraction with running size check
                                     while True:
                                         chunk = src.read(1024 * 1024)
                                         if not chunk:
                                             break
+                                        running_extracted_size += len(chunk)
+                                        if running_extracted_size > MAX_ZIP_SIZE:
+                                            temp_path.unlink(missing_ok=True)
+                                            raise HTTPException(
+                                                status_code=400,
+                                                detail="ZIP extraction aborted: extracted size exceeds limit (possible zip bomb)"
+                                            )
                                         await dst.write(chunk)
 
                             uploaded_files_list.append(str(extracted_path.relative_to(workspace)))
@@ -1040,7 +1133,7 @@ async def clone_github_repo(
         logger.exception(f"Error cloning repo: {e}")
         if clone_dir.exists():
             shutil.rmtree(clone_dir, ignore_errors=True)
-        raise HTTPException(status_code=500, detail=f"Clone failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Clone failed")
 
 
 class WebFetchRequest(BaseModel):
@@ -1104,7 +1197,7 @@ async def fetch_web_url(
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=400, detail=f"HTTP error: {e.response.status_code}")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to fetch URL: {str(e)}")
+        raise HTTPException(status_code=400, detail="Failed to fetch URL")
 
     content_type = response.headers.get('content-type', '')
 
@@ -1510,7 +1603,7 @@ async def list_files(
     path: str = "",
     db: AsyncSession = Depends(get_db)
 ):
-    """List files in session workspace directory"""
+    """List files in session workspace directory (or custom directory for SSH mode)"""
     # Rate limiting
     if not file_rate_limiter.is_allowed(ccresearch_id):
         raise HTTPException(status_code=429, detail="Too many requests. Please wait a moment.")
@@ -1524,13 +1617,19 @@ async def list_files(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    workspace = Path(session.workspace_dir)
+    # Use custom working directory for SSH mode if specified, otherwise use workspace
+    if session.session_mode == "terminal" and session.custom_working_dir:
+        workspace = Path(session.custom_working_dir)
+    else:
+        workspace = Path(session.workspace_dir)
 
     # Resolve requested path (prevent directory traversal)
     if path:
         target_path = (workspace / path).resolve()
-        # Ensure target is within workspace
-        if not str(target_path).startswith(str(workspace.resolve())):
+        # Ensure target is within workspace using secure validation
+        try:
+            validate_path_in_workspace(workspace, target_path)
+        except ValueError:
             raise HTTPException(status_code=403, detail="Access denied")
     else:
         target_path = workspace
@@ -1580,7 +1679,7 @@ async def download_file(
     path: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """Download a file from session workspace"""
+    """Download a file from session workspace (or custom directory for SSH mode)"""
     # Rate limiting
     if not file_rate_limiter.is_allowed(ccresearch_id):
         raise HTTPException(status_code=429, detail="Too many requests. Please wait a moment.")
@@ -1594,19 +1693,25 @@ async def download_file(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    workspace = Path(session.workspace_dir)
+    # Use custom working directory for SSH mode if specified
+    if session.session_mode == "terminal" and session.custom_working_dir:
+        workspace = Path(session.custom_working_dir)
+    else:
+        workspace = Path(session.workspace_dir)
 
     # Resolve requested path (prevent directory traversal)
     target_path = (workspace / path).resolve()
 
     # Ensure target is within workspace
-    if not str(target_path).startswith(str(workspace.resolve())):
+    try:
+        validate_path_in_workspace(workspace, target_path)
+    except ValueError:
         raise HTTPException(status_code=403, detail="Access denied")
 
     # Block access to sensitive credential files
     BLOCKED_FILES = {'.credentials.json', 'credentials.json', '.env', '.secrets'}
     if target_path.name in BLOCKED_FILES:
-        raise HTTPException(status_code=403, detail="Access to credential files is not allowed")
+        raise HTTPException(status_code=403, detail="Access denied")
 
     if not target_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
@@ -1614,16 +1719,24 @@ async def download_file(
     if not target_path.is_file():
         raise HTTPException(status_code=400, detail="Path is not a file")
 
-    # Determine MIME type
-    mime_type, _ = mimetypes.guess_type(str(target_path))
-    if not mime_type:
-        mime_type = "application/octet-stream"
+    try:
+        # Determine MIME type
+        mime_type, _ = mimetypes.guess_type(str(target_path))
+        if not mime_type:
+            mime_type = "application/octet-stream"
 
-    return FileResponse(
-        path=target_path,
-        filename=target_path.name,
-        media_type=mime_type
-    )
+        return FileResponse(
+            path=target_path,
+            filename=target_path.name,
+            media_type=mime_type
+        )
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="File not found")
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Permission denied")
+    except OSError as e:
+        logger.error(f"OS error during file download: {e}")
+        raise HTTPException(status_code=500, detail="File operation failed")
 
 
 @router.get("/sessions/{ccresearch_id}/files/content")
@@ -1632,7 +1745,7 @@ async def read_file_content(
     path: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """Read text content of a file (for preview)"""
+    """Read text content of a file (for preview in SSH custom directory or workspace)"""
     # Rate limiting
     if not file_rate_limiter.is_allowed(ccresearch_id):
         raise HTTPException(status_code=429, detail="Too many requests. Please wait a moment.")
@@ -1646,19 +1759,25 @@ async def read_file_content(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    workspace = Path(session.workspace_dir)
+    # Use custom working directory for SSH mode if specified
+    if session.session_mode == "terminal" and session.custom_working_dir:
+        workspace = Path(session.custom_working_dir)
+    else:
+        workspace = Path(session.workspace_dir)
 
     # Resolve requested path (prevent directory traversal)
     target_path = (workspace / path).resolve()
 
     # Ensure target is within workspace
-    if not str(target_path).startswith(str(workspace.resolve())):
+    try:
+        validate_path_in_workspace(workspace, target_path)
+    except ValueError:
         raise HTTPException(status_code=403, detail="Access denied")
 
     # Block access to sensitive credential files
     BLOCKED_FILES = {'.credentials.json', 'credentials.json', '.env', '.secrets'}
     if target_path.name in BLOCKED_FILES:
-        raise HTTPException(status_code=403, detail="Access to credential files is not allowed")
+        raise HTTPException(status_code=403, detail="Access denied")
 
     if not target_path.exists():
         raise HTTPException(status_code=404, detail="File not found")
@@ -1768,7 +1887,8 @@ async def save_session_as_project(
     if not project_path:
         raise HTTPException(status_code=500, detail="Failed to save project")
 
-    logger.info(f"Saved session {ccresearch_id} as project '{request.project_name}' for {session.email}")
+    from app.core.security import mask_email
+    logger.info(f"Saved session {ccresearch_id} as project '{request.project_name}' for {mask_email(session.email)}")
 
     return SaveProjectResponse(
         name=request.project_name,
@@ -1855,6 +1975,12 @@ async def create_unified_project(
     """
     if not email or not name:
         raise HTTPException(status_code=400, detail="Email and name are required")
+
+    # Validate project name
+    from app.core.project_manager import validate_project_name
+    is_valid, error_msg = validate_project_name(name)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail=error_msg)
 
     # Get user ID from email
     user_id = await get_user_id_from_email(email.lower())
@@ -2188,7 +2314,9 @@ async def list_shared_files(
     # Resolve requested path (prevent directory traversal)
     if path:
         target_path = (workspace / path).resolve()
-        if not str(target_path).startswith(str(workspace.resolve())):
+        try:
+            validate_path_in_workspace(workspace, target_path)
+        except ValueError:
             raise HTTPException(status_code=403, detail="Access denied")
     else:
         target_path = workspace
@@ -2241,7 +2369,9 @@ async def download_shared_file(
     workspace = Path(session.workspace_dir)
     target_path = (workspace / path).resolve()
 
-    if not str(target_path).startswith(str(workspace.resolve())):
+    try:
+        validate_path_in_workspace(workspace, target_path)
+    except ValueError:
         raise HTTPException(status_code=403, detail="Access denied")
 
     BLOCKED_FILES = {'.credentials.json', 'credentials.json', '.env', '.secrets'}
@@ -2277,7 +2407,9 @@ async def read_shared_file_content(
     workspace = Path(session.workspace_dir)
     target_path = (workspace / path).resolve()
 
-    if not str(target_path).startswith(str(workspace.resolve())):
+    try:
+        validate_path_in_workspace(workspace, target_path)
+    except ValueError:
         raise HTTPException(status_code=403, detail="Access denied")
 
     BLOCKED_FILES = {'.credentials.json', 'credentials.json', '.env', '.secrets'}
@@ -2328,8 +2460,9 @@ async def get_shared_session_log(
 
 # ============ Access Request Endpoints ============
 
-# Directory for storing requests
-REQUESTS_DIR = Path("/data/ccresearch-requests")
+# Directory for storing requests (uses DATA_BASE_DIR from settings)
+from app.core.config import settings as config_settings
+REQUESTS_DIR = Path(config_settings.DATA_BASE_DIR) / "ccresearch-requests"
 REQUESTS_DIR.mkdir(parents=True, exist_ok=True)
 
 
@@ -2367,7 +2500,8 @@ async def request_access(request: AccessRequestModel):
 
     # Save
     requests_file.write_text(json.dumps(requests, indent=2))
-    logger.info(f"New access request from {request.email}")
+    from app.core.security import mask_email
+    logger.info(f"New access request from {mask_email(str(request.email))}")
 
     # Send admin notification (async, don't block response)
     try:
@@ -2422,7 +2556,8 @@ async def request_plugin_or_skill(request: PluginSkillRequestModel):
 
     # Save
     requests_file.write_text(json.dumps(requests, indent=2))
-    logger.info(f"New {request.request_type} request: {request.name} from {request.email}")
+    from app.core.security import mask_email
+    logger.info(f"New {request.request_type} request: {request.name} from {mask_email(str(request.email))}")
 
     # Send admin notification (async, don't block response)
     try:
@@ -2566,7 +2701,7 @@ async def export_session_log(
             f.write(md_content)
     except Exception as e:
         logger.error(f"Failed to export session log: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to write export file: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to write export file")
 
     # Get relative path for display
     relative_path = str(filepath.relative_to(workspace_dir))
@@ -2643,6 +2778,36 @@ async def get_automation_rules():
 
 # ============ WebSocket Endpoint ============
 
+async def _authenticate_websocket(websocket: WebSocket):
+    """Authenticate WebSocket connection via JWT cookie.
+
+    Returns the user if authenticated, None otherwise.
+    """
+    from jose import jwt, JWTError
+    from app.core.config import settings as app_settings
+    from app.models.models import User
+    from app.core.database import AsyncSessionLocal
+
+    token = websocket.cookies.get("access_token")
+    if not token:
+        return None
+
+    try:
+        payload = jwt.decode(token, app_settings.SECRET_KEY, algorithms=[app_settings.ALGORITHM])
+        user_id_str: str = payload.get("sub")
+        if user_id_str is None:
+            return None
+        import uuid as _uuid
+        user_id = _uuid.UUID(user_id_str)
+    except (JWTError, ValueError):
+        return None
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalars().first()
+        return user
+
+
 @router.websocket("/terminal/{ccresearch_id}")
 async def terminal_websocket(
     websocket: WebSocket,
@@ -2650,6 +2815,16 @@ async def terminal_websocket(
 ):
     """Bidirectional terminal I/O via WebSocket"""
     await websocket.accept()
+
+    # Authenticate via JWT cookie before allowing terminal access
+    user = await _authenticate_websocket(websocket)
+    if not user:
+        await websocket.send_json({
+            "type": "error",
+            "error": "Unauthorized: invalid or expired token"
+        })
+        await websocket.close(code=4001)
+        return
 
     # Log connection info
     origin = websocket.headers.get("origin", "unknown")
@@ -2727,12 +2902,15 @@ async def terminal_websocket(
 
             if session_mode == "terminal":
                 # Direct terminal access - spawn bash shell
+                # Use custom working directory if specified, otherwise fall back to workspace
+                custom_dir = session.custom_working_dir if session.custom_working_dir else None
                 success = await ccresearch_manager.spawn_shell(
                     ccresearch_id,
                     Path(session.workspace_dir),
                     session.terminal_rows,
                     session.terminal_cols,
-                    send_output
+                    send_output,
+                    custom_working_dir=custom_dir
                 )
                 if not success:
                     await websocket.send_json({
@@ -2750,7 +2928,6 @@ async def terminal_websocket(
                     session.terminal_rows,
                     session.terminal_cols,
                     send_output,
-                    sandboxed=settings.CCRESEARCH_SANDBOX_ENABLED,
                     automation_callback=send_automation_notification,
                     continue_session=should_continue
                 )

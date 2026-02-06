@@ -13,8 +13,9 @@ from app.models.models import Base
 import uuid
 import time
 import logging
+import shutil
 import psutil
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from sqlalchemy.future import select
 
@@ -29,8 +30,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("api")
 
-# File size limit (50MB default)
-MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB
+# File size limit (from config, default 50MB)
+MAX_UPLOAD_SIZE = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 # Startup time for uptime calculation
 STARTUP_TIME = None
@@ -44,6 +45,19 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        # Content Security Policy
+        # Monaco editor and xterm.js require unsafe-inline/unsafe-eval for scripts
+        # Dynamic styles require unsafe-inline for style-src
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob: https:; "
+            "connect-src 'self' wss: https:; "
+            "font-src 'self' data: https:; "
+            "frame-ancestors 'none'"
+        )
         # HSTS - only for HTTPS (Cloudflare handles this but belt-and-suspenders)
         if request.url.scheme == "https":
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
@@ -85,6 +99,59 @@ def is_local_network_request(request: Request) -> bool:
         return False
 
 
+# Paths exempt from CSRF header check (public endpoints, GET-like endpoints, OAuth callbacks)
+CSRF_EXEMPT_PATHS = {
+    "/auth/login",
+    "/auth/register",
+    "/auth/logout",
+    "/auth/google",
+    "/auth/google/callback",
+    "/auth/refresh",
+    "/health",
+    "/health/detailed",
+    "/metrics",
+    "/",
+}
+# Path prefixes exempt from CSRF (public API, share endpoints, WebSocket upgrades)
+CSRF_EXEMPT_PREFIXES = (
+    "/ccresearch/share/",
+    "/ccresearch/request-access",
+    "/ccresearch/request-plugin-skill",
+    "/public/",
+)
+
+
+class CSRFProtectionMiddleware(BaseHTTPMiddleware):
+    """CSRF protection via custom header check for state-changing requests.
+
+    Requires X-Requested-With: XMLHttpRequest header on POST/PUT/DELETE/PATCH requests.
+    This is effective because:
+    - Browsers don't allow custom headers in cross-origin requests without CORS preflight
+    - SameSite=None cookies can be sent by cross-origin forms, but forms can't set custom headers
+    - Only JavaScript fetch/XHR can set custom headers, and those respect CORS
+    """
+    async def dispatch(self, request: Request, call_next):
+        method = request.method.upper()
+
+        # Only check state-changing methods
+        if method in ("POST", "PUT", "DELETE", "PATCH"):
+            path = request.url.path
+
+            # Skip exempt paths
+            if path not in CSRF_EXEMPT_PATHS and not path.startswith(CSRF_EXEMPT_PREFIXES):
+                # Skip WebSocket upgrade requests
+                if request.headers.get("upgrade", "").lower() != "websocket":
+                    # Skip multipart form uploads that include cookies (they set the header in JS)
+                    requested_with = request.headers.get("x-requested-with", "")
+                    if requested_with != "XMLHttpRequest":
+                        return JSONResponse(
+                            status_code=403,
+                            content={"detail": "Missing CSRF header"}
+                        )
+
+        return await call_next(request)
+
+
 class FileSizeLimitMiddleware(BaseHTTPMiddleware):
     """Limit upload file sizes to prevent OOM"""
     async def dispatch(self, request: Request, call_next):
@@ -115,7 +182,7 @@ async def create_initial_admin():
     """Create initial admin user if not exists."""
     from app.core.database import AsyncSessionLocal
     from app.models.models import User
-    from app.core.security import get_password_hash
+    from app.core.security import get_password_hash, mask_email
 
     # Admin credentials from environment (set ADMIN_PASSWORD in .env)
     admin_email = settings.ADMIN_EMAIL
@@ -126,13 +193,17 @@ async def create_initial_admin():
         logger.warning("ADMIN_PASSWORD not set in .env - skipping admin creation")
         return
 
+    # Warn if admin password is weak (same policy as user registration)
+    if len(admin_password) < 12:
+        logger.warning("ADMIN_PASSWORD is shorter than 12 characters - consider using a stronger password")
+
     async with AsyncSessionLocal() as db:
         # Check if admin exists
         result = await db.execute(select(User).where(User.email == admin_email))
         existing_admin = result.scalars().first()
 
         if not existing_admin:
-            logger.info(f"Creating initial admin user: {admin_email}")
+            logger.info(f"Creating initial admin user: {mask_email(admin_email)}")
             admin = User(
                 name=admin_name,
                 email=admin_email,
@@ -151,9 +222,9 @@ async def create_initial_admin():
             # Create projects directory for unified project storage
             (admin_dir / "projects").mkdir(exist_ok=True)
 
-            logger.info(f"Admin user created with ID: {admin.id}")
+            logger.info("Admin user created successfully")
         else:
-            logger.info(f"Admin user already exists: {admin_email}")
+            logger.info("Admin user already exists")
 
 
 @asynccontextmanager
@@ -209,6 +280,25 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(periodic_ccresearch_cleanup())
 
+    # Start periodic OAuth state cleanup task (prevent memory leak)
+    from app.routers.auth import _oauth_states
+
+    async def periodic_oauth_state_cleanup():
+        """Clean expired OAuth states every 5 minutes"""
+        while True:
+            try:
+                await asyncio.sleep(300)  # 5 minutes
+                cutoff = datetime.utcnow() - timedelta(minutes=10)
+                expired = [k for k, v in _oauth_states.items() if v < cutoff]
+                for k in expired:
+                    _oauth_states.pop(k, None)
+                if expired:
+                    logger.info(f"OAuth state cleanup: removed {len(expired)} expired states")
+            except Exception as e:
+                logger.error(f"Error during OAuth state cleanup: {e}")
+
+    asyncio.create_task(periodic_oauth_state_cleanup())
+
     yield
 
     # Cleanup: shutdown CCResearch processes
@@ -216,7 +306,15 @@ async def lifespan(app: FastAPI):
         logger.info("Shutting down CCResearch processes...")
         await ccresearch_manager.shutdown()
     except Exception as e:
-        logger.warning(f"Error shutting down CCResearch: {e}")
+        logger.error(f"Error shutting down CCResearch: {e}")
+
+    # Cleanup: shutdown Claude runner processes (Data Studio)
+    try:
+        from app.core.claude_runner import claude_runner
+        logger.info("Shutting down Claude runner processes...")
+        await claude_runner.shutdown_all()
+    except Exception as e:
+        logger.error(f"Error shutting down Claude runner: {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -239,6 +337,40 @@ ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://192.168.1.190:3000",     # Local network
 ]
+
+def get_cors_headers(request: Request) -> dict:
+    """Get CORS headers for the request origin if allowed."""
+    origin = request.headers.get("origin", "")
+    if origin in ALLOWED_ORIGINS:
+        return {
+            "Access-Control-Allow-Origin": origin,
+            "Access-Control-Allow-Credentials": "true",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
+    return {}
+
+@app.exception_handler(HTTPException)
+async def cors_http_exception_handler(request: Request, exc: HTTPException):
+    """Custom HTTPException handler that includes CORS headers."""
+    headers = get_cors_headers(request)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=headers
+    )
+
+@app.exception_handler(Exception)
+async def cors_general_exception_handler(request: Request, exc: Exception):
+    """Custom general exception handler that includes CORS headers."""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    headers = get_cors_headers(request)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+        headers=headers
+    )
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
@@ -249,6 +381,7 @@ app.add_middleware(
 )
 
 # Add custom middleware (order matters - first added = last executed)
+app.add_middleware(CSRFProtectionMiddleware)
 app.add_middleware(FileSizeLimitMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RequestIDMiddleware)
@@ -269,12 +402,61 @@ def read_root():
 @app.get("/health", tags=["Health"])
 async def health_check():
     """
-    Health check endpoint for monitoring systems.
+    Public health check endpoint for monitoring systems.
+    Returns only basic status (no system resource details).
+    Includes checks for external dependencies (SSD, Claude CLI).
+    """
+    from app.core.database import AsyncSessionLocal
+    from sqlalchemy import text
+    import os
+
+    # Database health check
+    db_healthy = False
+    try:
+        async with AsyncSessionLocal() as db:
+            await db.execute(text("SELECT 1"))
+            db_healthy = True
+    except Exception:
+        pass
+
+    # External dependency checks
+    ssd_available = os.path.exists(settings.DATA_BASE_DIR)
+    claude_cli_available = shutil.which('claude') is not None
+
+    # Overall status: degraded if any critical dependency is down
+    all_healthy = db_healthy and ssd_available
+    status = "healthy" if all_healthy else "degraded"
+
+    return {
+        "status": status,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "ssd_mounted": ssd_available,
+        "claude_cli": claude_cli_available,
+    }
+
+
+@app.get("/health/detailed", tags=["Health"])
+async def health_check_detailed(request: Request):
+    """
+    Detailed health check endpoint (admin only).
     Returns system status, resource usage, and service health.
+    Requires valid admin authentication cookie.
     """
     from app.core.ccresearch_manager import ccresearch_manager
     from app.core.database import AsyncSessionLocal
+    from app.routers.auth import get_current_user
     from sqlalchemy import text
+
+    # Verify admin access via JWT cookie
+    try:
+        async with AsyncSessionLocal() as db:
+            user = await get_current_user(request, db)
+            if not user.is_admin:
+                raise HTTPException(status_code=403, detail="Admin access required")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     # Calculate uptime
     uptime_seconds = 0
@@ -320,15 +502,27 @@ async def health_check():
 
 
 @app.get("/metrics", tags=["Metrics"])
-async def get_metrics():
+async def get_metrics(request: Request):
     """
-    Simple metrics endpoint for monitoring.
+    Metrics endpoint for monitoring (admin only).
     Returns counts and statistics about the system.
     """
     from app.core.ccresearch_manager import ccresearch_manager
     from app.core.database import AsyncSessionLocal
     from app.models.models import CCResearchSession
+    from app.routers.auth import get_current_user
     from sqlalchemy import select, func
+
+    # Verify admin access via JWT cookie
+    try:
+        async with AsyncSessionLocal() as db:
+            user = await get_current_user(request, db)
+            if not user.is_admin:
+                raise HTTPException(status_code=403, detail="Admin access required")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=403, detail="Admin access required")
 
     async with AsyncSessionLocal() as db:
         # CCResearch session counts

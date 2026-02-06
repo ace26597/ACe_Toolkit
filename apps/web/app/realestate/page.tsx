@@ -18,37 +18,37 @@ const features = [
     icon: <Calculator className="w-6 h-6" />,
     title: 'Deal Analysis',
     description: 'Calculate cap rate, cash-on-cash return, GRM, and DCR for any property.',
-    color: 'orange'
+    iconClass: 'bg-orange-500/10 text-orange-400'
   },
   {
     icon: <TrendingUp className="w-6 h-6" />,
     title: 'Cash Flow Projections',
     description: 'Build 5-10 year pro formas with rent growth, expense inflation, and appreciation.',
-    color: 'green'
+    iconClass: 'bg-green-500/10 text-green-400'
   },
   {
     icon: <Target className="w-6 h-6" />,
     title: 'Comps Analysis',
     description: 'Compare properties by price per sqft, GRM, and cap rate to estimate fair value.',
-    color: 'blue'
+    iconClass: 'bg-blue-500/10 text-blue-400'
   },
   {
     icon: <MapPin className="w-6 h-6" />,
     title: 'Market Research',
     description: 'Analyze demographics, employment, rent trends, and economic indicators.',
-    color: 'purple'
+    iconClass: 'bg-purple-500/10 text-purple-400'
   },
   {
     icon: <CheckSquare className="w-6 h-6" />,
     title: 'Due Diligence Tracking',
     description: 'Manage inspection deadlines, document checklists, and contingency periods.',
-    color: 'cyan'
+    iconClass: 'bg-cyan-500/10 text-cyan-400'
   },
   {
     icon: <FileText className="w-6 h-6" />,
     title: 'Investment Reports',
     description: 'Generate investor presentations, deal summaries, and market analysis reports.',
-    color: 'rose'
+    iconClass: 'bg-rose-500/10 text-rose-400'
   }
 ];
 
@@ -226,7 +226,7 @@ export default function RealEstatePage() {
               key={i}
               className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 hover:border-slate-600 transition-all"
             >
-              <div className={`w-12 h-12 rounded-lg bg-${feature.color}-500/10 flex items-center justify-center text-${feature.color}-400 mb-4`}>
+              <div className={`w-12 h-12 rounded-lg ${feature.iconClass} flex items-center justify-center mb-4`}>
                 {feature.icon}
               </div>
               <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>

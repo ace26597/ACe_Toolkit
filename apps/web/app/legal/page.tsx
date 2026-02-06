@@ -18,37 +18,37 @@ const features = [
     icon: <FileText className="w-6 h-6" />,
     title: 'Contract Analysis',
     description: 'Review NDAs, service agreements, and other contracts for risks, missing clauses, and negotiation points.',
-    color: 'emerald'
+    iconClass: 'bg-emerald-500/10 text-emerald-400'
   },
   {
     icon: <Search className="w-6 h-6" />,
     title: 'Clause Extraction',
     description: 'Identify key clauses like termination, indemnification, IP assignment, and limitation of liability.',
-    color: 'blue'
+    iconClass: 'bg-blue-500/10 text-blue-400'
   },
   {
     icon: <AlertTriangle className="w-6 h-6" />,
     title: 'Risk Identification',
     description: 'Flag potential issues, unfair terms, missing protections, and compliance gaps.',
-    color: 'amber'
+    iconClass: 'bg-amber-500/10 text-amber-400'
   },
   {
     icon: <CheckSquare className="w-6 h-6" />,
     title: 'Due Diligence Tracking',
     description: 'Manage checklists, deadlines, and document status across transactions.',
-    color: 'purple'
+    iconClass: 'bg-purple-500/10 text-purple-400'
   },
   {
     icon: <Clock className="w-6 h-6" />,
     title: 'Case Timeline',
     description: 'Track litigation events, deadlines, and procedural milestones.',
-    color: 'cyan'
+    iconClass: 'bg-cyan-500/10 text-cyan-400'
   },
   {
     icon: <BookOpen className="w-6 h-6" />,
     title: 'Document Generation',
     description: 'Generate demand letters, memos, and summaries from templates.',
-    color: 'rose'
+    iconClass: 'bg-rose-500/10 text-rose-400'
   }
 ];
 
@@ -209,7 +209,7 @@ export default function LegalPage() {
               key={i}
               className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 hover:border-slate-600 transition-all"
             >
-              <div className={`w-12 h-12 rounded-lg bg-${feature.color}-500/10 flex items-center justify-center text-${feature.color}-400 mb-4`}>
+              <div className={`w-12 h-12 rounded-lg ${feature.iconClass} flex items-center justify-center mb-4`}>
                 {feature.icon}
               </div>
               <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>

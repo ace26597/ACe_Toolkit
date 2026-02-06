@@ -150,7 +150,7 @@ export default function SharedSessionPage() {
       const data = await sharedApi.listFiles(token, currentPath);
       setFiles(data.files);
     } catch (err) {
-      console.error('Failed to load files:', err);
+      // Failed to load files - silently handled
     }
   }, [token, currentPath]);
 
@@ -167,7 +167,7 @@ export default function SharedSessionPage() {
       const data = await sharedApi.getLog(token);
       setLog(data.log);
     } catch (err) {
-      console.error('Failed to load log:', err);
+      // Failed to load log - silently handled
       setLog('Failed to load terminal log');
     }
   }, [token, session?.has_log]);
@@ -195,7 +195,7 @@ export default function SharedSessionPage() {
           setFileContent(data.content);
           setSelectedFile(file);
         } catch (err) {
-          console.error('Failed to load file content:', err);
+          // Failed to load file content - silently handled
         }
       } else {
         // For binary files, just select but don't load content

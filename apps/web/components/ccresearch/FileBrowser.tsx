@@ -42,7 +42,7 @@ interface FileBrowserProps {
   onCloneRepo?: (repoUrl: string, targetPath: string, branch?: string) => Promise<void>; // Clone callback
 }
 
-const API_URL = typeof window !== 'undefined' ? getApiUrl() : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000');
+const API_URL = typeof window !== 'undefined' ? getApiUrl() : (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000');
 
 // File icon helper
 const getFileIcon = (name: string, isDir: boolean) => {

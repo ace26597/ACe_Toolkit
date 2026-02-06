@@ -12,10 +12,12 @@ import os
 import json
 import shutil
 import uuid
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from .config import settings
+from .utils import sanitize_name as _shared_sanitize_name
 import aiofiles
 import aiofiles.os
 
@@ -44,17 +46,12 @@ class WorkspaceManager:
         return self.base_dir / safe_name
 
     def _sanitize_name(self, name: str) -> str:
-        """Sanitize a name for use as a directory/file name."""
-        # Remove dangerous characters, keep alphanumeric, hyphen, underscore, dot
-        safe = "".join(c if c.isalnum() or c in ('-', '_', '.') else '-' for c in name)
-        # Collapse multiple hyphens into one
-        while '--' in safe:
-            safe = safe.replace('--', '-')
-        safe = safe.strip('-').strip()
-        # Prevent empty or dot-only names
-        if not safe or safe in ('.', '..'):
-            safe = f"project-{uuid.uuid4().hex[:8]}"
-        return safe
+        """Sanitize a name for use as a directory/file name.
+
+        Delegates to the shared sanitize_name() in utils.py.
+        Allows dots (used for filenames in workspace context).
+        """
+        return _shared_sanitize_name(name, allow_dots=True)
 
     async def _copy_template_files(self, project_path: Path, template: str) -> None:
         """Copy template files to a new project.
@@ -672,8 +669,7 @@ class WorkspaceManager:
             try:
                 resolved = (self.base_dir / safe_path).resolve()
                 base_resolved = self.base_dir.resolve()
-                if not str(resolved).startswith(str(base_resolved)):
-                    raise ValueError("Path escapes project directory")
+                resolved.relative_to(base_resolved)  # Raises ValueError if outside
             except (ValueError, OSError):
                 raise ValueError("Invalid path")
 

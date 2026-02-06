@@ -46,7 +46,8 @@ async def get_user_id_from_email(email: str) -> Optional[str]:
             if user_id:
                 return str(user_id)
     except Exception as e:
-        logger.warning(f"Failed to look up user_id for {email}: {e}")
+        from app.core.security import mask_email
+        logger.warning(f"Failed to look up user_id for {mask_email(email)}: {e}")
     return None
 
 
@@ -65,18 +66,18 @@ SESSION_PERMISSIONS = {
         ],
         "deny": [
             # Block access to sensitive system files
-            "Read(/home/ace/.ccresearch_allowed_emails.json)",
-            "Read(/home/ace/.claude/CLAUDE.md)",
-            "Read(/home/ace/dev/**)",
-            "Write(/home/ace/dev/**)",
-            "Edit(/home/ace/dev/**)",
-            "Read(/home/ace/.bashrc)",
-            "Read(/home/ace/.bash_history)",
-            "Read(/home/ace/.ssh/**)",
-            "Read(/home/ace/.gnupg/**)",
-            "Read(/home/ace/.env)",
-            "Read(/home/ace/.env.*)",
-            "Read(/home/ace/.cloudflared/**)",
+            "Read(~/.ccresearch_allowed_emails.json)",
+            "Read(~/.claude/CLAUDE.md)",
+            "Read(~/dev/**)",
+            "Write(~/dev/**)",
+            "Edit(~/dev/**)",
+            "Read(~/.bashrc)",
+            "Read(~/.bash_history)",
+            "Read(~/.ssh/**)",
+            "Read(~/.gnupg/**)",
+            "Read(~/.env)",
+            "Read(~/.env.*)",
+            "Read(~/.cloudflared/**)",
             "Read(/etc/cloudflared/**)",
             "Read(/etc/shadow)",
             "Read(/etc/passwd)",
@@ -388,9 +389,17 @@ class SessionManager:
         session_dir = self.get_session_dir(user_id, session_id)
         file_path = (session_dir / "data" / path).resolve()
 
-        # Security check: ensure path is within session
-        if not str(file_path).startswith(str(session_dir.resolve())):
+        # Security check: ensure path is within session using relative_to
+        try:
+            file_path.relative_to(session_dir.resolve())
+        except ValueError:
             return None
+        # Reject symlinks pointing outside session
+        if file_path.is_symlink():
+            try:
+                file_path.resolve().relative_to(session_dir.resolve())
+            except ValueError:
+                return None
 
         return file_path if file_path.exists() else None
 
