@@ -1,6 +1,6 @@
 # CLAUDE.md - ACe_Toolkit
 
-**Last Updated:** February 6, 2026 | **Status:** Active | **Deployment:** Mac Mini + Cloudflare Tunnel
+**Last Updated:** February 7, 2026 | **Status:** Active | **Deployment:** Mac Mini + Cloudflare Tunnel
 
 ---
 
@@ -55,6 +55,9 @@ lsof -i :3000 -i :8000         # Check our ports
 | **C3 Researcher Workspace** | `/workspace` | Claude Code Custom Researcher - AI-powered research terminal |
 | **C3 Data Studio** | `/data-studio` | AI-powered data analysis with headless Claude |
 | **Remotion Video Studio** | `/video-studio` | AI video creation with Claude Code terminal + Remotion |
+| **Blog** | `/blog` | Technical posts on AI agents, benchmarks, OpenClaw experiments |
+| **Agent Diary** | `/diary` | Daily logs from Alfred and Pip with interactive calendar |
+| **Login** | `/login` | Dedicated login/signup page |
 
 **C3 Researcher Workspace Features:**
 - 145+ scientific skills, 34 MCP servers, 15 plugins (all user-scoped)
@@ -96,6 +99,25 @@ lsof -i :3000 -i :8000         # Check our ports
 - Terminal uses Workspace project directory for `--continue` support
 - Files, notes, and terminal share the same Workspace project context
 
+**Blog System:**
+- 7 published posts (5 OpenClaw-focused), filesystem-backed (markdown + gray-matter)
+- Comments per post (JSON files), draft/publish workflow
+- API routes: `/api/blog/posts`, `/api/blog/comments/[slug]`, `/api/blog/publish`
+- Data: `apps/web/data/blog/published/`, `apps/web/data/blog/drafts/`
+- Images: `apps/web/public/blog/images/`, Videos: `apps/web/public/blog/videos/`
+
+**Agent Diary:**
+- Daily entries from Alfred and Pip agents (OpenClaw)
+- Interactive calendar with word-count heatmap, agent color coding
+- API routes: `/api/diary/entries`, `/api/diary/entries/[date]`
+- Data: `apps/web/data/diary/alfred/`, `apps/web/data/diary/pip/`
+- Sync from T7 SSD: `apps/web/scripts/sync-diary.sh`
+
+**Landing Page Sections:**
+- HeroSection → AppSection (x3) → CapabilitiesGrid → ShowcasePreview → ExperimentalSection → WhatsNewSection → CTA
+- Components in `apps/web/components/home/`
+- Header/Footer in `apps/web/components/layout/`
+
 **For detailed app documentation, see:**
 - `apps/web/CLAUDE.md` - Frontend details
 - `apps/api/CLAUDE.md` - Backend API reference
@@ -125,8 +147,17 @@ ACe_Toolkit/
 ├── apps/
 │   ├── web/                    # Next.js Frontend (see apps/web/CLAUDE.md)
 │   │   ├── app/                # App Router pages
+│   │   │   ├── blog/           # Blog listing, [slug], drafts
+│   │   │   ├── diary/          # Agent diary with calendar
+│   │   │   ├── login/          # Dedicated login page
+│   │   │   └── api/            # API routes (blog, diary)
 │   │   ├── components/         # React components
-│   │   └── lib/                # Utilities
+│   │   │   ├── home/           # Landing page sections (6 components)
+│   │   │   ├── layout/         # Header, Footer
+│   │   │   ├── blog/           # Comments
+│   │   │   └── diary/          # DiaryCalendar, DiaryEntry
+│   │   ├── data/               # Content (blog posts, diary entries)
+│   │   └── lib/                # Utilities (api/, blog.ts)
 │   │
 │   └── api/                    # FastAPI Backend (see apps/api/CLAUDE.md)
 │       ├── app/
@@ -135,7 +166,8 @@ ACe_Toolkit/
 │       │   └── models/         # SQLAlchemy models
 │       └── requirements.txt
 │
-├── infra/scripts/              # start_all.sh, stop_all.sh, status.sh
+├── ecosystem.config.js         # PM2 process manager config
+├── infra/scripts/              # start_all.sh, pm2-manage.sh, status.sh
 ├── logs/                       # Application logs
 └── CLAUDE.md                   # This file
 ```
@@ -277,6 +309,15 @@ See `~/.secrets/README.md` for usage. CLI: `secrets get api_keys.openai`
 
 | Date | Change |
 |------|--------|
+| 2026-02-07 | **FIX: Mobile Terminal** - Reduced xterm font from 16px to 12px on mobile (canvas doesn't trigger iOS auto-zoom) |
+| 2026-02-07 | **NEW: Landing Page** - ExperimentalSection (OpenClaw agents, blog posts), WhatsNewSection (latest updates, Opus 4.6) |
+| 2026-02-07 | **NAV: Header/Footer** - Added Blog to desktop nav, Diary to mobile menu, Footer split into Apps + Content columns |
+| 2026-02-07 | **NEW: Blog System** - 7 published posts, comments, draft/publish workflow, filesystem-backed API routes |
+| 2026-02-07 | **NEW: Agent Diary** - Alfred & Pip daily logs, interactive calendar with heatmap, multi-agent support |
+| 2026-02-07 | **NEW: Login Page** - Dedicated `/login` route with LoginPageContent component |
+| 2026-02-07 | **SECURITY: .gitignore** - Added *.mac_backup, recordings symlink, blog generation artifacts |
+| 2026-02-07 | **INFRA: PM2 Config** - ecosystem.config.js, pm2-manage.sh, macos-services.sh |
+| 2026-02-07 | **README: Complete Rewrite** - All 3 apps, OpenClaw section, blog links, updated stats (34 MCP servers) |
 | 2026-02-06 | **AUDIT: Comprehensive Codebase Audit** - Security hardening (CSRF, path traversal, JWT fail-fast, rate limiting, CSP headers), bug fixes (DB session leak, file handle leaks, subprocess cleanup, race conditions), code quality (split api.ts into modules, ErrorBoundary, type safety, lazy loading, ARIA labels) - 42 fixes across 40 files |
 | 2026-02-05 | **NEW: Skills** - Installed 9 new skills (agent-factory, prompt-factory, claude-md-enhancer, senior-data-scientist, senior-data-engineer, senior-ml-engineer, code-reviewer, tdd-guide, senior-backend) |
 | 2026-02-05 | **Workspace:** SSH directory selection - choose starting directory when using SSH terminal mode |

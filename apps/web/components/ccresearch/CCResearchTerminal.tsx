@@ -172,13 +172,14 @@ export default function CCResearchTerminal({
     if (!terminalRef.current) return;
 
     // Create terminal instance with Tokyo Night theme
-    // 16px on mobile prevents iOS Safari auto-zoom on input focus
+    // xterm.js renders on canvas — no iOS auto-zoom issue (that only affects native <input>)
+    // Smaller font on mobile fits more columns and prevents line truncation
     const isMobileDevice = window.innerWidth < 768;
 
     const term = new XTerm({
       cursorBlink: true,
       cursorStyle: 'block',
-      fontSize: isMobileDevice ? 16 : 14,
+      fontSize: isMobileDevice ? 12 : 14,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       theme: {
         background: '#1a1b26',

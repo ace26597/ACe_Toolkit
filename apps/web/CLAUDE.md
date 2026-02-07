@@ -1,6 +1,6 @@
 # CLAUDE.md - Frontend (Next.js)
 
-**Location:** `apps/web/` | **Port:** 3000 | **Framework:** Next.js 16 (App Router) | **Updated:** February 6, 2026
+**Location:** `apps/web/` | **Port:** 3000 | **Framework:** Next.js 16 (App Router) | **Updated:** February 7, 2026
 
 ---
 
@@ -26,10 +26,21 @@
 ```
 apps/web/
 ├── app/                           # App Router pages
-│   ├── page.tsx                   # Home page
-│   ├── layout.tsx                 # Root layout
+│   ├── page.tsx                   # Home page (Hero, Apps, Capabilities, Showcase, Experimental, WhatsNew)
+│   ├── layout.tsx                 # Root layout (Header + Footer)
+│   ├── api/                       # API routes (filesystem-backed)
+│   │   ├── blog/                  # Blog API (reads from data/blog/)
+│   │   └── diary/                 # Diary API (reads from data/diary/)
+│   ├── blog/                      # Blog pages
+│   │   ├── page.tsx               # Blog listing
+│   │   ├── [slug]/page.tsx        # Blog post detail
+│   │   └── drafts/                # Draft posts
+│   ├── diary/                     # Agent Diary
+│   │   └── page.tsx               # Calendar + entry view
+│   ├── login/                     # Login page (standalone)
+│   │   └── page.tsx
 │   ├── ccresearch/
-│   │   ├── page.tsx               # CCResearch Terminal (Create Project flow)
+│   │   ├── page.tsx               # Redirects to /workspace?tab=terminal
 │   │   └── share/[token]/page.tsx # Public share view
 │   ├── workspace/page.tsx         # Workspace (Notes, Files, Terminal tabs)
 │   ├── data-studio/               # C3 Data Studio V2 (REDESIGNED)
@@ -42,18 +53,35 @@ apps/web/
 │   │   ├── LoginModal.tsx         # Login/Signup modal
 │   │   ├── ProtectedRoute.tsx     # Auth wrapper
 │   │   └── ExperimentalBanner.tsx # Disclaimer
+│   ├── blog/                      # Blog components
+│   │   ├── BlogPost.tsx           # Blog post renderer
+│   │   └── Comments.tsx           # Comment system
 │   ├── ccresearch/                # CCResearch components
 │   │   ├── SessionPicker.tsx      # Project list/create view (not sessions)
 │   │   ├── CCResearchTerminal.tsx # Terminal component
 │   │   └── FileBrowser.tsx        # File browser panel
+│   ├── diary/                     # Diary components
+│   │   ├── DiaryCalendar.tsx      # Calendar navigation
+│   │   └── DiaryEntry.tsx         # Entry renderer
 │   ├── home/                      # Home page components
+│   │   ├── HeroSection.tsx        # Hero with stats + CTA
+│   │   ├── AppSection.tsx         # Application cards (Workspace, Data Studio, Video Studio)
+│   │   ├── CapabilitiesGrid.tsx   # Scientific capabilities grid
+│   │   ├── ShowcasePreview.tsx    # Showcase preview
+│   │   ├── ExperimentalSection.tsx # OpenClaw Lab + Blog highlights
+│   │   ├── WhatsNewSection.tsx    # Ship Log / recent updates
 │   │   └── RecentSessions.tsx     # Unified project view
+│   ├── layout/                    # Layout components
+│   │   ├── Header.tsx             # Sticky nav (Workspace, Directory, Showcase, Blog)
+│   │   └── Footer.tsx             # Footer (Applications + Content columns)
 │   ├── workspace/                 # Workspace components
 │   │   ├── ProjectSidebar.tsx
+│   │   ├── MobileTerminalInput.tsx
 │   │   ├── NoteCard.tsx
 │   │   ├── NoteEditor.tsx
 │   │   └── DataBrowser.tsx
 │   ├── ui/
+│   │   ├── MobileMenu.tsx         # Hamburger menu for mobile nav
 │   │   └── ToastProvider.tsx
 │   └── ErrorBoundary.tsx          # React error boundary with fallback UI
 ├── lib/
@@ -64,11 +92,16 @@ apps/web/
 │   │   ├── dataStudio.ts          # dataStudioApi, dataStudioV2Api
 │   │   ├── types.ts               # Shared API types
 │   │   └── index.ts               # Re-exports (backward compatible)
+│   ├── blog.ts                    # Blog utilities (gray-matter frontmatter parsing)
 │   └── types.ts                   # TypeScript types
 ├── data/
+│   ├── blog/                      # Blog post markdown files (frontmatter + MDX)
+│   ├── diary/                     # Diary entry markdown files
 │   └── ccresearch/
 │       ├── capabilities.json      # Plugins, MCP servers
 │       └── use-cases.json         # Example prompts
+├── public/
+│   └── blog/images/               # Blog post images
 ├── package.json
 └── next.config.ts
 ```
@@ -300,6 +333,55 @@ AI-powered video creation using a real Claude Code PTY terminal with full skill/
     └── CLAUDE.md          # Minimal instructions
 ```
 
+### Blog System (`/blog`)
+
+Markdown-powered blog with frontmatter metadata, served via filesystem-backed API routes.
+
+**Features:**
+- Blog listing page with tag filtering
+- Individual post pages at `/blog/[slug]`
+- Comment system component
+- Draft support at `/blog/drafts/`
+- Images served from `public/blog/images/`
+
+**Data Flow:**
+1. Blog posts stored as markdown in `data/blog/` with gray-matter frontmatter
+2. API route `/api/blog/posts` reads and parses the files
+3. `lib/blog.ts` provides utilities for frontmatter parsing
+4. Components in `components/blog/` render the posts
+
+**Frontmatter Fields:** title, date, author, tags, excerpt, image, published
+
+### Agent Diary (`/diary`)
+
+Calendar-based diary showing AI agent activity logs and development notes.
+
+**Features:**
+- Calendar navigation (DiaryCalendar component)
+- Entry renderer (DiaryEntry component)
+- API route `/api/diary/entries` reads from `data/diary/`
+
+### Login Page (`/login`)
+
+Standalone login page (alternative to the modal-based login).
+
+### Landing Page (`/`)
+
+Home page composed of modular sections:
+
+| Section | Component | Description |
+|---------|-----------|-------------|
+| Hero | `HeroSection.tsx` | Animated stats, tagline, CTA buttons |
+| Applications | `AppSection.tsx` | Cards for Workspace, Data Studio, Video Studio |
+| Capabilities | `CapabilitiesGrid.tsx` | Scientific tools and databases grid |
+| Showcase | `ShowcasePreview.tsx` | Featured use cases |
+| Experimental Lab | `ExperimentalSection.tsx` | OpenClaw multi-agent AI (Alfred + Pip), blog highlights |
+| Ship Log | `WhatsNewSection.tsx` | Recent updates (Opus 4.6, agents, security, etc.) |
+
+**Navigation:**
+- **Header** (`layout/Header.tsx`): Sticky nav with Workspace, Directory, Showcase, Blog + mobile hamburger menu
+- **Footer** (`layout/Footer.tsx`): Three-column layout (Logo, Applications, Content)
+
 ---
 
 ## Authentication
@@ -457,7 +539,7 @@ apps/web/data/ccresearch/
 **File:** `apps/web/.env.local`
 
 ```env
-# Production (deployed on Raspberry Pi via Cloudflare tunnel)
+# Production (deployed on Mac Mini via Cloudflare tunnel)
 NEXT_PUBLIC_API_BASE_URL=https://api.orpheuscore.uk
 
 # Development (local only - change when testing locally)
@@ -538,6 +620,15 @@ npm run start
 
 | Date | Change |
 |------|--------|
+| 2026-02-07 | **Landing Page:** ExperimentalSection (OpenClaw Lab + blog highlights) and WhatsNewSection (Ship Log) |
+| 2026-02-07 | **NEW: Blog System** - Markdown blog with frontmatter, API routes, tag filtering, comments |
+| 2026-02-07 | **NEW: Agent Diary** - Calendar-based diary with API routes |
+| 2026-02-07 | **NEW: Login Page** - Standalone login at `/login` |
+| 2026-02-07 | **Layout:** Shared Header (added Blog nav) and Footer (Applications + Content columns) |
+| 2026-02-07 | **Home:** Modular sections (Hero, Apps, Capabilities, Showcase, Experimental, WhatsNew) |
+| 2026-02-07 | **FIX: Mobile Terminal Font** - Reduced xterm.js fontSize from 16 to 12 on mobile (canvas doesn't trigger iOS auto-zoom) |
+| 2026-02-07 | **.gitignore:** Added db backups, recordings symlink, blog generation artifacts |
+| 2026-02-07 | **README:** Complete rewrite with OpenClaw, blog links, all 3 apps, security details |
 | 2026-02-06 | **AUDIT: Quality & Security** - Split api.ts into modular lib/api/ directory, ErrorBoundary component, fixed 25 any-type violations, hardened DOMPurify config, fixed dynamic Tailwind classes, added ARIA labels, lazy loading for heavy deps, removed 24 console statements, next/image optimization, CSRF headers on all mutation requests |
 | 2026-02-04 | **FIX: Mobile Viewport** - Added viewport meta tag for proper mobile device scaling |
 | 2026-02-04 | **FIX: Auth Token Refresh** - AuthProvider now uses ref to track login state, avoiding stale closure |

@@ -199,7 +199,7 @@ function VideoStudioContent() {
           brightWhite: '#f0f6fc'
         },
         fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-        fontSize: window.innerWidth < 768 ? 16 : 13,
+        fontSize: window.innerWidth < 768 ? 12 : 13,
         lineHeight: 1.4,
         cursorBlink: true,
         cursorStyle: 'block',
