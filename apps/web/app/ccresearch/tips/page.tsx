@@ -193,7 +193,7 @@ export default function TipsPage() {
               <li>Verify results and iterate if needed</li>
             </ol>
             <p className="text-sm text-slate-400 mt-3">
-              In CCResearch sessions, Claude has access to 145+ scientific skills, 34 MCP servers, and 14 plugins.
+              In CCResearch sessions, Claude has access to 145+ scientific skills, 34 MCP servers, and 15 plugins.
             </p>
           </div>
         </div>

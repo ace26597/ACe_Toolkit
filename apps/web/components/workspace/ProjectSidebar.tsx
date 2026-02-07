@@ -71,7 +71,7 @@ export default function ProjectSidebar({
   // Collapsed view - just icons
   if (isCollapsed) {
     return (
-      <aside className="w-14 bg-slate-800/50 border-r border-slate-700 flex flex-col transition-all duration-200">
+      <aside className="w-14 h-full bg-slate-800/50 border-r border-slate-700 flex flex-col transition-all duration-200">
         {/* Header */}
         <div className="p-2 border-b border-slate-700 flex flex-col items-center gap-2">
           <button
@@ -136,7 +136,7 @@ export default function ProjectSidebar({
 
   // Expanded view
   return (
-    <aside className="w-64 bg-slate-800/50 border-r border-slate-700 flex flex-col transition-all duration-200">
+    <aside className="w-64 h-full bg-slate-800/50 border-r border-slate-700 flex flex-col transition-all duration-200">
       {/* Header */}
       <div className="p-4 border-b border-slate-700">
         <div className="flex items-center justify-between">

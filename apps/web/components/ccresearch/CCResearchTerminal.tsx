@@ -23,6 +23,7 @@ interface CCResearchTerminalProps {
   onResize?: (rows: number, cols: number) => void;
   onStatusChange?: (connected: boolean) => void;
   onAutomation?: (notification: AutomationNotification) => void;
+  onImagePaste?: (file: File) => Promise<string | null>; // Returns file path on success
   className?: string;
   // Ref for imperative control (e.g., mobile input)
   inputRef?: React.MutableRefObject<CCResearchTerminalHandle | null>;
@@ -43,6 +44,7 @@ export default function CCResearchTerminal({
   onResize,
   onStatusChange,
   onAutomation,
+  onImagePaste,
   className = '',
   inputRef
 }: CCResearchTerminalProps) {
@@ -50,10 +52,17 @@ export default function CCResearchTerminal({
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const onImagePasteRef = useRef(onImagePaste); // Ref to avoid useEffect dependency
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 3;
+
+  // Keep ref in sync with prop
+  useEffect(() => {
+    onImagePasteRef.current = onImagePaste;
+  }, [onImagePaste]);
 
   // Track last dimensions to avoid unnecessary resizes
   const lastDimensions = useRef<{ rows: number; cols: number } | null>(null);
@@ -66,6 +75,46 @@ export default function CCResearchTerminal({
       wsRef.current.send(encoder.encode(text));
     }
   }, []);
+
+  // Handle paste events - intercept images and upload them
+  const handlePaste = useCallback(async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items || !onImagePaste) return;
+
+    // Check for image in clipboard
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type.startsWith('image/')) {
+        e.preventDefault(); // Prevent default paste behavior
+
+        const file = item.getAsFile();
+        if (!file) continue;
+
+        // Generate filename with timestamp
+        const ext = file.type.split('/')[1] || 'png';
+        const filename = `pasted-image-${Date.now()}.${ext}`;
+        const namedFile = new File([file], filename, { type: file.type });
+
+        setUploadingImage(true);
+        xtermRef.current?.write('\r\n\x1b[1;33m📷 Uploading pasted image...\x1b[0m');
+
+        try {
+          const filePath = await onImagePaste(namedFile);
+          if (filePath) {
+            xtermRef.current?.write(`\r\n\x1b[1;32m✓ Image saved: ${filePath}\x1b[0m\r\n`);
+            xtermRef.current?.write(`\x1b[36m💡 To analyze: "Read the image at ${filePath} and describe what you see"\x1b[0m\r\n\r\n`);
+          } else {
+            xtermRef.current?.write('\r\n\x1b[1;31m✗ Failed to upload image\x1b[0m\r\n');
+          }
+        } catch (err) {
+          xtermRef.current?.write(`\r\n\x1b[1;31m✗ Upload error: ${err}\x1b[0m\r\n`);
+        } finally {
+          setUploadingImage(false);
+        }
+        return; // Only handle first image
+      }
+    }
+  }, [onImagePaste]);
 
   // Expose sendInput function via inputRef
   useEffect(() => {
@@ -123,10 +172,13 @@ export default function CCResearchTerminal({
     if (!terminalRef.current) return;
 
     // Create terminal instance with Tokyo Night theme
+    // 16px on mobile prevents iOS Safari auto-zoom on input focus
+    const isMobileDevice = window.innerWidth < 768;
+
     const term = new XTerm({
       cursorBlink: true,
       cursorStyle: 'block',
-      fontSize: 14,
+      fontSize: isMobileDevice ? 16 : 14,
       fontFamily: 'Menlo, Monaco, "Courier New", monospace',
       theme: {
         background: '#1a1b26',
@@ -297,6 +349,54 @@ export default function CCResearchTerminal({
       }
     });
 
+    // Intercept Ctrl+V to check for images in clipboard
+    term.attachCustomKeyEventHandler((event) => {
+      // Check for Ctrl+V or Cmd+V (paste)
+      if ((event.ctrlKey || event.metaKey) && event.key === 'v' && event.type === 'keydown') {
+        // Use the Clipboard API to check for images
+        navigator.clipboard.read().then(async (items) => {
+          for (const item of items) {
+            // Check if clipboard has image
+            const imageType = item.types.find(type => type.startsWith('image/'));
+            if (imageType) {
+              try {
+                const blob = await item.getType(imageType);
+                const ext = imageType.split('/')[1] || 'png';
+                const filename = `pasted-image-${Date.now()}.${ext}`;
+                const file = new File([blob], filename, { type: imageType });
+
+                // Call the image paste handler
+                if (onImagePasteRef.current) {
+                  setUploadingImage(true);
+                  term.write('\r\n\x1b[1;33m📷 Uploading pasted image...\x1b[0m');
+
+                  const filePath = await onImagePasteRef.current(file);
+                  if (filePath) {
+                    term.write(`\r\n\x1b[1;32m✓ Image saved: ${filePath}\x1b[0m\r\n`);
+                    term.write(`\x1b[36m💡 To analyze: "Read the image at ${filePath} and describe what you see"\x1b[0m\r\n\r\n`);
+                  } else {
+                    term.write('\r\n\x1b[1;31m✗ Failed to upload image\x1b[0m\r\n');
+                  }
+                  setUploadingImage(false);
+                }
+              } catch (err) {
+                // Failed to read image from clipboard - silently handled
+              }
+              return; // Don't process further - we handled the image
+            }
+          }
+        }).catch((err) => {
+          // Clipboard API failed (permissions or not supported)
+          // Let the default paste behavior happen for text
+          console.debug('Clipboard read failed, using default paste:', err);
+        });
+
+        // Return true to let xterm handle the paste (for text content)
+        return true;
+      }
+      return true; // Let all other keys through
+    });
+
     // Handle window resize with debouncing
     window.addEventListener('resize', handleResize);
 
@@ -357,11 +457,20 @@ export default function CCResearchTerminal({
         </div>
       )}
 
+      {/* Image upload indicator */}
+      {uploadingImage && (
+        <div className="absolute top-10 left-2 right-2 z-10 bg-amber-900/90 text-amber-200 px-3 py-2 rounded-md text-sm flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-amber-200 border-t-transparent rounded-full animate-spin" />
+          Uploading image...
+        </div>
+      )}
+
       {/* Terminal container - click to focus, prevent scroll issues */}
       <div
         ref={terminalRef}
         className="w-full h-full overflow-hidden"
         onClick={() => xtermRef.current?.focus()}
+        onPaste={handlePaste}
         onWheel={(e) => {
           // Prevent wheel events from bubbling to parent (browser scroll)
           e.stopPropagation();

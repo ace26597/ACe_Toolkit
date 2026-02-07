@@ -28,13 +28,13 @@ echo "$(date): Starting Frontend..." | tee -a "$LOG_FILE"
 bash "$SCRIPT_DIR/start_frontend.sh"
 sleep 5
 
-# Check Cloudflared status
+# Check Cloudflared status (macOS compatible)
 echo "$(date): Checking Cloudflare Tunnel status..." | tee -a "$LOG_FILE"
-if systemctl is-active --quiet cloudflared; then
+if pgrep -x cloudflared > /dev/null; then
     echo "$(date): Cloudflare Tunnel is running" | tee -a "$LOG_FILE"
 else
     echo "$(date): WARNING - Cloudflare Tunnel is not running!" | tee -a "$LOG_FILE"
-    echo "$(date): Start it with: sudo systemctl start cloudflared" | tee -a "$LOG_FILE"
+    echo "$(date): Start it with: /opt/homebrew/bin/cloudflared tunnel run" | tee -a "$LOG_FILE"
 fi
 
 echo "========================================" | tee -a "$LOG_FILE"

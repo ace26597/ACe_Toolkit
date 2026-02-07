@@ -41,6 +41,7 @@ yarn-error.log*
 *.sqlite
 *.sqlite3
 *.db
+*.db.mac_backup
 app.db
 mermaid.db
 mermaid.sqlite
@@ -70,3 +71,11 @@ temp/
 *.tmp
 .cache/
 apps/web/public/mcp-protocol-video.mp4
+
+# Symlinks to local storage (machine-specific)
+apps/web/public/recordings
+
+# Blog generation artifacts (not content)
+apps/web/public/blog/images/index.html
+apps/web/public/blog/images/prompts.json
+apps/web/public/blog/posts/

@@ -16,6 +16,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import AsyncGenerator, Dict, List, Optional
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,7 +48,7 @@ class DataStudioManager:
 
     def _get_project_dir(self, user_id: str, project_name: str) -> str:
         """Get the project directory path."""
-        return f"/data/users/{user_id}/projects/{project_name}"
+        return os.path.join(settings.DATA_BASE_DIR, "users", user_id, "projects", project_name)
 
     def _generate_claude_session_id(self, user_id: str, project_name: str) -> str:
         """Generate a deterministic UUID for Claude session based on user+project."""

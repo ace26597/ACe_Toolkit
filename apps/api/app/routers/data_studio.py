@@ -16,6 +16,7 @@ from pydantic import BaseModel
 
 from app.core.data_studio_manager import data_studio_manager, DataStudioSession
 from app.core.user_access import require_valid_access
+from app.core.config import settings
 from app.models.models import User
 
 logger = logging.getLogger(__name__)
@@ -250,7 +251,7 @@ async def websocket_endpoint(
 
 def _get_dashboards_dir(user_id: str, project_name: str) -> str:
     """Get the dashboards directory for a project."""
-    return f"/data/users/{user_id}/projects/{project_name}/.data-studio/dashboards"
+    return os.path.join(settings.DATA_BASE_DIR, "users", user_id, "projects", project_name, ".data-studio", "dashboards")
 
 
 @router.get("/dashboards/{project_name}")
@@ -353,7 +354,7 @@ async def list_project_files(
     user: User = Depends(require_valid_access)
 ):
     """List data files in a project."""
-    project_dir = f"/data/users/{user.id}/projects/{project_name}"
+    project_dir = os.path.join(settings.DATA_BASE_DIR, "users", str(user.id), "projects", project_name)
 
     if not os.path.exists(project_dir):
         raise HTTPException(status_code=404, detail="Project not found")

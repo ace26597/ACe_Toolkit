@@ -19,10 +19,12 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Callable
 import pexpect
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
-# Shared template location
-TEMPLATE_DIR = Path("/data/video-studio-template")
+# Shared template location (uses config for Mac/Pi compatibility)
+TEMPLATE_DIR = Path(settings.DATA_BASE_DIR) / "video-studio-template"
 
 
 @dataclass
@@ -38,7 +40,7 @@ class VideoStudioManager:
 
     def __init__(self):
         self.processes: Dict[str, ProcessInfo] = {}
-        self.base_dir = Path("/data/users")
+        self.base_dir = Path(settings.DATA_BASE_DIR) / "users"
         self.template_dir = TEMPLATE_DIR
 
     def get_user_studio_dir(self, user_id: str) -> Path:
@@ -481,11 +483,18 @@ Create a video based on the user's idea. Use your full capabilities.
         env['PWD'] = str(project_dir)
         env['NODE_PATH'] = '/usr/lib/node_modules'
 
-        # Find claude binary
+        # Find claude binary - check common locations (macOS and Linux)
         import shutil
         claude_bin = shutil.which('claude')
         if not claude_bin:
-            for path in ['/home/ace/.local/bin/claude', '/usr/local/bin/claude', '/usr/bin/claude']:
+            home = str(Path.home())
+            search_paths = [
+                f'{home}/.local/bin/claude',           # User install (both OS)
+                '/opt/homebrew/bin/claude',            # Homebrew (macOS ARM)
+                '/usr/local/bin/claude',               # Homebrew (macOS Intel) / Linux
+                '/usr/bin/claude',                     # System (Linux)
+            ]
+            for path in search_paths:
                 if os.path.isfile(path) and os.access(path, os.X_OK):
                     claude_bin = path
                     break

@@ -444,18 +444,23 @@ _oauth_states: dict = {}
 
 
 @router.get("/google")
-async def google_login(request: Request):
+async def google_login(request: Request, redirect: Optional[str] = None):
     """Redirect to Google OAuth consent screen."""
     if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
         raise HTTPException(status_code=500, detail="Google OAuth not configured")
 
+    # Validate redirect param (prevent open redirect attacks)
+    safe_redirect = "/workspace"
+    if redirect and redirect.startswith("/") and not redirect.startswith("//"):
+        safe_redirect = redirect
+
     # Generate state for CSRF protection
     state = secrets.token_urlsafe(32)
-    _oauth_states[state] = datetime.utcnow()
+    _oauth_states[state] = {"timestamp": datetime.utcnow(), "redirect": safe_redirect}
 
     # Clean old states (older than 10 minutes)
     cutoff = datetime.utcnow() - timedelta(minutes=10)
-    expired = [k for k, v in _oauth_states.items() if v < cutoff]
+    expired = [k for k, v in _oauth_states.items() if (v.get("timestamp") if isinstance(v, dict) else v) < cutoff]
     for k in expired:
         _oauth_states.pop(k, None)
 
@@ -489,20 +494,22 @@ async def google_callback(
     """Handle Google OAuth callback."""
     is_production = settings.ADMIN_EMAIL == "ace.tech.gg@gmail.com"
     frontend_url = settings.FRONTEND_URL if is_production else "http://localhost:3000"
+    login_url = f"{frontend_url}/login"
 
     # Handle OAuth errors
     if error:
         logger.warning(f"Google OAuth error: {error}")
-        return RedirectResponse(url=f"{frontend_url}?error=oauth_denied")
+        return RedirectResponse(url=f"{login_url}?error=oauth_denied")
 
     if not code or not state:
-        return RedirectResponse(url=f"{frontend_url}?error=oauth_invalid")
+        return RedirectResponse(url=f"{login_url}?error=oauth_invalid")
 
     # Verify state (CSRF protection)
     if state not in _oauth_states:
         logger.warning("Invalid OAuth state - possible CSRF attempt")
-        return RedirectResponse(url=f"{frontend_url}?error=oauth_invalid_state")
-    _oauth_states.pop(state)
+        return RedirectResponse(url=f"{login_url}?error=oauth_invalid_state")
+    state_data = _oauth_states.pop(state)
+    post_login_redirect = state_data.get("redirect", "/workspace") if isinstance(state_data, dict) else "/workspace"
 
     # Determine redirect URI (must match what was sent to Google)
     redirect_uri = f"{settings.OAUTH_REDIRECT_BASE}/auth/google/callback" if is_production else "http://localhost:8000/auth/google/callback"
@@ -523,7 +530,7 @@ async def google_callback(
 
             if token_response.status_code != 200:
                 logger.error(f"Google token exchange failed: {token_response.text}")
-                return RedirectResponse(url=f"{frontend_url}?error=oauth_token_failed")
+                return RedirectResponse(url=f"{login_url}?error=oauth_token_failed")
 
             tokens = token_response.json()
             access_token = tokens.get("access_token")
@@ -536,7 +543,7 @@ async def google_callback(
 
             if userinfo_response.status_code != 200:
                 logger.error(f"Google userinfo failed: {userinfo_response.text}")
-                return RedirectResponse(url=f"{frontend_url}?error=oauth_userinfo_failed")
+                return RedirectResponse(url=f"{login_url}?error=oauth_userinfo_failed")
 
             userinfo = userinfo_response.json()
 
@@ -547,7 +554,7 @@ async def google_callback(
         avatar_url = userinfo.get("picture")
 
         if not email:
-            return RedirectResponse(url=f"{frontend_url}?error=oauth_no_email")
+            return RedirectResponse(url=f"{login_url}?error=oauth_no_email")
 
         # Find or create user
         result = await db.execute(select(User).where(User.email == email))
@@ -596,7 +603,7 @@ async def google_callback(
         # Check trial status
         trial_info = check_trial_status(user)
         if not trial_info["has_access"]:
-            return RedirectResponse(url=f"{frontend_url}?error=trial_expired")
+            return RedirectResponse(url=f"{login_url}?error=trial_expired")
 
         # Create JWT tokens
         token_days = APPROVED_USER_COOKIE_DAYS if (user.is_admin or user.is_approved) else TRIAL_USER_COOKIE_DAYS
@@ -612,8 +619,8 @@ async def google_callback(
         db.add(rt_entry)
         await db.commit()
 
-        # Create redirect response with cookies
-        redirect_response = RedirectResponse(url=f"{frontend_url}/workspace", status_code=302)
+        # Create redirect response with cookies (use stored redirect from OAuth state)
+        redirect_response = RedirectResponse(url=f"{frontend_url}{post_login_redirect}", status_code=302)
 
         cookie_seconds = token_days * 24 * 60 * 60
         cookie_kwargs = get_cookie_kwargs()
@@ -637,7 +644,7 @@ async def google_callback(
 
     except Exception as e:
         logger.exception(f"Google OAuth error: {e}")
-        return RedirectResponse(url=f"{frontend_url}?error=oauth_server_error")
+        return RedirectResponse(url=f"{login_url}?error=oauth_server_error")
 
 
 # ==================== Admin Endpoints ====================

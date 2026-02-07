@@ -42,3 +42,111 @@ body {
   background: rgba(59, 130, 246, 0.3);
   color: #fff;
 }
+
+/* Command Center - Dot grid background */
+.dot-grid {
+  background-image: radial-gradient(circle, rgba(59, 130, 246, 0.15) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Command Center - Glow effects */
+.glow-blue {
+  box-shadow: 0 0 30px rgba(59, 130, 246, 0.15);
+}
+.glow-cyan {
+  box-shadow: 0 0 30px rgba(6, 182, 212, 0.15);
+}
+.glow-violet {
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.15);
+}
+.glow-green {
+  box-shadow: 0 0 30px rgba(34, 197, 94, 0.15);
+}
+.glow-amber {
+  box-shadow: 0 0 30px rgba(245, 158, 11, 0.15);
+}
+.glow-rose {
+  box-shadow: 0 0 30px rgba(244, 63, 94, 0.15);
+}
+.glow-red {
+  box-shadow: 0 0 30px rgba(239, 68, 68, 0.15);
+}
+.glow-indigo {
+  box-shadow: 0 0 30px rgba(99, 102, 241, 0.15);
+}
+
+/* Command Center - Pulsing dot animation */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Command Center - Grid line animation */
+@keyframes grid-shift {
+  0% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+  100% { opacity: 0.3; }
+}
+.grid-animate {
+  animation: grid-shift 8s ease-in-out infinite;
+}
+
+/* Command Center - Scan line */
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+.scan-line {
+  animation: scan-line 8s linear infinite;
+}
+
+/* Command Center - Glow pulse for terminal */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.1), 0 0 60px rgba(59, 130, 246, 0.05); }
+  50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.2), 0 0 80px rgba(59, 130, 246, 0.1); }
+}
+.glow-pulse {
+  animation: glow-pulse 4s ease-in-out infinite;
+}
+
+/* Command Center - Fade in up */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+.fade-in-up-delay-1 {
+  animation: fade-in-up 0.6s ease-out 0.1s forwards;
+  opacity: 0;
+}
+.fade-in-up-delay-2 {
+  animation: fade-in-up 0.6s ease-out 0.2s forwards;
+  opacity: 0;
+}
+.fade-in-up-delay-3 {
+  animation: fade-in-up 0.6s ease-out 0.3s forwards;
+  opacity: 0;
+}
+.fade-in-up-delay-4 {
+  animation: fade-in-up 0.6s ease-out 0.4s forwards;
+  opacity: 0;
+}
+
+/* Safe area insets for mobile devices with notch/home indicator */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Hide scrollbar on PTY key toolbar while keeping scroll functionality */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

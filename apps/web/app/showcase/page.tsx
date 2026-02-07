@@ -296,7 +296,7 @@ export default function ShowcasePage() {
             Showcase
           </h1>
           <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-            See what's possible when Claude Code has access to 145+ skills, 34 MCP servers, and 14 plugins.
+            See what's possible when Claude Code has access to 145+ skills, 34 MCP servers, and 15 plugins.
             These are real projects created using C3 Researcher.
           </p>
           <p className="text-xs text-slate-600 mt-4">Last updated: January 2026</p>

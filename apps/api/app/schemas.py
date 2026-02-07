@@ -305,4 +305,3 @@ class SandboxFileSchema(BaseModel):
     size: int
     is_dir: bool
     modified_at: str
-

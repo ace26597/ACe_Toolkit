@@ -5,7 +5,7 @@
 set -e
 
 # Configuration
-PROJECT_DIR="/home/ace/dev/ACe_Toolkit"
+PROJECT_DIR="/Users/blest/dev/ACe_Toolkit"
 API_DIR="$PROJECT_DIR/apps/api"
 LOG_DIR="$PROJECT_DIR/logs"
 VENV_PATH="$API_DIR/.venv"

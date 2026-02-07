@@ -5,7 +5,7 @@
 set -e
 
 # Configuration
-PROJECT_DIR="/home/ace/dev/ACe_Toolkit"
+PROJECT_DIR="/Users/blest/dev/ACe_Toolkit"
 WEB_DIR="$PROJECT_DIR/apps/web"
 LOG_DIR="$PROJECT_DIR/logs"
 

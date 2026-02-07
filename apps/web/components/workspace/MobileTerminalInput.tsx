@@ -3,10 +3,6 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   CornerDownLeft,
-  ArrowUp,
-  ArrowDown,
-  XCircle,
-  Space,
   ChevronRight,
   History,
   Keyboard
@@ -19,8 +15,11 @@ interface MobileTerminalInputProps {
 }
 
 /**
- * Mobile-friendly terminal input with command history and quick actions
- * Provides easier typing on mobile devices with soft keyboards
+ * Mobile-friendly terminal input with PTY escape key toolbar and text input.
+ *
+ * Row 1: Scrollable PTY key buttons that send escape sequences directly to the terminal.
+ *         Arrow Up/Down send \x1b[A / \x1b[B for Claude Code history navigation.
+ * Row 2: Text input field with send button and local command history popup.
  */
 export function MobileTerminalInput({
   onSendInput,
@@ -29,7 +28,6 @@ export function MobileTerminalInput({
 }: MobileTerminalInputProps) {
   const [input, setInput] = useState('');
   const [commandHistory, setCommandHistory] = useState<string[]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
   const [showHistory, setShowHistory] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -38,7 +36,7 @@ export function MobileTerminalInput({
     const saved = localStorage.getItem('terminal_command_history');
     if (saved) {
       try {
-        setCommandHistory(JSON.parse(saved).slice(0, 50)); // Keep last 50
+        setCommandHistory(JSON.parse(saved).slice(0, 50));
       } catch {
         // Ignore invalid JSON
       }
@@ -49,7 +47,7 @@ export function MobileTerminalInput({
   const saveToHistory = useCallback((cmd: string) => {
     if (!cmd.trim()) return;
     setCommandHistory(prev => {
-      const filtered = prev.filter(c => c !== cmd); // Remove duplicates
+      const filtered = prev.filter(c => c !== cmd);
       const updated = [cmd, ...filtered].slice(0, 50);
       localStorage.setItem('terminal_command_history', JSON.stringify(updated));
       return updated;
@@ -59,7 +57,6 @@ export function MobileTerminalInput({
   // Send the current input
   const handleSend = useCallback(() => {
     if (!input.trim() && input !== '') {
-      // Just send Enter for empty input
       onSendInput('\r');
       return;
     }
@@ -67,90 +64,19 @@ export function MobileTerminalInput({
     saveToHistory(input);
     onSendInput(input + '\r');
     setInput('');
-    setHistoryIndex(-1);
     inputRef.current?.focus();
   }, [input, onSendInput, saveToHistory]);
 
-  // Handle keyboard submit
+  // Handle keyboard submit (Enter only - arrow keys are handled by toolbar)
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (commandHistory.length > 0) {
-        const newIndex = Math.min(historyIndex + 1, commandHistory.length - 1);
-        setHistoryIndex(newIndex);
-        setInput(commandHistory[newIndex] || '');
-      }
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      if (historyIndex > 0) {
-        const newIndex = historyIndex - 1;
-        setHistoryIndex(newIndex);
-        setInput(commandHistory[newIndex] || '');
-      } else {
-        setHistoryIndex(-1);
-        setInput('');
-      }
     }
-  }, [handleSend, commandHistory, historyIndex]);
-
-  // Navigate history
-  const navigateHistory = useCallback((direction: 'up' | 'down') => {
-    if (direction === 'up' && commandHistory.length > 0) {
-      const newIndex = Math.min(historyIndex + 1, commandHistory.length - 1);
-      setHistoryIndex(newIndex);
-      setInput(commandHistory[newIndex] || '');
-    } else if (direction === 'down') {
-      if (historyIndex > 0) {
-        const newIndex = historyIndex - 1;
-        setHistoryIndex(newIndex);
-        setInput(commandHistory[newIndex] || '');
-      } else {
-        setHistoryIndex(-1);
-        setInput('');
-      }
-    }
-    inputRef.current?.focus();
-  }, [commandHistory, historyIndex]);
-
-  // Quick action buttons configuration
-  const quickActions = [
-    {
-      icon: <XCircle className="w-4 h-4" />,
-      label: 'Ctrl+C',
-      action: () => onSendControlSequence('\x03'),
-      className: 'text-red-400 hover:bg-red-400/20'
-    },
-    {
-      icon: <span className="text-xs font-mono">Tab</span>,
-      label: 'Tab',
-      action: () => onSendInput('\t'),
-      className: 'text-blue-400 hover:bg-blue-400/20'
-    },
-    {
-      icon: <ArrowUp className="w-4 h-4" />,
-      label: 'Up',
-      action: () => navigateHistory('up'),
-      className: 'text-slate-400 hover:bg-slate-400/20'
-    },
-    {
-      icon: <ArrowDown className="w-4 h-4" />,
-      label: 'Down',
-      action: () => navigateHistory('down'),
-      className: 'text-slate-400 hover:bg-slate-400/20'
-    },
-    {
-      icon: <History className="w-4 h-4" />,
-      label: 'History',
-      action: () => setShowHistory(!showHistory),
-      className: showHistory ? 'text-green-400 bg-green-400/20' : 'text-slate-400 hover:bg-slate-400/20'
-    },
-  ];
+  }, [handleSend]);
 
   return (
-    <div className="md:hidden bg-slate-900 border-t border-slate-700">
+    <div className="md:hidden bg-slate-900 border-t border-slate-700 safe-area-bottom">
       {/* Command history dropdown */}
       {showHistory && commandHistory.length > 0 && (
         <div className="max-h-32 overflow-y-auto border-b border-slate-700 bg-slate-950">
@@ -171,51 +97,42 @@ export function MobileTerminalInput({
         </div>
       )}
 
-      {/* Quick action buttons */}
-      <div className="flex items-center gap-1 px-2 py-2 border-b border-slate-800 overflow-x-auto">
-        {quickActions.map((action, i) => (
-          <button
-            key={i}
-            onClick={action.action}
-            disabled={disabled}
-            className={`
-              flex items-center justify-center min-w-[44px] h-9 px-3 rounded-lg
-              transition-colors text-xs font-medium
-              disabled:opacity-50 disabled:cursor-not-allowed
-              ${action.className}
-            `}
-            title={action.label}
-          >
-            {action.icon}
-          </button>
-        ))}
+      {/* Row 1: PTY Keys Toolbar (horizontally scrollable) */}
+      <div className="flex items-center gap-1.5 px-2 py-2 border-b border-slate-800 overflow-x-auto scrollbar-hide">
+        {/* Control keys group */}
+        <PtyButton label="Esc" seq={'\x1b'} color="yellow" disabled={disabled} onSend={onSendControlSequence} />
+        <PtyButton label="Tab" seq={'\t'} color="blue" disabled={disabled} onSend={onSendControlSequence} />
+        <PtyButton label="^C" seq={'\x03'} color="red" disabled={disabled} onSend={onSendControlSequence} />
+        <PtyButton label="^D" seq={'\x04'} color="orange" disabled={disabled} onSend={onSendControlSequence} />
+        <PtyButton label="^L" seq={'\x0c'} color="cyan" disabled={disabled} onSend={onSendControlSequence} />
 
-        {/* Common commands quick insert */}
+        {/* Divider */}
+        <div className="w-px h-7 bg-slate-700 mx-0.5 flex-shrink-0" />
+
+        {/* Arrow keys group */}
+        <PtyButton label="\u25C0" seq={'\x1b[D'} color="slate" disabled={disabled} onSend={onSendControlSequence} />
+        <PtyButton label="\u25B6" seq={'\x1b[C'} color="slate" disabled={disabled} onSend={onSendControlSequence} />
+        <PtyButton label="\u25B2" seq={'\x1b[A'} color="slate" disabled={disabled} onSend={onSendControlSequence} />
+        <PtyButton label="\u25BC" seq={'\x1b[B'} color="slate" disabled={disabled} onSend={onSendControlSequence} />
+
+        {/* Spacer + History toggle */}
         <div className="flex-1" />
         <button
-          onClick={() => { setInput('ls -la'); inputRef.current?.focus(); }}
+          onClick={() => setShowHistory(!showHistory)}
           disabled={disabled}
-          className="px-2 h-9 text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
+          className={`
+            flex items-center justify-center min-w-[44px] h-[44px] px-3 rounded-lg
+            transition-colors text-sm font-medium
+            disabled:opacity-50 disabled:cursor-not-allowed
+            ${showHistory ? 'text-green-400 bg-green-400/20' : 'text-slate-400 bg-slate-800/60 hover:bg-slate-700/60'}
+          `}
+          title="Command History"
         >
-          ls
-        </button>
-        <button
-          onClick={() => { setInput('cd '); inputRef.current?.focus(); }}
-          disabled={disabled}
-          className="px-2 h-9 text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
-        >
-          cd
-        </button>
-        <button
-          onClick={() => { setInput('cat '); inputRef.current?.focus(); }}
-          disabled={disabled}
-          className="px-2 h-9 text-xs text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-lg transition-colors"
-        >
-          cat
+          <History className="w-5 h-5" />
         </button>
       </div>
 
-      {/* Input field with send button */}
+      {/* Row 2: Text Input + Send */}
       <div className="flex items-center gap-2 p-2">
         <div className="flex-1 relative">
           <input
@@ -229,7 +146,7 @@ export function MobileTerminalInput({
             className="
               w-full h-11 px-4 pr-10
               bg-slate-800 border border-slate-700 rounded-xl
-              text-sm text-white placeholder-slate-500
+              text-base text-white placeholder-slate-500
               focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500
               disabled:opacity-50 disabled:cursor-not-allowed
               font-mono
@@ -261,8 +178,49 @@ export function MobileTerminalInput({
   );
 }
 
+/** Color map for PTY button variants */
+const colorMap = {
+  yellow: 'text-yellow-400 bg-yellow-400/10 hover:bg-yellow-400/25 active:bg-yellow-400/35',
+  blue:   'text-blue-400 bg-blue-400/10 hover:bg-blue-400/25 active:bg-blue-400/35',
+  red:    'text-red-400 bg-red-400/10 hover:bg-red-400/25 active:bg-red-400/35',
+  orange: 'text-orange-400 bg-orange-400/10 hover:bg-orange-400/25 active:bg-orange-400/35',
+  cyan:   'text-cyan-400 bg-cyan-400/10 hover:bg-cyan-400/25 active:bg-cyan-400/35',
+  slate:  'text-slate-200 bg-slate-700/50 hover:bg-slate-600/60 active:bg-slate-500/60',
+} as const;
+
+/** Individual PTY key button with tinted background for visibility */
+function PtyButton({
+  label,
+  seq,
+  color,
+  disabled,
+  onSend,
+}: {
+  label: string;
+  seq: string;
+  color: keyof typeof colorMap;
+  disabled: boolean;
+  onSend: (seq: string) => void;
+}) {
+  return (
+    <button
+      onClick={() => onSend(seq)}
+      disabled={disabled}
+      className={`
+        flex items-center justify-center min-w-[44px] h-[44px] px-2.5 rounded-lg
+        transition-colors text-sm font-semibold whitespace-nowrap flex-shrink-0
+        disabled:opacity-50 disabled:cursor-not-allowed
+        ${colorMap[color]}
+      `}
+      title={label}
+    >
+      {label}
+    </button>
+  );
+}
+
 /**
- * Compact version for when space is limited
+ * Compact version for when space is limited (e.g., Video Studio)
  */
 export function MobileTerminalInputCompact({
   onSendInput,
@@ -279,45 +237,45 @@ export function MobileTerminalInputCompact({
   }, [input, onSendInput]);
 
   return (
-    <div className="md:hidden flex items-center gap-2 p-2 bg-slate-900 border-t border-slate-700">
-      {/* Ctrl+C button */}
-      <button
-        onClick={() => onSendControlSequence('\x03')}
-        disabled={disabled}
-        className="w-10 h-10 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-400/20"
-        title="Ctrl+C"
-      >
-        <XCircle className="w-5 h-5" />
-      </button>
+    <div className="md:hidden bg-slate-900 border-t border-slate-700 safe-area-bottom">
+      {/* PTY Keys Row */}
+      <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-slate-800 overflow-x-auto scrollbar-hide">
+        <PtyButton label="^C" seq={'\x03'} color="red" disabled={disabled} onSend={onSendControlSequence} />
+        <PtyButton label="Tab" seq={'\t'} color="blue" disabled={disabled} onSend={onSendControlSequence} />
+        <div className="w-px h-6 bg-slate-700 mx-0.5 flex-shrink-0" />
+        <PtyButton label="\u25B2" seq={'\x1b[A'} color="slate" disabled={disabled} onSend={onSendControlSequence} />
+        <PtyButton label="\u25BC" seq={'\x1b[B'} color="slate" disabled={disabled} onSend={onSendControlSequence} />
+      </div>
 
-      {/* Input */}
-      <input
-        ref={inputRef}
-        type="text"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-        disabled={disabled}
-        placeholder="Command..."
-        className="
-          flex-1 h-10 px-3
-          bg-slate-800 border border-slate-700 rounded-lg
-          text-sm text-white placeholder-slate-500
-          focus:outline-none focus:border-blue-500
-          font-mono
-        "
-        autoCapitalize="none"
-        autoCorrect="off"
-      />
+      {/* Input Row */}
+      <div className="flex items-center gap-2 p-2">
+        <input
+          ref={inputRef}
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+          disabled={disabled}
+          placeholder="Command..."
+          className="
+            flex-1 h-10 px-3
+            bg-slate-800 border border-slate-700 rounded-lg
+            text-base text-white placeholder-slate-500
+            focus:outline-none focus:border-blue-500
+            font-mono
+          "
+          autoCapitalize="none"
+          autoCorrect="off"
+        />
 
-      {/* Send */}
-      <button
-        onClick={handleSend}
-        disabled={disabled}
-        className="w-10 h-10 flex items-center justify-center rounded-lg bg-blue-600 text-white"
-      >
-        <CornerDownLeft className="w-5 h-5" />
-      </button>
+        <button
+          onClick={handleSend}
+          disabled={disabled}
+          className="w-10 h-10 flex items-center justify-center rounded-lg bg-blue-600 text-white"
+        >
+          <CornerDownLeft className="w-5 h-5" />
+        </button>
+      </div>
     </div>
   );
 }

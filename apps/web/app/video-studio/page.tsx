@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { ProtectedRoute } from '@/components/auth';
 import { getApiUrl } from '@/lib/api';
+import { MobileTerminalInputCompact } from '@/components/workspace/MobileTerminalInput';
 
 // Dynamic import for xterm (client-side only)
 import type { Terminal as XTermType } from '@xterm/xterm';
@@ -198,7 +199,7 @@ function VideoStudioContent() {
           brightWhite: '#f0f6fc'
         },
         fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-        fontSize: 13,
+        fontSize: window.innerWidth < 768 ? 16 : 13,
         lineHeight: 1.4,
         cursorBlink: true,
         cursorStyle: 'block',
@@ -746,6 +747,22 @@ function VideoStudioContent() {
                   className="flex-1 bg-[#0d1117]"
                   style={{ padding: '8px' }}
                 />
+                {/* Mobile Terminal Input for Video Studio */}
+                {sessionActive && (
+                  <MobileTerminalInputCompact
+                    onSendInput={(input) => {
+                      if (wsRef.current?.readyState === WebSocket.OPEN) {
+                        wsRef.current.send(input);
+                      }
+                    }}
+                    onSendControlSequence={(seq) => {
+                      if (wsRef.current?.readyState === WebSocket.OPEN) {
+                        wsRef.current.send(seq);
+                      }
+                    }}
+                    disabled={!sessionActive}
+                  />
+                )}
               </div>
 
               {/* Videos Sidebar */}

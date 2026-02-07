@@ -24,25 +24,37 @@ export function useAuth() {
   return context;
 }
 
-// Refresh token every 12 hours to keep session alive
-const TOKEN_REFRESH_INTERVAL = 12 * 60 * 60 * 1000;
+// Refresh token every 10 minutes to keep session alive
+// This ensures tokens are refreshed well before the 15-min minimum expiry
+const TOKEN_REFRESH_INTERVAL = 10 * 60 * 1000;
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [trialInfo, setTrialInfo] = useState<TrialInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Track if user is logged in using a ref to avoid stale closure in interval
+  const isLoggedInRef = useRef<boolean>(false);
 
   const isTrialExpired = trialInfo?.trial_expired ?? false;
 
-  const refreshAuth = useCallback(async () => {
+  const refreshAuth = useCallback(async (): Promise<boolean> => {
     try {
       // First try to get status (uses access token)
       const status = await authApi.getStatus();
       setUser(status.user as AuthUser);
       setTrialInfo(status.trial);
+      isLoggedInRef.current = true;
       return true;
-    } catch {
+    } catch (error) {
+      // Check if it's a trial expiration error
+      if (error instanceof Error && error.message === 'trial_expired') {
+        setUser(null);
+        setTrialInfo({ has_access: false, is_trial: true, trial_expired: true, trial_expires_at: null });
+        isLoggedInRef.current = false;
+        return false;
+      }
+
       // If status fails, try to refresh the token
       try {
         await authApi.refresh();
@@ -50,28 +62,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const status = await authApi.getStatus();
         setUser(status.user as AuthUser);
         setTrialInfo(status.trial);
+        isLoggedInRef.current = true;
         return true;
-      } catch {
+      } catch (refreshError) {
+        // Check if refresh failed due to trial expiration
+        if (refreshError instanceof Error && refreshError.message === 'trial_expired') {
+          setTrialInfo({ has_access: false, is_trial: true, trial_expired: true, trial_expires_at: null });
+        } else {
+          setTrialInfo(null);
+        }
         // Refresh also failed, user is logged out
         setUser(null);
-        setTrialInfo(null);
+        isLoggedInRef.current = false;
         return false;
       }
     }
   }, []);
 
+  // Initial auth check on mount
   useEffect(() => {
-    // Check auth status on mount
     const checkAuth = async () => {
       await refreshAuth();
       setLoading(false);
     };
-
     checkAuth();
+  }, [refreshAuth]);
 
-    // Set up periodic token refresh for logged-in users
+  // Set up periodic token refresh - uses ref to avoid stale closure
+  useEffect(() => {
     refreshIntervalRef.current = setInterval(() => {
-      if (user) {
+      // Use ref instead of state to get current value
+      if (isLoggedInRef.current) {
         refreshAuth();
       }
     }, TOKEN_REFRESH_INTERVAL);
@@ -81,16 +102,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         clearInterval(refreshIntervalRef.current);
       }
     };
-  }, []);
+  }, [refreshAuth]);
 
   const login = async (email: string, password: string) => {
     const response = await authApi.login(email, password);
     setUser(response.user as AuthUser);
     setTrialInfo(response.trial);
+    isLoggedInRef.current = true;
   };
 
   const register = async (name: string, email: string, password: string) => {
-    const newUser = await authApi.register(name, email, password);
+    await authApi.register(name, email, password);
     // After registration, automatically log in
     await login(email, password);
   };
@@ -99,6 +121,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Always clear local state first, regardless of backend response
     setUser(null);
     setTrialInfo(null);
+    isLoggedInRef.current = false;
     try {
       await authApi.logout();
     } catch {

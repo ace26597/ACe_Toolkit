@@ -2019,9 +2019,9 @@ function WorkspaceContent() {
       </FileBrowserModal>
 
       {/* Main Content */}
-      <div className="flex h-[calc(100vh-60px)] md:h-[calc(100vh-60px)] pb-16 md:pb-0">
+      <div className="flex h-[calc(100vh-60px)] h-[calc(100dvh-60px)] md:h-[calc(100vh-60px)] pb-16 md:pb-0">
         {/* Desktop Project Sidebar */}
-        <div className="hidden md:block">
+        <div className="hidden md:block h-full">
           <ProjectSidebar
             projects={projects}
             selectedProject={selectedProject}
@@ -2522,7 +2522,7 @@ function WorkspaceContent() {
                 ) : (
                   <div className="h-full flex flex-col bg-slate-900/50 overflow-y-auto">
                     {/* Stats Bar */}
-                    <div className="flex-shrink-0 grid grid-cols-4 gap-2 p-4 border-b border-slate-800">
+                    <div className="flex-shrink-0 grid grid-cols-2 md:grid-cols-4 gap-2 p-4 border-b border-slate-800">
                       <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-2.5 text-center">
                         <div className="text-lg font-bold text-emerald-400">145+</div>
                         <div className="text-xs text-slate-500">Skills</div>

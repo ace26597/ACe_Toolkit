@@ -289,7 +289,7 @@ async def lifespan(app: FastAPI):
             try:
                 await asyncio.sleep(300)  # 5 minutes
                 cutoff = datetime.utcnow() - timedelta(minutes=10)
-                expired = [k for k, v in _oauth_states.items() if v < cutoff]
+                expired = [k for k, v in _oauth_states.items() if (v.get("timestamp") if isinstance(v, dict) else v) < cutoff]
                 for k in expired:
                     _oauth_states.pop(k, None)
                 if expired:

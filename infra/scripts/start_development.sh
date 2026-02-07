@@ -12,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-PROJECT_DIR="/home/ace/dev/ACe_Toolkit"
+PROJECT_DIR="/Users/blest/dev/ACe_Toolkit"
 API_DIR="$PROJECT_DIR/apps/api"
 WEB_DIR="$PROJECT_DIR/apps/web"
 LOG_DIR="$PROJECT_DIR/logs"
