@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "asciinema-player/dist/bundle/asciinema-player.css";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { AuthProvider } from "@/components/auth";

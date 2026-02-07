@@ -362,3 +362,48 @@ export const workspaceApi = {
         if (!res.ok) throw new Error('Failed to delete session');
     },
 };
+
+// ============ Recordings API (CCResearch session recordings) ============
+
+export interface RecordingInfo {
+    has_recording: boolean;
+    size_bytes: number;
+    filename?: string;
+    created_at?: string;
+    duration?: number;
+}
+
+export const recordingsApi = {
+    /** Check if a session has a recording */
+    hasRecording: async (sessionId: string): Promise<RecordingInfo> => {
+        const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${sessionId}/has-recording`, {
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to check recording');
+        return res.json();
+    },
+
+    /** List recordings for a session */
+    listRecordings: async (sessionId: string): Promise<RecordingInfo[]> => {
+        const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${sessionId}/recordings`, {
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to list recordings');
+        return res.json();
+    },
+
+    /** Get the URL for streaming a .cast recording */
+    getRecordingUrl: (sessionId: string): string => {
+        return `${getApiUrl()}/ccresearch/sessions/${sessionId}/recording`;
+    },
+
+    /** Delete a session recording */
+    deleteRecording: async (sessionId: string): Promise<void> => {
+        const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${sessionId}/recording`, {
+            method: 'DELETE',
+            headers: { ...CSRF_HEADERS },
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to delete recording');
+    },
+};

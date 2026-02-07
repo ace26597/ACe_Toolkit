@@ -18,6 +18,7 @@ Key Features:
 import asyncio
 import os
 import re
+import time
 import uuid
 import shutil
 import json
@@ -97,12 +98,12 @@ MAX_OPEN_FILES = settings.CCRESEARCH_MAX_OPEN_FILES
 #   - enabled: If False, rule is skipped (default True)
 #   - description: Human-readable description
 #
-# Rules are checked against the last ~2000 chars of output (rolling buffer)
+# Rules are checked against the last ~50K chars of output (rolling buffer)
 # ============================================================================
 
 # Automation disabled - was not working reliably with PTY
 AUTOMATION_RULES = []
-OUTPUT_BUFFER_SIZE = 2000
+OUTPUT_BUFFER_SIZE = 50000
 
 
 def _set_resource_limits():
@@ -543,6 +544,91 @@ head -20 data/FILENAME  # Replace FILENAME
 """
 
 
+class CastRecorder:
+    """Records terminal sessions in asciinema .cast v2 format.
+
+    Cast v2 format:
+    - Line 1: JSON header {"version": 2, "width": W, "height": H, "timestamp": T, ...}
+    - Subsequent lines: [time_offset, event_type, data]
+      - event_type: "o" for output, "i" for input
+      - time_offset: seconds since recording start (float)
+
+    Uses buffered writes to avoid flushing on every event. The buffer is
+    flushed periodically (every FLUSH_INTERVAL_EVENTS events or on close).
+    """
+
+    FLUSH_INTERVAL_EVENTS = 50  # Flush buffer every N events
+
+    def __init__(self, cast_path: Path, width: int = 80, height: int = 24):
+        self.cast_path = cast_path
+        self.start_time = time.time()
+        self._closed = False
+        self._buffer: list[str] = []
+        self._event_count = 0
+
+        # Write header immediately
+        header = json.dumps({
+            "version": 2,
+            "width": width,
+            "height": height,
+            "timestamp": int(self.start_time),
+            "env": {"TERM": "xterm-256color", "SHELL": "/bin/bash"}
+        })
+        try:
+            with open(cast_path, "w", encoding="utf-8") as f:
+                f.write(header + "\n")
+            logger.debug(f"CastRecorder started: {cast_path}")
+        except Exception as e:
+            logger.warning(f"Failed to create cast file {cast_path}: {e}")
+            self._closed = True  # Disable recording if file can't be created
+
+    def record_output(self, data: bytes):
+        """Record an output event."""
+        if self._closed:
+            return
+        self._write_event("o", data)
+
+    def record_input(self, data: bytes):
+        """Record an input event."""
+        if self._closed:
+            return
+        self._write_event("i", data)
+
+    def _write_event(self, event_type: str, data: bytes):
+        """Buffer a single event, flushing periodically."""
+        try:
+            elapsed = time.time() - self.start_time
+            text = data.decode("utf-8", errors="replace")
+            # json.dumps handles escaping of newlines, quotes, backslashes
+            line = json.dumps([round(elapsed, 6), event_type, text])
+            self._buffer.append(line)
+            self._event_count += 1
+
+            # Flush buffer periodically
+            if self._event_count % self.FLUSH_INTERVAL_EVENTS == 0:
+                self._flush()
+        except Exception as e:
+            logger.debug(f"Cast recording write error: {e}")
+
+    def _flush(self):
+        """Write buffered events to disk."""
+        if not self._buffer:
+            return
+        try:
+            with open(self.cast_path, "a", encoding="utf-8") as f:
+                f.write("\n".join(self._buffer) + "\n")
+            self._buffer.clear()
+        except Exception as e:
+            logger.debug(f"Cast recording flush error: {e}")
+
+    def close(self):
+        """Flush remaining buffer and mark recording as complete."""
+        if not self._closed:
+            self._flush()
+        self._closed = True
+        logger.debug(f"CastRecorder closed: {self.cast_path} ({self._event_count} events)")
+
+
 @dataclass
 class ClaudeProcess:
     """Container for Claude Code process state"""
@@ -559,6 +645,8 @@ class ClaudeProcess:
     triggered_rules: set = field(default_factory=set)  # Track "once" rules that have fired
     # Callback for automation notifications (to notify WebSocket clients)
     automation_callback: Optional[Callable[[dict], Any]] = None
+    # Cast recording
+    cast_recorder: Optional[CastRecorder] = None
 
 
 class CCResearchManager:
@@ -760,6 +848,96 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
                 logger.info(f"Closed session log for {process_info.ccresearch_id}")
             except Exception as e:
                 logger.error(f"Error writing log footer: {e}")
+
+    # ========================================================================
+    # CAST RECORDING - Asciinema .cast v2 format
+    # ========================================================================
+
+    def _create_cast_recorder(
+        self, ccresearch_id: str, width: int = 80, height: int = 24
+    ) -> Optional[CastRecorder]:
+        """Create a .cast recorder for a session.
+
+        Args:
+            ccresearch_id: Session ID
+            width: Terminal width
+            height: Terminal height
+
+        Returns:
+            CastRecorder instance, or None on failure
+        """
+        try:
+            cast_path = self.LOGS_DIR / f"{ccresearch_id}.cast"
+            recorder = CastRecorder(cast_path, width=width, height=height)
+            logger.info(f"Created cast recorder: {cast_path}")
+            return recorder
+        except Exception as e:
+            logger.error(f"Failed to create cast recorder: {e}")
+            return None
+
+    def get_cast_path(self, ccresearch_id: str) -> Optional[Path]:
+        """Get the .cast file path for a session.
+
+        Args:
+            ccresearch_id: Session ID
+
+        Returns:
+            Path to .cast file, or None if not found
+        """
+        cast_path = self.LOGS_DIR / f"{ccresearch_id}.cast"
+        if cast_path.exists():
+            return cast_path
+        return None
+
+    def list_recordings(self, ccresearch_id: str) -> List[dict]:
+        """List available recordings for a session.
+
+        Args:
+            ccresearch_id: Session ID
+
+        Returns:
+            List of recording metadata dicts
+        """
+        recordings = []
+        for cast_file in sorted(self.LOGS_DIR.glob(f"{ccresearch_id}*.cast")):
+            try:
+                stat = cast_file.stat()
+                # Read header to get dimensions
+                header = {}
+                with open(cast_file, "r", encoding="utf-8") as f:
+                    first_line = f.readline().strip()
+                    if first_line:
+                        header = json.loads(first_line)
+                recordings.append({
+                    "filename": cast_file.name,
+                    "path": str(cast_file),
+                    "size_bytes": stat.st_size,
+                    "created_at": datetime.fromtimestamp(stat.st_ctime).isoformat(),
+                    "width": header.get("width", 80),
+                    "height": header.get("height", 24),
+                })
+            except Exception as e:
+                logger.warning(f"Failed to read recording metadata for {cast_file}: {e}")
+        return recordings
+
+    def delete_recording(self, ccresearch_id: str) -> bool:
+        """Delete the .cast recording for a session.
+
+        Args:
+            ccresearch_id: Session ID
+
+        Returns:
+            True if deletion successful
+        """
+        cast_path = self.get_cast_path(ccresearch_id)
+        if cast_path:
+            try:
+                cast_path.unlink()
+                logger.info(f"Deleted recording: {cast_path}")
+                return True
+            except Exception as e:
+                logger.error(f"Failed to delete recording: {e}")
+        return False
 
     # ========================================================================
     # AUTOMATION - Pattern matching and auto-response
@@ -1054,6 +1232,44 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             return process_info.output_buffer
         return None
 
+    def save_terminal_history(self, workspace_dir: Path, output_buffer: str):
+        """Save the output buffer to .terminal-history in the workspace directory.
+
+        This persists terminal output across server restarts so users can
+        restore their terminal state on reconnect.
+
+        Args:
+            workspace_dir: Workspace directory path
+            output_buffer: Current output buffer contents
+        """
+        if not output_buffer:
+            return
+        try:
+            history_path = workspace_dir / ".terminal-history"
+            history_path.write_text(output_buffer, encoding="utf-8")
+            logger.debug(f"Saved terminal history ({len(output_buffer)} chars) to {history_path}")
+        except Exception as e:
+            logger.error(f"Failed to save terminal history: {e}")
+
+    def load_terminal_history(self, workspace_dir: Path) -> Optional[str]:
+        """Load terminal history from .terminal-history file.
+
+        Args:
+            workspace_dir: Workspace directory path
+
+        Returns:
+            The saved output buffer contents, or None if not found
+        """
+        try:
+            history_path = workspace_dir / ".terminal-history"
+            if history_path.exists():
+                content = history_path.read_text(encoding="utf-8")
+                logger.debug(f"Loaded terminal history ({len(content)} chars) from {history_path}")
+                return content
+        except Exception as e:
+            logger.error(f"Failed to load terminal history: {e}")
+        return None
+
     async def spawn_claude(
         self,
         ccresearch_id: str,
@@ -1171,6 +1387,9 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             # Create session log file
             log_file_path = self._create_session_log(ccresearch_id, workspace_dir)
 
+            # Create .cast recorder for terminal recording
+            cast_recorder = self._create_cast_recorder(ccresearch_id, cols, rows)
+
             # Store process info
             self.processes[ccresearch_id] = ClaudeProcess(
                 process=process,
@@ -1178,7 +1397,8 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
                 ccresearch_id=ccresearch_id,
                 created_at=datetime.utcnow(),
                 log_file_path=log_file_path,
-                automation_callback=automation_callback
+                automation_callback=automation_callback,
+                cast_recorder=cast_recorder
             )
 
             # Start async read task if callback provided
@@ -1284,13 +1504,17 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             # Create session log file
             log_file_path = self._create_session_log(ccresearch_id, working_dir)
 
+            # Create .cast recorder for terminal recording
+            cast_recorder = self._create_cast_recorder(ccresearch_id, cols, rows)
+
             # Store process info
             self.processes[ccresearch_id] = ClaudeProcess(
                 process=process,
                 workspace_dir=working_dir,
                 ccresearch_id=ccresearch_id,
                 created_at=datetime.utcnow(),
-                log_file_path=log_file_path
+                log_file_path=log_file_path,
+                cast_recorder=cast_recorder
             )
 
             # Start async read task if callback provided
@@ -1336,6 +1560,10 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
                         process_info.last_activity = datetime.utcnow()
                         # Log terminal output
                         self._log_output(process_info, data)
+
+                        # Record output to .cast file
+                        if process_info.cast_recorder:
+                            process_info.cast_recorder.record_output(data)
 
                         # Update output buffer for automation pattern matching
                         try:
@@ -1426,6 +1654,9 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             process_info.last_activity = datetime.utcnow()
             # Log input before sending
             self._log_input(process_info, data)
+            # Record input to .cast file
+            if process_info.cast_recorder:
+                process_info.cast_recorder.record_input(data)
             process_info.process.send(data)
             return True
         except Exception as e:
@@ -1512,6 +1743,16 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
 
             # Mark as not alive
             process_info.is_alive = False
+
+            # Save terminal history to disk for restore on reconnect
+            self.save_terminal_history(
+                process_info.workspace_dir,
+                process_info.output_buffer
+            )
+
+            # Close cast recorder
+            if process_info.cast_recorder:
+                process_info.cast_recorder.close()
 
             # Close session log file (log is preserved in LOGS_DIR)
             self._close_session_log(process_info)

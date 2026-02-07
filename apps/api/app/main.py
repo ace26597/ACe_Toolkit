@@ -227,6 +227,31 @@ async def create_initial_admin():
             logger.info("Admin user already exists")
 
 
+def _run_migrations(connection):
+    """Run lightweight schema migrations for SQLite.
+
+    SQLAlchemy's create_all doesn't add columns to existing tables,
+    so we manually add missing columns here. Each migration is idempotent.
+    """
+    from sqlalchemy import text, inspect as sa_inspect
+
+    inspector = sa_inspect(connection)
+
+    # Migration: Add recording columns to ccresearch_sessions
+    if "ccresearch_sessions" in inspector.get_table_names():
+        columns = {col["name"] for col in inspector.get_columns("ccresearch_sessions")}
+        if "recording_path" not in columns:
+            connection.execute(text(
+                "ALTER TABLE ccresearch_sessions ADD COLUMN recording_path VARCHAR"
+            ))
+            logger.info("Migration: Added recording_path to ccresearch_sessions")
+        if "has_recording" not in columns:
+            connection.execute(text(
+                "ALTER TABLE ccresearch_sessions ADD COLUMN has_recording BOOLEAN DEFAULT 0"
+            ))
+            logger.info("Migration: Added has_recording to ccresearch_sessions")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global STARTUP_TIME
@@ -236,6 +261,10 @@ async def lifespan(app: FastAPI):
     # properly we use alembic, but this is a nice fallback for quick start
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Lightweight schema migrations for SQLite (add missing columns)
+    async with engine.begin() as conn:
+        await conn.run_sync(_run_migrations)
 
     # Create initial admin user if not exists
     await create_initial_admin()
@@ -300,6 +329,13 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(periodic_oauth_state_cleanup())
 
     yield
+
+    # Cleanup: stop file watchers
+    try:
+        from app.core.file_watcher import file_watcher
+        file_watcher.stop_all()
+    except Exception as e:
+        logger.error(f"Error stopping file watchers: {e}")
 
     # Cleanup: shutdown CCResearch processes
     try:

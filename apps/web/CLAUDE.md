@@ -58,8 +58,18 @@ apps/web/
 │   │   └── Comments.tsx           # Comment system
 │   ├── ccresearch/                # CCResearch components
 │   │   ├── SessionPicker.tsx      # Project list/create view (not sessions)
-│   │   ├── CCResearchTerminal.tsx # Terminal component
+│   │   ├── CCResearchTerminal.tsx # Terminal component (serialize + search addons)
 │   │   └── FileBrowser.tsx        # File browser panel
+│   ├── workspace/                 # Workspace view components
+│   │   ├── TerminalView.tsx       # Terminal container, session controls, recording UI
+│   │   ├── NotesView.tsx          # Notes editor, file preview (25+ types)
+│   │   ├── SessionPlayer.tsx      # Asciinema player wrapper (speed, fullscreen)
+│   │   ├── RecordingsList.tsx     # Recording list with play/delete
+│   │   ├── ProjectSidebar.tsx
+│   │   ├── MobileTerminalInput.tsx
+│   │   ├── NoteCard.tsx
+│   │   ├── NoteEditor.tsx
+│   │   └── DataBrowser.tsx
 │   ├── diary/                     # Diary components
 │   │   ├── DiaryCalendar.tsx      # Calendar navigation
 │   │   └── DiaryEntry.tsx         # Entry renderer
@@ -620,6 +630,7 @@ npm run start
 
 | Date | Change |
 |------|--------|
+| 2026-02-07 | **MAJOR: Session Recording & Replay** - SessionPlayer (asciinema-player wrapper with speed 0.5x-4x, fullscreen), RecordingsList, terminal search (Ctrl+F via @xterm/addon-search), terminal buffer serialize (@xterm/addon-serialize), red REC indicator + Recordings button in TerminalView, rich share pages (replay/transcript/files tabs with OG meta tags), workspace page.tsx split (2988→951 lines into TerminalView + NotesView), recordingsApi in workspace.ts |
 | 2026-02-07 | **Landing Page:** ExperimentalSection (OpenClaw Lab + blog highlights) and WhatsNewSection (Ship Log) |
 | 2026-02-07 | **NEW: Blog System** - Markdown blog with frontmatter, API routes, tag filtering, comments |
 | 2026-02-07 | **NEW: Agent Diary** - Calendar-based diary with API routes |

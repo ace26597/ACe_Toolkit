@@ -48,7 +48,10 @@ apps/api/
 │       ├── session_manager.py     # Session management
 │       ├── notifications.py       # Discord/ntfy alerts
 │       ├── user_access.py         # Per-user data access
-│       └── utils.py               # Shared utilities (sanitize_name)
+│       ├── utils.py               # Shared utilities (sanitize_name)
+│       ├── transcript_parser.py   # Session transcript parser (JSONL + logs)
+│       ├── session_summarizer.py  # AI session summary generator
+│       └── file_watcher.py        # Real-time file watching (watchdog)
 ├── requirements.txt
 ├── .env                           # Environment variables
 └── app.db                         # SQLite database
@@ -93,6 +96,14 @@ apps/api/
 | DELETE | `/sessions/{id}/share` | Revoke share link |
 | POST | `/sessions/{id}/clone-repo` | Clone GitHub repo to workspace |
 | POST | `/sessions/{id}/fetch-url` | Fetch web URL and save as markdown |
+| GET | `/sessions/{id}/recording` | Stream .cast recording file |
+| GET | `/sessions/{id}/has-recording` | Check if recording exists |
+| GET | `/sessions/{id}/recordings` | List recordings with metadata |
+| DELETE | `/sessions/{id}/recording` | Delete recording |
+| POST | `/sessions/{id}/transcript` | Generate session transcript |
+| GET | `/sessions/{id}/transcript` | Get cached transcript |
+| POST | `/sessions/{id}/summary` | Generate AI session summary |
+| GET | `/sessions/{id}/summary` | Get cached summary |
 | GET | `/share/{token}` | Public: Get shared session |
 | GET | `/share/{token}/files` | Public: List files |
 | GET | `/share/{token}/log` | Public: Get terminal log |
@@ -599,6 +610,7 @@ The following modules were removed during cleanup:
 
 | Date | Change |
 |------|--------|
+| 2026-02-07 | **MAJOR: Session Recording & Replay** - CastRecorder (.cast v2 with buffered writes), transcript parser (JSONL + terminal log), AI session summarizer (Claude CLI + fallback), file watcher (watchdog + debouncing), output buffer 2K→50K with .terminal-history persist, recording/transcript/summary API endpoints, DB migration for recording columns |
 | 2026-02-06 | **AUDIT: Security & Quality** - CSRF middleware, path traversal fix (relative_to), JWT fail-fast, account lockout, magic byte validation, health endpoint split, error message sanitization, DB session fix, file handle leak fix, subprocess cleanup, OAuth state cleanup, race condition fix, rate limiting, DB indexes, connection pool, shared utils, config centralization, logging levels |
 | 2026-02-04 | **FIX: Mobile Cookies** - Changed `SameSite` from `lax` to `none` (required for cross-origin fetch) |
 | 2026-02-04 | **FIX: Cookie Domain** - Changed to `.orpheuscore.uk` (leading dot) for proper subdomain sharing |

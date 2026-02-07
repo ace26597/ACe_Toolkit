@@ -167,6 +167,8 @@ class SessionResponse(BaseModel):
     expires_at: datetime
     uploaded_files: Optional[List[str]] = None
     is_admin: bool = False  # Admin sessions are unsandboxed
+    has_recording: bool = False  # Whether a .cast recording exists
+    recording_path: Optional[str] = None  # Path to .cast file
 
     class Config:
         from_attributes = True
@@ -2776,6 +2778,290 @@ async def get_automation_rules():
     }
 
 
+# ============ Transcript Endpoints ============
+
+@router.post("/sessions/{ccresearch_id}/transcript")
+async def generate_session_transcript(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Generate a structured markdown transcript for a session.
+
+    Parses Claude Code's JSONL session files and/or terminal logs
+    into a readable transcript with user prompts, Claude responses,
+    tool calls, and file changes. Caches the result for fast retrieval.
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    from app.core.transcript_parser import generate_transcript, cache_transcript
+
+    workspace_dir = Path(session.workspace_dir)
+    logs_dir = ccresearch_manager.LOGS_DIR
+
+    transcript = generate_transcript(ccresearch_id, workspace_dir, logs_dir)
+    if not transcript:
+        raise HTTPException(
+            status_code=404,
+            detail="No session data found to generate transcript"
+        )
+
+    # Cache the transcript
+    cached_path = cache_transcript(transcript, workspace_dir)
+
+    return {
+        "transcript": transcript,
+        "cached_path": str(cached_path),
+        "session_id": ccresearch_id,
+        "length": len(transcript),
+    }
+
+
+@router.get("/sessions/{ccresearch_id}/transcript")
+async def get_session_transcript(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retrieve a cached transcript for a session.
+
+    Returns the previously generated transcript from the workspace
+    output/transcripts/ directory. Call POST first to generate.
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    workspace_dir = Path(session.workspace_dir)
+    transcript_path = workspace_dir / "output" / "transcripts" / "transcript.md"
+
+    if not transcript_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="No cached transcript found. Use POST to generate one."
+        )
+
+    try:
+        content = transcript_path.read_text(encoding="utf-8")
+        return {
+            "transcript": content,
+            "cached_path": str(transcript_path),
+            "session_id": ccresearch_id,
+            "length": len(content),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error reading transcript: {e}")
+
+
+# ============ Summary Endpoints ============
+
+@router.post("/sessions/{ccresearch_id}/summary")
+async def generate_session_summary(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Generate a structured AI summary for a session.
+
+    Uses the session transcript and Claude CLI to produce a JSON summary
+    with title, key findings, files created/modified, tools used, and
+    duration estimate. Falls back to metadata-based summary if Claude
+    is unavailable or transcript is too short.
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    from app.core.session_summarizer import generate_summary
+
+    workspace_dir = Path(session.workspace_dir)
+    logs_dir = ccresearch_manager.LOGS_DIR
+
+    summary = await generate_summary(ccresearch_id, workspace_dir, logs_dir)
+
+    return {
+        "summary": summary,
+        "session_id": ccresearch_id,
+    }
+
+
+@router.get("/sessions/{ccresearch_id}/summary")
+async def get_session_summary(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Retrieve a cached summary for a session.
+
+    Returns the previously generated summary from the workspace
+    output/.summary.json file. Call POST first to generate one.
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    from app.core.session_summarizer import get_cached_summary
+
+    workspace_dir = Path(session.workspace_dir)
+    summary = await get_cached_summary(workspace_dir)
+
+    if not summary:
+        raise HTTPException(
+            status_code=404,
+            detail="No cached summary found. Use POST to generate one."
+        )
+
+    return {
+        "summary": summary,
+        "session_id": ccresearch_id,
+    }
+
+
+# ============ Recording Endpoints ============
+
+@router.get("/sessions/{ccresearch_id}/recording")
+async def get_session_recording(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Stream the .cast recording file for a session.
+
+    Returns the asciinema v2 .cast file as a streaming response,
+    suitable for playback with asciinema-player or xterm.js.
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    cast_path = ccresearch_manager.get_cast_path(ccresearch_id)
+    if not cast_path:
+        raise HTTPException(status_code=404, detail="No recording found for this session")
+
+    return FileResponse(
+        path=str(cast_path),
+        media_type="application/x-asciicast",
+        filename=f"{ccresearch_id}.cast",
+        headers={"Content-Disposition": f"inline; filename={ccresearch_id}.cast"}
+    )
+
+
+@router.get("/sessions/{ccresearch_id}/recordings")
+async def list_session_recordings(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    List available recordings for a session.
+
+    Returns metadata about each .cast recording file.
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    recordings = ccresearch_manager.list_recordings(ccresearch_id)
+    return {
+        "recordings": recordings,
+        "count": len(recordings),
+        "session_id": ccresearch_id
+    }
+
+
+@router.delete("/sessions/{ccresearch_id}/recording")
+async def delete_session_recording(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Delete the .cast recording for a session.
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    deleted = ccresearch_manager.delete_recording(ccresearch_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="No recording found to delete")
+
+    # Update session model
+    session.has_recording = False
+    session.recording_path = None
+    await db.commit()
+
+    return {"message": "Recording deleted", "session_id": ccresearch_id}
+
+
+@router.get("/sessions/{ccresearch_id}/has-recording")
+async def check_session_recording(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Quick check if a recording exists for a session.
+
+    Returns has_recording boolean and file size.
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    cast_path = ccresearch_manager.get_cast_path(ccresearch_id)
+    if cast_path:
+        return {
+            "has_recording": True,
+            "size_bytes": cast_path.stat().st_size,
+            "session_id": ccresearch_id,
+        }
+    return {
+        "has_recording": False,
+        "size_bytes": 0,
+        "session_id": ccresearch_id,
+    }
+
+
 # ============ WebSocket Endpoint ============
 
 async def _authenticate_websocket(websocket: WebSocket):
@@ -2886,6 +3172,16 @@ async def terminal_websocket(
                     ws_closed = True
                     logger.error(f"Failed to send automation notification: {e}")
 
+            # Define file change callback for workspace file watching
+            async def send_file_change(event_data: dict):
+                nonlocal ws_closed
+                if ws_closed:
+                    return
+                try:
+                    await websocket.send_json(event_data)
+                except Exception as e:
+                    logger.debug(f"Failed to send file change event: {e}")
+
             # Check session mode and spawn appropriate process
             session_mode = session.session_mode or "claude"
 
@@ -2939,9 +3235,13 @@ async def terminal_websocket(
                     await websocket.close()
                     return
 
-            # Update session status
+            # Update session status and recording info
             session.status = "active"
             session.last_activity_at = datetime.utcnow()
+            process_info = ccresearch_manager.processes.get(ccresearch_id)
+            if process_info and process_info.cast_recorder:
+                session.has_recording = True
+                session.recording_path = str(process_info.cast_recorder.cast_path)
             await db.commit()
 
             # Send status message
@@ -2951,6 +3251,39 @@ async def terminal_websocket(
                 "pid": ccresearch_manager.processes.get(ccresearch_id).process.pid
                 if ccresearch_id in ccresearch_manager.processes else None
             })
+
+            # Restore terminal buffer on reconnect
+            # First try in-memory buffer, then fall back to .terminal-history file
+            try:
+                process_info = ccresearch_manager.processes.get(ccresearch_id)
+                restore_data = None
+                if process_info and process_info.output_buffer:
+                    restore_data = process_info.output_buffer
+                else:
+                    # Try loading from disk (survives server restarts)
+                    restore_data = ccresearch_manager.load_terminal_history(
+                        Path(session.workspace_dir)
+                    )
+                    # Populate in-memory buffer from disk
+                    if restore_data and process_info:
+                        process_info.output_buffer = restore_data
+
+                if restore_data:
+                    await websocket.send_bytes(restore_data.encode("utf-8"))
+                    logger.info(
+                        f"Restored {len(restore_data)} chars of terminal history "
+                        f"for session {ccresearch_id}"
+                    )
+            except Exception as e:
+                logger.error(f"Failed to restore terminal buffer: {e}")
+
+            # Start file watcher for workspace directory
+            from app.core.file_watcher import file_watcher
+            file_watcher.start(
+                ccresearch_id,
+                Path(session.workspace_dir),
+                send_file_change
+            )
 
             # Main message loop
             try:
@@ -2992,6 +3325,24 @@ async def terminal_websocket(
                 logger.info(f"WebSocket disconnected: {ccresearch_id}")
             except Exception as e:
                 logger.error(f"WebSocket error: {e}")
+
+            # Stop file watcher on disconnect
+            try:
+                from app.core.file_watcher import file_watcher
+                file_watcher.stop(ccresearch_id)
+            except Exception as e:
+                logger.error(f"Failed to stop file watcher: {e}")
+
+            # Save terminal history on disconnect for restore on reconnect
+            try:
+                process_info = ccresearch_manager.processes.get(ccresearch_id)
+                if process_info and process_info.output_buffer:
+                    ccresearch_manager.save_terminal_history(
+                        Path(session.workspace_dir),
+                        process_info.output_buffer
+                    )
+            except Exception as e:
+                logger.error(f"Failed to save terminal history on disconnect: {e}")
 
             # Don't terminate process on disconnect - allow reconnect
             session.status = "disconnected"

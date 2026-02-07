@@ -4,6 +4,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
+import { SerializeAddon } from '@xterm/addon-serialize';
+import { SearchAddon } from '@xterm/addon-search';
 import '@xterm/xterm/css/xterm.css';
 
 interface AutomationNotification {
@@ -16,6 +18,7 @@ interface AutomationNotification {
 // Interface for imperative handle methods
 export interface CCResearchTerminalHandle {
   sendInput: (text: string) => void;
+  serializeBuffer: () => string;
 }
 
 interface CCResearchTerminalProps {
@@ -51,11 +54,16 @@ export default function CCResearchTerminal({
   const terminalRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
+  const serializeAddonRef = useRef<SerializeAddon | null>(null);
+  const searchAddonRef = useRef<SearchAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const onImagePasteRef = useRef(onImagePaste); // Ref to avoid useEffect dependency
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 3;
 
@@ -74,6 +82,14 @@ export default function CCResearchTerminal({
       const encoder = new TextEncoder();
       wsRef.current.send(encoder.encode(text));
     }
+  }, []);
+
+  // Serialize the terminal buffer contents (for state restore on reconnect)
+  const serializeBuffer = useCallback(() => {
+    if (serializeAddonRef.current) {
+      return serializeAddonRef.current.serialize();
+    }
+    return '';
   }, []);
 
   // Handle paste events - intercept images and upload them
@@ -116,17 +132,17 @@ export default function CCResearchTerminal({
     }
   }, [onImagePaste]);
 
-  // Expose sendInput function via inputRef
+  // Expose sendInput and serializeBuffer functions via inputRef
   useEffect(() => {
     if (inputRef) {
-      inputRef.current = { sendInput };
+      inputRef.current = { sendInput, serializeBuffer };
     }
     return () => {
       if (inputRef) {
         inputRef.current = null;
       }
     };
-  }, [inputRef, sendInput]);
+  }, [inputRef, sendInput, serializeBuffer]);
 
   // Update parent when connection status changes
   useEffect(() => {
@@ -213,9 +229,13 @@ export default function CCResearchTerminal({
     // Add addons
     const fitAddon = new FitAddon();
     const webLinksAddon = new WebLinksAddon();
+    const serializeAddon = new SerializeAddon();
+    const searchAddon = new SearchAddon();
 
     term.loadAddon(fitAddon);
     term.loadAddon(webLinksAddon);
+    term.loadAddon(serializeAddon);
+    term.loadAddon(searchAddon);
 
     // Open terminal in DOM
     term.open(terminalRef.current);
@@ -236,6 +256,8 @@ export default function CCResearchTerminal({
     // Store refs
     xtermRef.current = term;
     fitAddonRef.current = fitAddon;
+    serializeAddonRef.current = serializeAddon;
+    searchAddonRef.current = searchAddon;
 
     // Connect to WebSocket
     const connectWebSocket = () => {
@@ -350,8 +372,17 @@ export default function CCResearchTerminal({
       }
     });
 
-    // Intercept Ctrl+V to check for images in clipboard
+    // Intercept keyboard shortcuts
     term.attachCustomKeyEventHandler((event) => {
+      // Check for Ctrl+F or Cmd+F (search)
+      if ((event.ctrlKey || event.metaKey) && event.key === 'f' && event.type === 'keydown') {
+        event.preventDefault();
+        setSearchVisible(true);
+        // Focus search input after render
+        setTimeout(() => searchInputRef.current?.focus(), 0);
+        return false; // Prevent xterm from processing
+      }
+
       // Check for Ctrl+V or Cmd+V (paste)
       if ((event.ctrlKey || event.metaKey) && event.key === 'v' && event.type === 'keydown') {
         // Use the Clipboard API to check for images
@@ -435,6 +466,8 @@ export default function CCResearchTerminal({
       window.removeEventListener('resize', handleResize);
       resizeObserver.disconnect();
       wsRef.current?.close();
+      serializeAddonRef.current = null;
+      searchAddonRef.current = null;
       term.dispose();
     };
   }, [sessionId, handleResize]);
@@ -450,6 +483,68 @@ export default function CCResearchTerminal({
           </span>
         </div>
       </div>
+
+      {/* Search bar */}
+      {searchVisible && (
+        <div className="absolute top-0 left-0 right-0 z-20 flex items-center gap-2 bg-[#1a1b26] border-b border-[#33467c] px-3 py-2">
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              if (e.target.value) {
+                searchAddonRef.current?.findNext(e.target.value);
+              } else {
+                searchAddonRef.current?.clearDecorations();
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                if (e.shiftKey) {
+                  searchAddonRef.current?.findPrevious(searchQuery);
+                } else {
+                  searchAddonRef.current?.findNext(searchQuery);
+                }
+              }
+              if (e.key === 'Escape') {
+                searchAddonRef.current?.clearDecorations();
+                setSearchVisible(false);
+                setSearchQuery('');
+                xtermRef.current?.focus();
+              }
+            }}
+            placeholder="Search terminal..."
+            className="flex-1 bg-[#24283b] text-[#a9b1d6] text-sm px-3 py-1 rounded border border-[#414868] outline-none focus:border-[#7aa2f7] placeholder-[#565f89]"
+          />
+          <button
+            onClick={() => searchAddonRef.current?.findPrevious(searchQuery)}
+            className="text-[#a9b1d6] hover:text-[#c0caf5] px-2 py-1 text-sm"
+            title="Previous (Shift+Enter)"
+          >
+            &#x25B2;
+          </button>
+          <button
+            onClick={() => searchAddonRef.current?.findNext(searchQuery)}
+            className="text-[#a9b1d6] hover:text-[#c0caf5] px-2 py-1 text-sm"
+            title="Next (Enter)"
+          >
+            &#x25BC;
+          </button>
+          <button
+            onClick={() => {
+              searchAddonRef.current?.clearDecorations();
+              setSearchVisible(false);
+              setSearchQuery('');
+              xtermRef.current?.focus();
+            }}
+            className="text-[#a9b1d6] hover:text-[#f7768e] px-2 py-1 text-sm"
+            title="Close (Escape)"
+          >
+            &#x2715;
+          </button>
+        </div>
+      )}
 
       {/* Error banner */}
       {error && (

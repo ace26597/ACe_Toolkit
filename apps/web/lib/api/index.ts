@@ -5,7 +5,7 @@ export { CSRF_HEADERS, getApiUrl } from './client';
 export { authApi } from './auth';
 export type { AuthUser, TrialInfo, LoginResponse, RegisterResponse } from './auth';
 
-export { workspaceApi } from './workspace';
+export { workspaceApi, recordingsApi } from './workspace';
 export type {
   WorkspaceProject,
   WorkspaceNote,
@@ -13,6 +13,7 @@ export type {
   ImageUploadResult,
   WorkspaceSession,
   SessionFile,
+  RecordingInfo,
 } from './workspace';
 
 export { dataStudioApi, dataStudioV2Api } from './dataStudio';

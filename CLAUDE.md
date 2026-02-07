@@ -65,6 +65,14 @@ lsof -i :3000 -i :8000         # Check our ports
 - Claude Code terminal with SSH mode option
 - Project-based workspace with notes and file management
 - **Project persistence**: Last opened project auto-restores on page refresh (per-browser)
+- **Session recording**: Auto-records terminal sessions in asciinema .cast v2 format
+- **Session replay**: Asciinema player with speed control (0.5x-4x), fullscreen
+- **Session transcripts**: Structured markdown from Claude Code JSONL + terminal logs
+- **AI session summaries**: Auto-generated summaries via Claude CLI
+- **Terminal search**: Ctrl/Cmd+F search within terminal output
+- **Terminal restore**: 50K char buffer persists across page refresh/reconnect
+- **File watching**: Real-time file browser updates via watchdog (replaces polling)
+- **Rich share pages**: Public session replay with transcript and file browser tabs
 - Welcome page shows all capabilities when no project selected
 - `/ccresearch` redirects to `/workspace?tab=terminal`
 
@@ -154,6 +162,7 @@ ACe_Toolkit/
 │   │   ├── components/         # React components
 │   │   │   ├── home/           # Landing page sections (6 components)
 │   │   │   ├── layout/         # Header, Footer
+│   │   │   ├── workspace/      # TerminalView, NotesView, SessionPlayer, RecordingsList
 │   │   │   ├── blog/           # Comments
 │   │   │   └── diary/          # DiaryCalendar, DiaryEntry
 │   │   ├── data/               # Content (blog posts, diary entries)
@@ -309,6 +318,7 @@ See `~/.secrets/README.md` for usage. CLI: `secrets get api_keys.openai`
 
 | Date | Change |
 |------|--------|
+| 2026-02-07 | **MAJOR: Session Recording & Replay** - Auto-record terminal sessions as .cast v2, asciinema player with speed control, session transcripts (JSONL parser), AI summaries, terminal search (Ctrl+F), 50K output buffer with reconnect restore, file watching (watchdog), rich share pages with replay/transcript/files tabs, workspace page.tsx split (2988→951 lines) |
 | 2026-02-07 | **FIX: Mobile Terminal** - Reduced xterm font from 16px to 12px on mobile (canvas doesn't trigger iOS auto-zoom) |
 | 2026-02-07 | **NEW: Landing Page** - ExperimentalSection (OpenClaw agents, blog posts), WhatsNewSection (latest updates, Opus 4.6) |
 | 2026-02-07 | **NAV: Header/Footer** - Added Blog to desktop nav, Diary to mobile menu, Footer split into Apps + Content columns |

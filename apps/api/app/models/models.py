@@ -320,6 +320,10 @@ class CCResearchSession(Base):
     shared_at = Column(DateTime, nullable=True)  # When sharing was enabled
     share_expires_at = Column(DateTime, nullable=True, index=True)  # When share link expires (default: 7 days from shared_at)
 
+    # Recording - asciinema .cast v2 format
+    recording_path = Column(String, nullable=True)  # Path to .cast file
+    has_recording = Column(Boolean, default=False)  # Quick check if recording exists
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     last_activity_at = Column(DateTime, default=datetime.utcnow)
