@@ -25,16 +25,15 @@ export function Footer() {
           {/* Navigation */}
           <div className="space-y-3">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Navigation
+              Applications
             </h3>
             <nav className="flex flex-col gap-2">
               {[
                 { href: '/workspace', label: 'Workspace' },
                 { href: '/data-studio', label: 'Data Studio' },
                 { href: '/video-studio', label: 'Video Studio' },
-                { href: '/directory', label: 'Directory' },
+                { href: '/directory', label: 'Skills Directory' },
                 { href: '/showcase', label: 'Showcase' },
-                { href: '/ccresearch/tips', label: 'Tips & Guides' },
               ].map((link) => (
                 <Link
                   key={link.href}
@@ -47,15 +46,29 @@ export function Footer() {
             </nav>
           </div>
 
-          {/* Powered By */}
+          {/* Content & Resources */}
           <div className="space-y-3">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Platform
+              Content
             </h3>
-            <div className="space-y-2 text-sm text-slate-500">
+            <nav className="flex flex-col gap-2">
+              {[
+                { href: '/blog', label: 'Blog' },
+                { href: '/diary', label: 'Agent Diary' },
+                { href: '/ccresearch/tips', label: 'Tips & Guides' },
+              ].map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-sm text-slate-500 hover:text-slate-300 transition-colors w-fit"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="pt-2 space-y-2 text-sm text-slate-600">
               <p>Powered by Claude Code</p>
               <p>Built with Next.js & FastAPI</p>
-              <p>Deployed via Cloudflare Tunnel</p>
             </div>
           </div>
         </div>

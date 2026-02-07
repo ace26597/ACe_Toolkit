@@ -14,6 +14,8 @@ import { HeroSection } from '@/components/home/HeroSection';
 import { AppSection } from '@/components/home/AppSection';
 import { CapabilitiesGrid } from '@/components/home/CapabilitiesGrid';
 import { ShowcasePreview } from '@/components/home/ShowcasePreview';
+import { ExperimentalSection } from '@/components/home/ExperimentalSection';
+import { WhatsNewSection } from '@/components/home/WhatsNewSection';
 
 /* ============================================================
    Inline Visual Components for App Sections
@@ -304,6 +306,12 @@ export default function Home() {
 
       {/* Showcase */}
       <ShowcasePreview />
+
+      {/* Experimental Lab - OpenClaw agents, blog, diary */}
+      <ExperimentalSection />
+
+      {/* What's New - Latest updates */}
+      <WhatsNewSection />
 
       {/* Final CTA */}
       <section className="relative overflow-hidden">

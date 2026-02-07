@@ -14,13 +14,14 @@ const navLinks = [
   { href: '/workspace', label: 'Workspace' },
   { href: '/directory', label: 'Directory' },
   { href: '/showcase', label: 'Showcase' },
-  { href: '/ccresearch/tips', label: 'Tips' },
+  { href: '/blog', label: 'Blog' },
 ];
 
 const mobileLinks = [
   ...navLinks,
+  { href: '/diary', label: 'Diary' },
+  { href: '/ccresearch/tips', label: 'Tips' },
   { href: '/changelog', label: 'Changelog' },
-  { href: '/status', label: 'Status' },
 ];
 
 export function Header({ variant = 'default' }: HeaderProps) {
