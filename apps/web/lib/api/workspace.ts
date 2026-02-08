@@ -8,6 +8,8 @@ export interface WorkspaceProject {
     updatedAt: string;
     noteCount: number;
     dataSize: string;
+    projectType?: string;  // "claude" (default) or "ssh"
+    sshConfig?: { working_directory?: string };
 }
 
 export interface WorkspaceNote {
@@ -67,9 +69,20 @@ export const workspaceApi = {
         return res.json();
     },
 
-    createProject: async (name: string, template?: string): Promise<WorkspaceProject> => {
-        const body: { name: string; template?: string } = { name };
-        if (template) body.template = template;
+    createProject: async (name: string, options?: string | {
+        template?: string;
+        projectType?: string;
+        sshConfig?: { working_directory?: string };
+    }): Promise<WorkspaceProject> => {
+        const body: Record<string, unknown> = { name };
+        // Support legacy signature: createProject(name, templateString)
+        if (typeof options === 'string') {
+            body.template = options;
+        } else if (options) {
+            if (options.template) body.template = options.template;
+            if (options.projectType) body.projectType = options.projectType;
+            if (options.sshConfig) body.sshConfig = options.sshConfig;
+        }
 
         const res = await fetch(`${getApiUrl()}/workspace/projects`, {
             method: 'POST',
@@ -111,6 +124,19 @@ export const workspaceApi = {
             credentials: 'include',
         });
         if (!res.ok) throw new Error('Failed to delete project');
+    },
+
+    updateProjectType: async (name: string, projectType: string, sshConfig?: { working_directory?: string }): Promise<void> => {
+        const res = await fetch(`${getApiUrl()}/workspace/projects/${encodeURIComponent(name)}/type`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', ...CSRF_HEADERS },
+            credentials: 'include',
+            body: JSON.stringify({ projectType, sshConfig }),
+        });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Failed to update project type' }));
+            throw new Error(error.detail || 'Failed to update project type');
+        }
     },
 
     // Notes

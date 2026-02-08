@@ -298,29 +298,196 @@ export const VideoComposition: React.FC = () => {
         with open(project_dir / "tsconfig.json", "w") as f:
             json.dump(tsconfig, f, indent=2)
 
-        # Create minimal CLAUDE.md
+        # Create comprehensive CLAUDE.md for agent-driven video production
         claude_md = f'''# Video Studio - {project_name}
 
-## Your Task
-Create a video based on the user's idea. Use your full capabilities.
+## Mission
+Create an entertaining, polished video based on the user's idea. You have full access to research tools, image generation, audio generation, and the Remotion video framework. Use agents to parallelize work and deliver high-quality results.
 
-## Project Structure
-- `src/` - Video components (edit these)
-- `public/` - Assets (images, audio, fonts)
-- `out/` - Rendered videos (save here)
+## Project Layout
+```
+{project_dir}/
+├── src/           # Video components (Video.tsx, Root.tsx, index.ts)
+├── public/        # Assets: images, audio, fonts (reference as /filename.ext)
+├── out/           # Rendered MP4 videos
+└── .claude/       # This config
+```
 
-## Workflow
-1. **Research** - Use WebSearch for facts, images, inspiration
-2. **Plan** - Structure scenes, timing, visuals
-3. **Build** - Edit src/Video.tsx with your composition
-4. **Render** - Run: `npx remotion render src/index.ts Video out/video.mp4`
+## Production Workflow
 
-## Tips
-- Run `/remotion-best-practices` for Remotion patterns
-- Use `@remotion/transitions` for smooth scene changes
-- Images go in `public/` and reference as `/image.png`
-- Target 30-60 seconds (900-1800 frames at 30fps)
-- Make it visually engaging with animations
+Follow these phases in order. Use the Task tool to spawn parallel agents where noted.
+
+### Phase 1: Research & Script (use agents in parallel)
+
+**Agent 1 - Researcher:**
+- Use WebSearch/WebFetch for facts, statistics, quotes, trends
+- Find compelling angles, recent data, surprising insights
+- Identify 3-5 key points that make the topic interesting
+
+**Agent 2 - Script Writer:**
+- Write a narration script (voiceover text) timed to scenes
+- Each scene needs: narration text, duration (seconds), visual description
+- Target 30-90 seconds total (900-2700 frames at 30fps)
+- Structure: Hook (3-5s) → Content scenes → CTA/Outro
+- Make it entertaining: use humor, surprise, rhetorical questions, storytelling
+
+**Output a script document** in `public/script.json`:
+```json
+{{
+  "title": "Video Title",
+  "total_duration_seconds": 60,
+  "scenes": [
+    {{
+      "id": "scene-1",
+      "narration": "Text spoken in this scene",
+      "duration_seconds": 5,
+      "visual": "Description of what viewer sees",
+      "image_prompt": "Prompt for image generation if needed"
+    }}
+  ]
+}}
+```
+
+### Phase 2: Asset Generation (use agents in parallel)
+
+**Agent 3 - Audio Producer:**
+- Generate voiceover audio from the script narration text
+- Use available TTS: search HuggingFace Spaces for text-to-speech endpoints
+  - `mcp__hf-image__search-spaces` with query "text to speech"
+  - Popular options: Kokoro TTS, Edge TTS, F5-TTS
+- Save audio files to `public/` (e.g., `public/voiceover.mp3`)
+- If TTS unavailable, use `@remotion/captions` with text overlays instead
+- For background music: search for royalty-free sources or generate with music spaces
+
+**Agent 4 - Image Producer:**
+- Generate or download images for each scene that needs visuals
+- Image generation tools available:
+  - `mcp__hf-image__FLUX_1-schnell-infer` - Fast image gen (prompt, width, height)
+  - `mcp__hugging-face__gr1_z_image_turbo_generate` - High quality (32 resolutions)
+  - `mcp__cloudflare__ai_image_generation` - Cloudflare Workers AI
+- Download from web: use WebFetch to download images from URLs
+- Save ALL images to `public/` directory
+- Use 1080x1920 (9:16 portrait) for full backgrounds, 1080x1080 for insets
+- Optimize: relevant, high-contrast, readable with text overlay
+
+### Phase 3: Build Video Composition
+
+**Read Remotion skills first:**
+- Run `/remotion-best-practices` for comprehensive Remotion patterns
+- Key rules to read: animations, audio, compositions, sequencing, transitions, timing, images, fonts, text-animations
+
+**Build `src/Video.tsx`:**
+- Import all assets from `public/` using `staticFile()`
+- Use `<Audio>` from `@remotion/media` for voiceover and music
+- Use `<Img>` from `remotion` for images
+- Use `<Sequence>` for scene timing - each scene starts after the previous ends
+- Use `@remotion/transitions` (`<TransitionSeries>`) for smooth scene changes
+
+**Audio-Video Sync (CRITICAL):**
+- Each `<Sequence>` must match the narration timing from the script
+- Use `getAudioDurationInSeconds()` from `@remotion/media` to get exact audio duration
+- Calculate frames: `duration_seconds * fps` for each scene
+- If using per-scene audio files, verify each file's duration matches the scene
+- Add `trimBefore`/`trimAfter` on `<Audio>` if needed to align
+- Test sync by rendering a preview: `npx remotion render src/index.ts Video out/preview.mp4 --frames=0-150`
+
+**Text & Captions:**
+- Add animated text overlays for key points (even with voiceover)
+- Use `interpolate()` for fade-in/out, slide animations
+- Use `spring()` for bouncy, engaging text reveals
+- Add emphasis styling (larger font, accent color) for key words
+- Consider TikTok-style word-by-word captions with `@remotion/captions`
+
+**Visual Quality:**
+- Never use plain solid backgrounds - use gradients, images, or patterns
+- Layer elements: background → image/video → overlay → text → particles
+- Use `interpolate()` with `Easing` for smooth zoom/pan on images
+- Add subtle motion to static images (slow zoom, parallax)
+- Color palette: pick 2-3 colors, use consistently across scenes
+
+### Phase 4: Render & Verify
+
+**Render the video:**
+```bash
+npx remotion render src/index.ts Video out/video.mp4
+```
+
+**Render options:**
+```bash
+# Quick preview (first 5 seconds)
+npx remotion render src/index.ts Video out/preview.mp4 --frames=0-150
+
+# Full render with custom quality
+npx remotion render src/index.ts Video out/video.mp4 --codec=h264 --crf=18
+
+# Specific resolution
+npx remotion render src/index.ts Video out/video.mp4 --width=1080 --height=1920
+```
+
+**Verification checklist:**
+- [ ] Audio and video are in sync (narration matches visuals)
+- [ ] No silent gaps or audio overlaps between scenes
+- [ ] All images load correctly (no broken references)
+- [ ] Text is readable against backgrounds
+- [ ] Transitions are smooth between scenes
+- [ ] Total duration matches script target
+- [ ] Video renders without errors
+
+**If sync is off:** Adjust `<Sequence from={{...}}>` values and re-render.
+
+## Available Tools & Skills
+
+| Category | Tools |
+|----------|-------|
+| **Research** | WebSearch, WebFetch, mcp__fetch__fetch |
+| **Image Gen** | mcp__hf-image__FLUX_1-schnell-infer, mcp__hugging-face__gr1_z_image_turbo_generate, mcp__cloudflare__ai_image_generation |
+| **Audio/TTS** | Search HuggingFace Spaces: mcp__hf-image__search-spaces (query: "text to speech") |
+| **Discovery** | mcp__hugging-face__space_search (find any ML endpoint) |
+| **Remotion** | /remotion-best-practices skill (31 rule files covering all Remotion features) |
+| **Downloads** | WebFetch for images/audio from URLs, Bash for curl/wget |
+
+## Key Remotion Patterns
+
+**Scene with image + text + audio:**
+```tsx
+import {{ AbsoluteFill, Sequence, Img, staticFile, interpolate, useCurrentFrame }} from "remotion";
+import {{ Audio }} from "@remotion/media";
+
+const Scene = ({{ text, image, startFrame }}) => {{
+  const frame = useCurrentFrame();
+  const opacity = interpolate(frame, [0, 20], [0, 1], {{ extrapolateRight: "clamp" }});
+  return (
+    <AbsoluteFill>
+      <Img src={{staticFile(image)}} style={{{{ width: "100%", height: "100%" }}}} />
+      <div style={{{{ position: "absolute", bottom: 100, padding: 40, opacity }}}}>
+        <h1 style={{{{ color: "white", fontSize: 48 }}}}>{text}</h1>
+      </div>
+    </AbsoluteFill>
+  );
+}};
+```
+
+**Composition with audio:**
+```tsx
+<Composition
+  id="Video"
+  component={{VideoComposition}}
+  durationInFrames={{totalFrames}}
+  fps={{30}}
+  width={{1080}}
+  height={{1920}}
+/>
+```
+
+## Entertainment Guidelines
+
+- **Hook viewers in 3 seconds** - Start with something unexpected, a bold claim, or a question
+- **Use visual variety** - Never show the same layout twice in a row
+- **Add motion to everything** - Static = boring. Animate text, zoom images, use transitions
+- **Pace it fast** - Short scenes (3-8 seconds), quick cuts, high information density
+- **Use contrast** - Big text on dark backgrounds, bright accents, visual hierarchy
+- **End with impact** - Strong CTA, memorable closing shot, or callback to the hook
+- **Sound matters** - Good voiceover > fancy visuals. Music sets the mood.
 
 ## Current Directory
 {project_dir}
@@ -482,6 +649,13 @@ Create a video based on the user's idea. Use your full capabilities.
         env['HOME'] = str(Path.home())
         env['PWD'] = str(project_dir)
         env['NODE_PATH'] = '/usr/lib/node_modules'
+
+        # Inject API keys from centralized config
+        from app.core.config import settings
+        if settings.OPENAI_API_KEY:
+            env['OPENAI_API_KEY'] = settings.OPENAI_API_KEY
+        if settings.TAVILY_API_KEY:
+            env['TAVILY_API_KEY'] = settings.TAVILY_API_KEY
 
         # Find claude binary - check common locations (macOS and Linux)
         import shutil

@@ -63,6 +63,8 @@ lsof -i :3000 -i :8000         # Check our ports
 - 145+ scientific skills, 34 MCP servers, 15 plugins (all user-scoped)
 - Access to 30+ databases: PubMed, ChEMBL, AACT (566K+ trials), UniProt, etc.
 - Claude Code terminal with SSH mode option
+- **Typed projects**: Projects can be "Claude Code" or "SSH Terminal" type with auto-mode switching
+- **SSH project config**: SSH projects store working directory, auto-fill on selection
 - Project-based workspace with notes and file management
 - **Project persistence**: Last opened project auto-restores on page refresh (per-browser)
 - **Session recording**: Auto-records terminal sessions in asciinema .cast v2 format
@@ -290,7 +292,7 @@ pm2 logs cloudflared    # Tunnel logs only
 │   └── {user-id}/
 │       ├── projects/   # Unified project storage (CCResearch + Workspace)
 │       │   └── {project-name}/
-│       │       ├── .project.json  # Project metadata
+│       │       ├── .project.json  # Project metadata (project_type, ssh_config)
 │       │       ├── data/          # User files
 │       │       ├── notes/         # Workspace notes
 │       │       ├── output/        # Generated outputs
@@ -318,6 +320,7 @@ See `~/.secrets/README.md` for usage. CLI: `secrets get api_keys.openai`
 
 | Date | Change |
 |------|--------|
+| 2026-02-08 | **Workspace: Typed Projects** - Projects now have type (Claude Code or SSH Terminal), auto-mode switching, SSH badge in sidebar, custom working directory input, error toast on missing project, PATCH endpoint for project type updates |
 | 2026-02-07 | **MAJOR: Session Recording & Replay** - Auto-record terminal sessions as .cast v2, asciinema player with speed control, session transcripts (JSONL parser), AI summaries, terminal search (Ctrl+F), 50K output buffer with reconnect restore, file watching (watchdog), rich share pages with replay/transcript/files tabs, workspace page.tsx split (2988→951 lines) |
 | 2026-02-07 | **FIX: Mobile Terminal** - Reduced xterm font from 16px to 12px on mobile (canvas doesn't trigger iOS auto-zoom) |
 | 2026-02-07 | **NEW: Landing Page** - ExperimentalSection (OpenClaw agents, blog posts), WhatsNewSection (latest updates, Opus 4.6) |

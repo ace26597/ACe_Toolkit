@@ -1344,6 +1344,14 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             # (pptxgenjs, playwright, etc.)
             env['NODE_PATH'] = '/usr/lib/node_modules'
 
+            # Inject API keys from centralized config so child processes can use them
+            # (pydantic-settings reads .env into Settings but doesn't export to os.environ)
+            from app.core.config import settings
+            if settings.OPENAI_API_KEY:
+                env['OPENAI_API_KEY'] = settings.OPENAI_API_KEY
+            if settings.TAVILY_API_KEY:
+                env['TAVILY_API_KEY'] = settings.TAVILY_API_KEY
+
             # Set API key for headless authentication (skips OAuth browser login)
             # Only use user-provided API key - server's API key is NOT used for ccresearch
             if api_key:
@@ -1473,6 +1481,13 @@ SESSION ENDED: {datetime.utcnow().isoformat()}
             env['COLORTERM'] = 'truecolor'
             # Add global node_modules to NODE_PATH
             env['NODE_PATH'] = '/usr/lib/node_modules'
+
+            # Inject API keys from centralized config for shell sessions
+            from app.core.config import settings
+            if settings.OPENAI_API_KEY:
+                env['OPENAI_API_KEY'] = settings.OPENAI_API_KEY
+            if settings.TAVILY_API_KEY:
+                env['TAVILY_API_KEY'] = settings.TAVILY_API_KEY
 
             # Determine working directory (priority order):
             # 1. Custom working directory if specified and exists

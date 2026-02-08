@@ -608,9 +608,12 @@ function WorkspaceContent() {
   }, [loadProjects]);
 
   // Create project
-  const handleCreateProject = async (name: string) => {
+  const handleCreateProject = async (name: string, options?: { projectType?: string; sshConfig?: { working_directory?: string } }) => {
     try {
-      const project = await workspaceApi.createProject(name);
+      const project = await workspaceApi.createProject(name, options ? {
+        projectType: options.projectType,
+        sshConfig: options.sshConfig,
+      } : undefined);
       setProjects(prev => [project, ...prev]);
       setSelectedProject(project.name);
       showToast('Project created');
@@ -909,17 +912,22 @@ function WorkspaceContent() {
           )}
 
           {/* Terminal View - ALWAYS MOUNTED when project selected, hidden with CSS when not active */}
-          {selectedProject && (
-            <div className={`h-full absolute inset-0 ${viewMode === 'terminal' ? '' : 'invisible pointer-events-none'}`}>
-              <TerminalView
-                key={selectedProject}
-                selectedProject={selectedProject}
-                userEmail={user?.email}
-                showToast={showToast}
-                isMobile={isMobile}
-              />
-            </div>
-          )}
+          {selectedProject && (() => {
+            const currentProject = projects.find(p => p.name === selectedProject);
+            return (
+              <div className={`h-full absolute inset-0 ${viewMode === 'terminal' ? '' : 'invisible pointer-events-none'}`}>
+                <TerminalView
+                  key={selectedProject}
+                  selectedProject={selectedProject}
+                  userEmail={user?.email}
+                  showToast={showToast}
+                  isMobile={isMobile}
+                  projectType={currentProject?.projectType}
+                  projectSshConfig={currentProject?.sshConfig}
+                />
+              </div>
+            );
+          })()}
         </main>
       </div>
     </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import {
@@ -41,6 +41,7 @@ const SSH_DIR_PRESETS = [
   { label: 'Unity Projects', value: '/Users/blest/Unity', description: 'Unity game development projects' },
   { label: 'Data Directory', value: '/Volumes/T7/dev', description: 'External SSD data folder' },
   { label: 'Dev Projects', value: '/Users/blest/dev', description: 'All development projects' },
+  { label: 'Custom...', value: '__custom__', description: 'Enter a custom directory path' },
 ];
 
 interface TerminalViewProps {
@@ -48,6 +49,8 @@ interface TerminalViewProps {
   userEmail: string | undefined;
   showToast: (message: string, type?: 'success' | 'error') => void;
   isMobile: boolean;
+  projectType?: string;
+  projectSshConfig?: { working_directory?: string };
 }
 
 export default function TerminalView({
@@ -55,6 +58,8 @@ export default function TerminalView({
   userEmail,
   showToast,
   isMobile,
+  projectType,
+  projectSshConfig,
 }: TerminalViewProps) {
   // Terminal state
   const [terminalSessionId, setTerminalSessionId] = useState<string | null>(null);
@@ -71,6 +76,7 @@ export default function TerminalView({
   const [terminalMode, setTerminalMode] = useState<'claude' | 'ssh'>('claude');
   const [accessKey, setAccessKey] = useState('');
   const [sshWorkingDir, setSshWorkingDir] = useState('project');
+  const [customSshDir, setCustomSshDir] = useState('');
 
   // Import data modal state
   const [showImportModal, setShowImportModal] = useState(false);
@@ -128,8 +134,12 @@ export default function TerminalView({
 
   // Start terminal session for current project
   const startTerminalSession = async (mode: 'claude' | 'ssh' = 'claude', key?: string) => {
+    if (!selectedProject) {
+      showToast('Please select or create a project first', 'error');
+      return;
+    }
     const bsId = getBrowserSessionId();
-    if (!selectedProject || !userEmail || !bsId) return;
+    if (!userEmail || !bsId) return;
 
     // SSH mode requires access key
     if (mode === 'ssh' && !key?.trim()) {
@@ -148,8 +158,9 @@ export default function TerminalView({
       // Add access key and working directory for SSH mode
       if (mode === 'ssh' && key) {
         formData.append('access_key', key);
-        if (sshWorkingDir && sshWorkingDir !== 'project') {
-          formData.append('working_directory', sshWorkingDir);
+        const effectiveDir = sshWorkingDir === '__custom__' ? customSshDir.trim() : sshWorkingDir;
+        if (effectiveDir && effectiveDir !== 'project') {
+          formData.append('working_directory', effectiveDir);
         }
       }
 
@@ -536,6 +547,28 @@ export default function TerminalView({
     loadProjectSessions();
   });
 
+  // Auto-select terminal mode based on project type
+  useEffect(() => {
+    if (!terminalSessionId) {
+      // Only auto-switch when no active session
+      if (projectType === 'ssh') {
+        setTerminalMode('ssh');
+        // Pre-fill SSH working directory from project config
+        if (projectSshConfig?.working_directory) {
+          const presetMatch = SSH_DIR_PRESETS.find(p => p.value === projectSshConfig.working_directory);
+          if (presetMatch) {
+            setSshWorkingDir(presetMatch.value);
+          } else {
+            setSshWorkingDir('__custom__');
+            setCustomSshDir(projectSshConfig.working_directory);
+          }
+        }
+      } else {
+        setTerminalMode('claude');
+      }
+    }
+  }, [projectType, projectSshConfig, terminalSessionId]);
+
   // Reset terminal when project changes (handled by key prop from parent)
 
   return (
@@ -739,7 +772,12 @@ export default function TerminalView({
                       </label>
                       <select
                         value={sshWorkingDir}
-                        onChange={(e) => setSshWorkingDir(e.target.value)}
+                        onChange={(e) => {
+                          setSshWorkingDir(e.target.value);
+                          if (e.target.value !== '__custom__') {
+                            setCustomSshDir('');
+                          }
+                        }}
                         className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent appearance-none cursor-pointer"
                         style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239ca3af' d='M2 4l4 4 4-4'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
                       >
@@ -749,9 +787,19 @@ export default function TerminalView({
                           </option>
                         ))}
                       </select>
-                      <p className="text-xs text-slate-500 mt-1">
-                        {SSH_DIR_PRESETS.find(p => p.value === sshWorkingDir)?.description || 'Select where to start the terminal'}
-                      </p>
+                      {sshWorkingDir === '__custom__' ? (
+                        <input
+                          type="text"
+                          value={customSshDir}
+                          onChange={(e) => setCustomSshDir(e.target.value)}
+                          placeholder="/absolute/path/to/directory"
+                          className="w-full mt-2 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+                        />
+                      ) : (
+                        <p className="text-xs text-slate-500 mt-1">
+                          {SSH_DIR_PRESETS.find(p => p.value === sshWorkingDir)?.description || 'Select where to start the terminal'}
+                        </p>
+                      )}
                     </div>
                   </>
                 )}

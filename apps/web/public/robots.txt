@@ -1,0 +1,13 @@
+# ACe_Toolkit - robots.txt
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://orpheuscore.uk/sitemap.xml
+
+# Protected app routes (require auth)
+Disallow: /workspace
+Disallow: /data-studio
+Disallow: /video-studio
+Disallow: /ccresearch
+Disallow: /api/

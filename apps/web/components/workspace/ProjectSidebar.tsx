@@ -1,14 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FolderOpen, Plus, Trash2, RefreshCw, ChevronRight, ChevronLeft, PanelLeftClose, PanelLeft } from 'lucide-react';
+import { FolderOpen, Plus, Trash2, RefreshCw, ChevronRight, ChevronLeft, PanelLeftClose, PanelLeft, Key, Terminal } from 'lucide-react';
 import { WorkspaceProject } from '@/lib/api';
 
 interface ProjectSidebarProps {
   projects: WorkspaceProject[];
   selectedProject: string | null;
   onSelectProject: (name: string) => void;
-  onCreateProject: (name: string) => void;
+  onCreateProject: (name: string, options?: { projectType?: string; sshConfig?: { working_directory?: string } }) => void;
   onDeleteProject: (name: string) => void;
   loading: boolean;
   collapsed?: boolean;
@@ -29,6 +29,8 @@ export default function ProjectSidebar({
 }: ProjectSidebarProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  const [newProjectType, setNewProjectType] = useState<'claude' | 'ssh'>('claude');
+  const [newSshDir, setNewSshDir] = useState('');
 
   // Use controlled collapsed state if provided, otherwise manage internally
   const [internalCollapsed, setInternalCollapsed] = useState(false);
@@ -53,8 +55,13 @@ export default function ProjectSidebar({
 
   const handleCreate = () => {
     if (newProjectName.trim()) {
-      onCreateProject(newProjectName.trim());
+      const options = newProjectType === 'ssh'
+        ? { projectType: 'ssh' as const, sshConfig: newSshDir.trim() ? { working_directory: newSshDir.trim() } : undefined }
+        : undefined;
+      onCreateProject(newProjectName.trim(), options);
       setNewProjectName('');
+      setNewProjectType('claude');
+      setNewSshDir('');
       setIsCreating(false);
     }
   };
@@ -116,9 +123,13 @@ export default function ProjectSidebar({
                         ? 'bg-indigo-600/30 text-indigo-300'
                         : 'text-slate-400 hover:bg-slate-700/50 hover:text-white'
                     }`}
-                    title={project.name}
+                    title={`${project.name}${project.projectType === 'ssh' ? ' (SSH)' : ''}`}
                   >
-                    <FolderOpen size={18} />
+                    {project.projectType === 'ssh' ? (
+                      <Key size={18} className={selectedProject === project.name ? 'text-amber-400' : ''} />
+                    ) : (
+                      <FolderOpen size={18} />
+                    )}
                   </button>
                 </li>
               ))}
@@ -176,10 +187,49 @@ export default function ProjectSidebar({
             autoFocus
             className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500"
           />
+          {/* Project Type Toggle */}
+          <div className="flex gap-1 mt-2">
+            <button
+              onClick={() => setNewProjectType('claude')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium transition-colors ${
+                newProjectType === 'claude'
+                  ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/50'
+                  : 'bg-slate-700 text-slate-400 border border-transparent hover:bg-slate-600'
+              }`}
+            >
+              <Terminal size={12} />
+              Claude Code
+            </button>
+            <button
+              onClick={() => setNewProjectType('ssh')}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-medium transition-colors ${
+                newProjectType === 'ssh'
+                  ? 'bg-amber-600/30 text-amber-300 border border-amber-500/50'
+                  : 'bg-slate-700 text-slate-400 border border-transparent hover:bg-slate-600'
+              }`}
+            >
+              <Key size={12} />
+              SSH Terminal
+            </button>
+          </div>
+          {/* SSH Working Directory */}
+          {newProjectType === 'ssh' && (
+            <input
+              type="text"
+              placeholder="Working directory (e.g. /Users/blest/Unity)"
+              value={newSshDir}
+              onChange={(e) => setNewSshDir(e.target.value)}
+              className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 mt-2"
+            />
+          )}
           <div className="flex gap-2 mt-2">
             <button
               onClick={handleCreate}
-              className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-sm py-1.5 rounded transition-colors"
+              className={`flex-1 text-white text-sm py-1.5 rounded transition-colors ${
+                newProjectType === 'ssh'
+                  ? 'bg-amber-600 hover:bg-amber-700'
+                  : 'bg-indigo-600 hover:bg-indigo-700'
+              }`}
             >
               Create
             </button>
@@ -187,6 +237,8 @@ export default function ProjectSidebar({
               onClick={() => {
                 setIsCreating(false);
                 setNewProjectName('');
+                setNewProjectType('claude');
+                setNewSshDir('');
               }}
               className="flex-1 bg-slate-600 hover:bg-slate-500 text-white text-sm py-1.5 rounded transition-colors"
             >
@@ -230,7 +282,14 @@ export default function ProjectSidebar({
                     className={selectedProject === project.name ? 'text-indigo-400' : 'text-slate-400'}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{project.name}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium truncate">{project.name}</span>
+                      {project.projectType === 'ssh' && (
+                        <span className="flex-shrink-0 text-[10px] font-medium bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded">
+                          SSH
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-slate-500">
                       {project.noteCount} notes · {project.dataSize}
                     </div>

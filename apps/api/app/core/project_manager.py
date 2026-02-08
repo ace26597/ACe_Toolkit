@@ -135,7 +135,9 @@ class ProjectManager:
         name: str,
         created_by: str = "workspace",
         owner_email: str = "",
-        tags: List[str] = None
+        tags: List[str] = None,
+        project_type: str = "claude",
+        ssh_config: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """Create a new project with full directory structure.
 
@@ -144,6 +146,8 @@ class ProjectManager:
             created_by: Source app ("ccresearch" or "workspace")
             owner_email: Owner's email address
             tags: Optional list of tags
+            project_type: "claude" (default) or "ssh"
+            ssh_config: Optional SSH config (e.g. {"working_directory": "/path"})
 
         Returns:
             Project metadata dict
@@ -154,6 +158,10 @@ class ProjectManager:
         is_valid, error_msg = validate_project_name(name)
         if not is_valid:
             raise ValueError(error_msg)
+
+        # Validate project_type
+        if project_type not in ("claude", "ssh"):
+            raise ValueError("project_type must be 'claude' or 'ssh'")
 
         safe_name = self._sanitize_name(name)
         project_path = self.base_dir / safe_name
@@ -181,6 +189,7 @@ class ProjectManager:
         meta = {
             "id": str(uuid.uuid4()),
             "name": name,
+            "project_type": project_type,
             "created_at": now,
             "updated_at": now,
             "created_by": created_by,
@@ -192,6 +201,9 @@ class ProjectManager:
                 "status": "ready"
             }
         }
+
+        if ssh_config:
+            meta["ssh_config"] = ssh_config
 
         # Write .project.json
         await self._write_project_meta(safe_name, meta)
@@ -256,6 +268,44 @@ class ProjectManager:
             return meta
 
         return {"name": new_name, "dir_name": safe_old}
+
+    async def update_project_type(
+        self,
+        project_name: str,
+        project_type: str,
+        ssh_config: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Update a project's type and SSH config.
+
+        Args:
+            project_name: Project name
+            project_type: "claude" or "ssh"
+            ssh_config: Optional SSH config (e.g. {"working_directory": "/path"})
+
+        Returns:
+            Updated project metadata, or None if not found
+        """
+        if project_type not in ("claude", "ssh"):
+            raise ValueError("project_type must be 'claude' or 'ssh'")
+
+        safe_name = self._sanitize_name(project_name)
+        meta = await self._read_project_meta(safe_name)
+
+        if not meta:
+            return None
+
+        meta["project_type"] = project_type
+        meta["updated_at"] = datetime.utcnow().isoformat()
+
+        if ssh_config is not None:
+            meta["ssh_config"] = ssh_config
+        elif project_type == "claude":
+            # Clear ssh_config when switching to claude type
+            meta.pop("ssh_config", None)
+
+        await self._write_project_meta(safe_name, meta)
+        meta["dir_name"] = safe_name
+        return meta
 
     # ==================== TERMINAL STATUS ====================
 

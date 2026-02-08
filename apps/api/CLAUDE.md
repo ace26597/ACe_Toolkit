@@ -113,8 +113,9 @@ apps/api/
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/projects` | List all projects |
-| POST | `/projects` | Create project |
+| POST | `/projects` | Create project (with optional projectType, sshConfig) |
 | DELETE | `/projects/{name}` | Delete project |
+| PATCH | `/projects/{name}/type` | Update project type and SSH config |
 | GET | `/projects/{name}/notes` | List notes |
 | POST | `/projects/{name}/notes` | Create note |
 | PUT | `/projects/{name}/notes/{id}` | Update note |
@@ -610,6 +611,7 @@ The following modules were removed during cleanup:
 
 | Date | Change |
 |------|--------|
+| 2026-02-08 | **Workspace: Typed Projects** - Added project_type (claude/ssh) and ssh_config to ProjectManager, WorkspaceManager, and workspace router. New PATCH /projects/{name}/type endpoint. ProjectCreate schema accepts projectType and sshConfig |
 | 2026-02-07 | **MAJOR: Session Recording & Replay** - CastRecorder (.cast v2 with buffered writes), transcript parser (JSONL + terminal log), AI session summarizer (Claude CLI + fallback), file watcher (watchdog + debouncing), output buffer 2K→50K with .terminal-history persist, recording/transcript/summary API endpoints, DB migration for recording columns |
 | 2026-02-06 | **AUDIT: Security & Quality** - CSRF middleware, path traversal fix (relative_to), JWT fail-fast, account lockout, magic byte validation, health endpoint split, error message sanitization, DB session fix, file handle leak fix, subprocess cleanup, OAuth state cleanup, race condition fix, rate limiting, DB indexes, connection pool, shared utils, config centralization, logging levels |
 | 2026-02-04 | **FIX: Mobile Cookies** - Changed `SameSite` from `lax` to `none` (required for cross-origin fetch) |

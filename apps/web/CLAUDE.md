@@ -168,8 +168,10 @@ When no project is selected, displays comprehensive capabilities overview:
 - **Notes:** Markdown notes with "New Note" button for manual creation
 - **Files:** Full file explorer with navigation, click to preview any file
 - **Terminal:** Full Claude Code terminal (merged from CCResearch)
-  - Terminal mode selection: Claude Code (default) or SSH mode
-  - SSH mode requires access key
+  - Terminal mode auto-selects based on project type (Claude Code or SSH)
+  - SSH projects store working directory, auto-fill on selection
+  - Custom directory input with presets for SSH mode
+  - Error toast when starting terminal without a project selected
   - Stats bar: 145+ skills, 34 MCP servers, 15 plugins, 566K+ clinical trials
   - File browser sidebar with upload and refresh
   - Import Data modal (GitHub clone, Web URL fetch)
@@ -630,6 +632,7 @@ npm run start
 
 | Date | Change |
 |------|--------|
+| 2026-02-08 | **Workspace: Typed Projects** - Projects have type (Claude Code/SSH), auto-mode switching on selection, SSH badge in ProjectSidebar, custom working directory input in TerminalView, error toast on missing project, updateProjectType API method |
 | 2026-02-07 | **MAJOR: Session Recording & Replay** - SessionPlayer (asciinema-player wrapper with speed 0.5x-4x, fullscreen), RecordingsList, terminal search (Ctrl+F via @xterm/addon-search), terminal buffer serialize (@xterm/addon-serialize), red REC indicator + Recordings button in TerminalView, rich share pages (replay/transcript/files tabs with OG meta tags), workspace page.tsx split (2988→951 lines into TerminalView + NotesView), recordingsApi in workspace.ts |
 | 2026-02-07 | **Landing Page:** ExperimentalSection (OpenClaw Lab + blog highlights) and WhatsNewSection (Ship Log) |
 | 2026-02-07 | **NEW: Blog System** - Markdown blog with frontmatter, API routes, tag filtering, comments |

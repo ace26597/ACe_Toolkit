@@ -141,10 +141,17 @@ def get_user_workspace_manager(user: User) -> WorkspaceManager:
 class ProjectCreate(BaseModel):
     name: str
     template: Optional[str] = None  # Template name: "finance", "legal", "realestate"
+    projectType: Optional[str] = "claude"  # "claude" or "ssh"
+    sshConfig: Optional[dict] = None  # e.g. {"working_directory": "/path"}
 
 
 class ProjectRename(BaseModel):
     newName: str
+
+
+class ProjectTypeUpdate(BaseModel):
+    projectType: str  # "claude" or "ssh"
+    sshConfig: Optional[dict] = None  # e.g. {"working_directory": "/path"}
 
 
 class ProjectResponse(BaseModel):
@@ -153,6 +160,8 @@ class ProjectResponse(BaseModel):
     updatedAt: str
     noteCount: int
     dataSize: str
+    projectType: str = "claude"
+    sshConfig: Optional[dict] = None
 
 
 class NoteCreate(BaseModel):
@@ -236,7 +245,12 @@ async def create_project(project: ProjectCreate, user: User = Depends(require_va
 
     manager = get_user_workspace_manager(user)
     try:
-        result = await manager.create_project(project.name, template=project.template)
+        result = await manager.create_project(
+            project.name,
+            template=project.template,
+            project_type=project.projectType or "claude",
+            ssh_config=project.sshConfig,
+        )
         return ProjectResponse(**result)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -287,6 +301,20 @@ async def delete_project(name: str, user: User = Depends(require_valid_access)):
     if not deleted:
         raise HTTPException(status_code=404, detail="Project not found")
     return {"status": "deleted", "name": name}
+
+
+@router.patch("/projects/{name}/type")
+async def update_project_type(name: str, data: ProjectTypeUpdate, user: User = Depends(require_valid_access)):
+    """Update a project's type (claude/ssh) and SSH config."""
+    if data.projectType not in ("claude", "ssh"):
+        raise HTTPException(status_code=400, detail="projectType must be 'claude' or 'ssh'")
+
+    from app.core.project_manager import get_project_manager
+    pm = get_project_manager(str(user.id))
+    result = await pm.update_project_type(name, data.projectType, data.sshConfig)
+    if not result:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return {"status": "updated", "name": name, "projectType": data.projectType}
 
 
 # ==================== NOTE ENDPOINTS ====================

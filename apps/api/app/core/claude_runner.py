@@ -18,6 +18,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, AsyncGenerator, Dict, List, Optional
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -427,7 +429,9 @@ If asked to create a visualization, output a Plotly JSON specification."""
                 cwd=project_dir,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                env={**os.environ, "TERM": "dumb"}
+                env={**os.environ, "TERM": "dumb",
+                     **({"OPENAI_API_KEY": settings.OPENAI_API_KEY} if settings.OPENAI_API_KEY else {}),
+                     **({"TAVILY_API_KEY": settings.TAVILY_API_KEY} if settings.TAVILY_API_KEY else {})}
             )
 
             # Store session

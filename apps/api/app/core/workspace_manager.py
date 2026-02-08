@@ -137,12 +137,20 @@ class WorkspaceManager:
         projects.sort(key=lambda x: x.get("updatedAt", ""), reverse=True)
         return projects
 
-    async def create_project(self, name: str, template: Optional[str] = None) -> Dict[str, Any]:
+    async def create_project(
+        self,
+        name: str,
+        template: Optional[str] = None,
+        project_type: str = "claude",
+        ssh_config: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Create a new project with directory structure.
 
         Args:
             name: Project name
             template: Optional template name ("finance", "legal", "realestate")
+            project_type: "claude" (default) or "ssh"
+            ssh_config: Optional SSH config (e.g. {"working_directory": "/path"})
         """
         await self.ensure_base_dir()
         project_path = self._get_project_path(name)
@@ -167,8 +175,11 @@ class WorkspaceManager:
             "updatedAt": now,
             "noteCount": 0,
             "dataSize": "0 B",
-            "template": template
+            "template": template,
+            "projectType": project_type,
         }
+        if ssh_config:
+            meta["sshConfig"] = ssh_config
 
         await self._write_project_meta(meta["name"], meta)
 
@@ -240,7 +251,7 @@ class WorkspaceManager:
             async with aiofiles.open(unified_path, 'r') as f:
                 data = json.loads(await f.read())
                 # Convert from ProjectManager format if needed
-                return {
+                result = {
                     "name": data.get("name", name),
                     "createdAt": data.get("created_at", data.get("createdAt", "")),
                     "updatedAt": data.get("updated_at", data.get("updatedAt", "")),
@@ -249,7 +260,11 @@ class WorkspaceManager:
                     "created_by": data.get("created_by", "workspace"),
                     "owner_email": data.get("owner_email", ""),
                     "terminal": data.get("terminal", {}),
+                    "projectType": data.get("project_type", "claude"),
                 }
+                if data.get("ssh_config"):
+                    result["sshConfig"] = data["ssh_config"]
+                return result
         except (FileNotFoundError, json.JSONDecodeError):
             pass
 
@@ -268,6 +283,7 @@ class WorkspaceManager:
         unified_meta = {
             "id": meta.get("id", str(uuid.uuid4())),
             "name": meta.get("name", name),
+            "project_type": meta.get("projectType", meta.get("project_type", "claude")),
             "created_at": meta.get("createdAt", meta.get("created_at", datetime.now().isoformat())),
             "updated_at": meta.get("updatedAt", meta.get("updated_at", datetime.now().isoformat())),
             "created_by": meta.get("created_by", "workspace"),
@@ -275,6 +291,10 @@ class WorkspaceManager:
             "tags": meta.get("tags", []),
             "terminal": meta.get("terminal", {"enabled": True, "status": "ready"}),
         }
+        # Include ssh_config if present (from either camelCase or snake_case key)
+        ssh_config = meta.get("sshConfig", meta.get("ssh_config"))
+        if ssh_config:
+            unified_meta["ssh_config"] = ssh_config
         async with aiofiles.open(meta_path, 'w') as f:
             await f.write(json.dumps(unified_meta, indent=2))
 
