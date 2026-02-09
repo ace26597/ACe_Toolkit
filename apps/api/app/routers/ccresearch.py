@@ -1341,9 +1341,11 @@ async def fetch_web_url(
 @router.get("/sessions/by-email", response_model=list[SessionResponse])
 async def list_sessions_by_email(
     email: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all sessions for a specific email address.
+    """List sessions for a specific email address with pagination.
 
     This ensures users only see their own sessions across devices/browsers.
     """
@@ -1354,6 +1356,8 @@ async def list_sessions_by_email(
         select(CCResearchSession)
         .where(CCResearchSession.email == email.lower())
         .order_by(CCResearchSession.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     sessions = result.scalars().all()
 
@@ -1384,13 +1388,17 @@ async def list_sessions_by_email(
 @router.get("/sessions/{browser_session_id}", response_model=list[SessionResponse])
 async def list_sessions(
     browser_session_id: str,
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_db)
 ):
-    """List all sessions for a browser session (legacy - prefer by-email endpoint)"""
+    """List sessions for a browser session with pagination (legacy - prefer by-email endpoint)"""
     result = await db.execute(
         select(CCResearchSession)
         .where(CCResearchSession.session_id == browser_session_id)
         .order_by(CCResearchSession.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     sessions = result.scalars().all()
 

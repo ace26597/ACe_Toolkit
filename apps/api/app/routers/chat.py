@@ -135,24 +135,17 @@ async def send_chat_message(
         raise HTTPException(status_code=403, detail="Not your session")
 
     async def stream_response():
-        got_result = False
         async for event in chat_manager.send_message(session_id, body.message):
-            if event.get("type") == "result":
-                got_result = True
             yield f"data: {json.dumps(event)}\n\n"
 
-        # Persist session state after stream completes
-        if got_result:
-            try:
-                from app.core.database import AsyncSessionLocal
-                async with AsyncSessionLocal() as persist_db:
-                    await chat_manager.persist_session(
-                        persist_db,
-                        session_id,
-                        messages=body.messages_snapshot,
-                    )
-            except Exception as e:
-                logger.error(f"Failed to persist chat session {session_id}: {e}")
+        # Persist cost/turns/claude_session_id (no messages - frontend sends
+        # the complete post-response snapshot via /persist endpoint)
+        try:
+            from app.core.database import AsyncSessionLocal
+            async with AsyncSessionLocal() as persist_db:
+                await chat_manager.persist_session(persist_db, session_id)
+        except Exception as e:
+            logger.error(f"Failed to persist chat session {session_id}: {e}")
 
     return StreamingResponse(
         stream_response(),
@@ -212,9 +205,17 @@ async def close_chat_session(
     db: AsyncSession = Depends(get_db),
 ):
     """Close a chat session (soft close - marks as closed, preserves history)."""
+    # Check ownership from cache or DB
     session = chat_manager.sessions.get(session_id)
-    if session and session.user_id != str(user.id):
-        raise HTTPException(status_code=403, detail="Not your session")
+    if session:
+        if session.user_id != str(user.id):
+            raise HTTPException(status_code=403, detail="Not your session")
+    else:
+        detail = await chat_manager.get_session_detail(db, session_id)
+        if not detail:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+        if detail["user_id"] != str(user.id):
+            raise HTTPException(status_code=403, detail="Not your session")
 
     await chat_manager.close_session(db, session_id)
     return {"status": "closed"}

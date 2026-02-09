@@ -12,6 +12,7 @@ server restarts and can be listed/resumed from the frontend.
 import asyncio
 import json
 import logging
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -51,15 +52,34 @@ class ChatSession:
     total_cost_usd: float = 0.0
     total_turns: int = 0
     created_at: datetime = field(default_factory=datetime.utcnow)
+    last_accessed: float = field(default_factory=time.monotonic)
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
 class ChatManager:
     """Manages chat sessions using the Claude Code SDK with DB persistence."""
 
+    CACHE_MAX_IDLE_SECONDS = 3600  # Evict sessions idle for >1 hour
+
     def __init__(self):
         # In-memory cache for active sessions (holds asyncio.Lock)
         self.sessions: Dict[str, ChatSession] = {}
+
+    def _evict_idle_sessions(self):
+        """Remove sessions from cache that haven't been accessed recently.
+
+        Safe because any evicted session can be reloaded from DB via load_session().
+        """
+        now = time.monotonic()
+        to_evict = [
+            sid for sid, s in self.sessions.items()
+            if (now - s.last_accessed) > self.CACHE_MAX_IDLE_SECONDS
+            and not s.lock.locked()
+        ]
+        for sid in to_evict:
+            self.sessions.pop(sid, None)
+        if to_evict:
+            logger.info(f"Evicted {len(to_evict)} idle chat session(s) from cache")
 
     async def create_session(
         self,
@@ -74,6 +94,9 @@ class ChatManager:
             The session ID (our internal UUID).
         """
         from app.models.models import WorkspaceChatSession
+
+        # Evict idle sessions to keep memory bounded
+        self._evict_idle_sessions()
 
         session_id = str(uuid.uuid4())[:12]
 
@@ -123,6 +146,7 @@ class ChatManager:
 
         # Already cached?
         if session_id in self.sessions:
+            self.sessions[session_id].last_accessed = time.monotonic()
             return self.sessions[session_id]
 
         result = await db.execute(
@@ -282,6 +306,8 @@ class ChatManager:
         if not session:
             yield {"type": "error", "content": "Session not found"}
             return
+
+        session.last_accessed = time.monotonic()
 
         # Only one message at a time per session
         async with session.lock:
