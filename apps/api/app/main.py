@@ -7,7 +7,7 @@ from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from app.core.config import settings
-from app.routers import auth, ccresearch, workspace, public_api, data_studio, data_studio_v2, video_studio
+from app.routers import auth, ccresearch, workspace, public_api, data_studio, data_studio_v2, video_studio, chat
 from app.core.database import engine
 from app.models.models import Base
 import uuid
@@ -237,6 +237,13 @@ def _run_migrations(connection):
 
     inspector = sa_inspect(connection)
 
+    # Migration: Remove 24h expiry - set all sessions to 10-year expiry
+    if "ccresearch_sessions" in inspector.get_table_names():
+        connection.execute(text(
+            "UPDATE ccresearch_sessions SET expires_at = datetime('now', '+3650 days') "
+            "WHERE expires_at < datetime('now', '+3650 days')"
+        ))
+
     # Migration: Add recording columns to ccresearch_sessions
     if "ccresearch_sessions" in inspector.get_table_names():
         columns = {col["name"] for col in inspector.get_columns("ccresearch_sessions")}
@@ -288,22 +295,15 @@ async def lifespan(app: FastAPI):
 
     # Start periodic CCResearch session cleanup task
     from app.core.ccresearch_manager import ccresearch_manager
-    from app.routers.ccresearch import cleanup_expired_sessions as ccresearch_cleanup
-    from app.core.database import AsyncSessionLocal
 
     async def periodic_ccresearch_cleanup():
-        """Cleanup expired and idle CCResearch sessions every hour"""
+        """Cleanup idle CCResearch processes every hour (sessions persist forever)"""
         while True:
             try:
                 await asyncio.sleep(3600)  # Wait 1 hour
-                # Cleanup idle sessions (2+ hours inactive)
+                # Cleanup idle sessions (2+ hours inactive) - only kills processes, preserves DB/workspace
                 idle_terminated = await ccresearch_manager.cleanup_idle_sessions(max_idle_hours=2)
-                # Cleanup process manager (filesystem - 24h old)
-                deleted_fs = await ccresearch_manager.cleanup_old_sessions(max_age_hours=24)
-                # Cleanup database entries
-                async with AsyncSessionLocal() as db:
-                    deleted_db = await ccresearch_cleanup(db)
-                logger.info(f"CCResearch cleanup: {idle_terminated} idle, {deleted_fs} filesystem, {deleted_db} database entries")
+                logger.info(f"CCResearch cleanup: {idle_terminated} idle processes terminated")
             except Exception as e:
                 logger.error(f"Error during CCResearch cleanup: {e}")
 
@@ -351,6 +351,14 @@ async def lifespan(app: FastAPI):
         await claude_runner.shutdown_all()
     except Exception as e:
         logger.error(f"Error shutting down Claude runner: {e}")
+
+    # Cleanup: shutdown Chat sessions
+    try:
+        from app.core.chat_manager import chat_manager
+        logger.info("Shutting down chat sessions...")
+        await chat_manager.shutdown_all()
+    except Exception as e:
+        logger.error(f"Error shutting down chat manager: {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -429,6 +437,7 @@ app.include_router(public_api.router, tags=["Public API"])
 app.include_router(data_studio.router, tags=["Data Studio"])
 app.include_router(data_studio_v2.router, tags=["Data Studio V2"])
 app.include_router(video_studio.router, tags=["Video Studio"])
+app.include_router(chat.router, prefix="/chat", tags=["Chat"])
 
 @app.get("/")
 def read_root():

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Uuid, Integer, Boolean
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Uuid, Integer, Boolean, Float
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -328,6 +328,37 @@ class CCResearchSession(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     last_activity_at = Column(DateTime, default=datetime.utcnow)
     expires_at = Column(DateTime, nullable=False)  # 24 hours from creation
+
+
+# Workspace Chat - Claude Code SDK conversational sessions
+class WorkspaceChatSession(Base):
+    """Persistent chat session using Claude Code SDK for structured messaging."""
+    __tablename__ = "workspace_chat_sessions"
+
+    id = Column(String, primary_key=True)           # Short UUID (12 chars)
+    user_id = Column(String, nullable=False, index=True)
+    project_name = Column(String, nullable=False, index=True)
+    project_dir = Column(String, nullable=False)
+    title = Column(String, nullable=False)           # "Chat #1 - Feb 09" or user-renamed
+    session_number = Column(Integer, nullable=False, default=1)
+
+    # Claude Code SDK state
+    claude_session_id = Column(String, nullable=True)  # SDK session ID for resume
+    model = Column(String, nullable=True)
+
+    # Messages stored as JSON array
+    messages_json = Column(Text, nullable=True)       # JSON array of chat messages
+
+    # Cost tracking
+    total_cost_usd = Column(Float, default=0.0)
+    total_turns = Column(Integer, default=0)
+
+    # Status
+    status = Column(String, default="active")         # active | closed
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_activity_at = Column(DateTime, default=datetime.utcnow)
 
 
 # Legacy: MedResearch - Web-based Claude Code Terminal (kept for backward compatibility)

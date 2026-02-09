@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { Play, Trash2, Loader2, X, Film, RefreshCw } from 'lucide-react';
+import { Play, Trash2, Loader2, X, Film, RefreshCw, Download, FileText } from 'lucide-react';
 import { recordingsApi, type RecordingInfo } from '@/lib/api';
 
 // Dynamic import for SessionPlayer (accesses window/document via asciinema-player)
@@ -22,6 +22,8 @@ export default function RecordingsList({ sessionId, onClose, showToast }: Record
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [playingUrl, setPlayingUrl] = useState<string | null>(null);
+  const [downloadingCast, setDownloadingCast] = useState(false);
+  const [downloadingTranscript, setDownloadingTranscript] = useState(false);
 
   const loadRecordings = useCallback(async () => {
     setLoading(true);
@@ -65,6 +67,30 @@ export default function RecordingsList({ sessionId, onClose, showToast }: Record
   const handlePlay = () => {
     const url = recordingsApi.getRecordingUrl(sessionId);
     setPlayingUrl(url);
+  };
+
+  const handleDownloadCast = async () => {
+    setDownloadingCast(true);
+    try {
+      await recordingsApi.downloadRecording(sessionId);
+      showToast('Recording downloaded', 'success');
+    } catch {
+      showToast('Failed to download recording', 'error');
+    } finally {
+      setDownloadingCast(false);
+    }
+  };
+
+  const handleDownloadTranscript = async () => {
+    setDownloadingTranscript(true);
+    try {
+      await recordingsApi.downloadTranscript(sessionId);
+      showToast('Transcript downloaded', 'success');
+    } catch {
+      showToast('Failed to download transcript', 'error');
+    } finally {
+      setDownloadingTranscript(false);
+    }
   };
 
   const formatSize = (bytes: number): string => {
@@ -153,6 +179,30 @@ export default function RecordingsList({ sessionId, onClose, showToast }: Record
                         title="Play recording"
                       >
                         <Play size={16} />
+                      </button>
+                      <button
+                        onClick={handleDownloadCast}
+                        disabled={downloadingCast}
+                        className="p-2 text-[#9ece6a] hover:bg-[#9ece6a]/10 rounded transition-colors disabled:opacity-50"
+                        title="Download .cast file"
+                      >
+                        {downloadingCast ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Download size={16} />
+                        )}
+                      </button>
+                      <button
+                        onClick={handleDownloadTranscript}
+                        disabled={downloadingTranscript}
+                        className="p-2 text-[#e0af68] hover:bg-[#e0af68]/10 rounded transition-colors disabled:opacity-50"
+                        title="Download transcript (.md)"
+                      >
+                        {downloadingTranscript ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <FileText size={16} />
+                        )}
                       </button>
                       <button
                         onClick={handleDelete}

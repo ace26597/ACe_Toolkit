@@ -27,4 +27,7 @@ export type {
   Dashboard,
 } from './dataStudio';
 
+export { chatApi } from './chat';
+export type { ChatSessionInfo, ChatSessionSummary, ChatSessionDetail, ChatMessage, ChatEvent } from './chat';
+
 export type { DashboardInfo, DashboardLayout, DashboardWidget } from './types';

@@ -432,4 +432,42 @@ export const recordingsApi = {
         });
         if (!res.ok) throw new Error('Failed to delete recording');
     },
+
+    /** Generate transcript for a session (POST) */
+    generateTranscript: async (sessionId: string): Promise<{ transcript: string; session_id: string }> => {
+        const res = await fetch(`${getApiUrl()}/ccresearch/sessions/${sessionId}/transcript`, {
+            method: 'POST',
+            headers: { ...CSRF_HEADERS },
+            credentials: 'include',
+        });
+        if (!res.ok) throw new Error('Failed to generate transcript');
+        return res.json();
+    },
+
+    /** Download a file via fetch+blob (handles cross-origin cookies) */
+    downloadFile: async (url: string, filename: string): Promise<void> => {
+        const res = await fetch(url, { credentials: 'include' });
+        if (!res.ok) throw new Error('Download failed');
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+    },
+
+    /** Download .cast recording file */
+    downloadRecording: async (sessionId: string): Promise<void> => {
+        const url = `${getApiUrl()}/ccresearch/sessions/${sessionId}/recording?download=true`;
+        await recordingsApi.downloadFile(url, `${sessionId}.cast`);
+    },
+
+    /** Download transcript .md file */
+    downloadTranscript: async (sessionId: string): Promise<void> => {
+        const url = `${getApiUrl()}/ccresearch/sessions/${sessionId}/transcript/download`;
+        await recordingsApi.downloadFile(url, `transcript-${sessionId}.md`);
+    },
 };

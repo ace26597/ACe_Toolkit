@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
-import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, ChevronDown, Terminal, Plus, Lightbulb, Database, Server, Sparkles, Wrench, Dna, Pill, Brain, BarChart3, BookOpen, Zap, Copy, Check, Key, Play, Loader2, Beaker, Menu } from 'lucide-react';
+import { Search, FolderOpen, FileText, RefreshCw, Home, X, ChevronRight, ChevronDown, Terminal, Plus, Lightbulb, Database, Server, Sparkles, Wrench, Dna, Pill, Brain, BarChart3, BookOpen, Zap, Copy, Check, Key, Play, Loader2, Beaker, Menu, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ProtectedRoute, useAuth } from '@/components/auth';
@@ -12,12 +12,15 @@ import { useIsMobile } from '@/hooks/useWorkspaceState';
 import { workspaceApi, WorkspaceProject } from '@/lib/api';
 import TerminalView from '@/components/workspace/TerminalView';
 import NotesView from '@/components/workspace/NotesView';
+import dynamic from 'next/dynamic';
+
+const ChatView = dynamic(() => import('@/components/workspace/ChatView'), { ssr: false });
 
 // Import capabilities data for welcome view
 import capabilitiesData from '@/data/ccresearch/capabilities.json';
 import useCasesData from '@/data/ccresearch/use-cases.json';
 
-type ViewMode = 'notes' | 'data' | 'terminal';
+type ViewMode = 'notes' | 'data' | 'terminal' | 'chat';
 
 // Welcome Content Component - shows when no project selected
 function WelcomeContent() {
@@ -543,9 +546,9 @@ function WorkspaceContent() {
       setSelectedProject(savedProject);
     }
 
-    if (urlTab && ['terminal', 'notes', 'data'].includes(urlTab)) {
+    if (urlTab && ['terminal', 'notes', 'data', 'chat'].includes(urlTab)) {
       setViewMode(urlTab as ViewMode);
-    } else if (savedViewMode && ['terminal', 'notes', 'data'].includes(savedViewMode)) {
+    } else if (savedViewMode && ['terminal', 'notes', 'data', 'chat'].includes(savedViewMode)) {
       setViewMode(savedViewMode as ViewMode);
     }
 
@@ -855,6 +858,17 @@ function WorkspaceContent() {
                 <Terminal size={16} className="inline-block mr-1" />
                 Terminal
               </button>
+              <button
+                onClick={() => setViewMode('chat')}
+                className={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  viewMode === 'chat'
+                    ? 'bg-purple-600 text-white'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                <MessageSquare size={16} className="inline-block mr-1" />
+                Chat
+              </button>
             </div>
           </div>
         </div>
@@ -928,6 +942,14 @@ function WorkspaceContent() {
               </div>
             );
           })()}
+
+          {/* Chat View */}
+          {selectedProject && viewMode === 'chat' && (
+            <ChatView
+              selectedProject={selectedProject}
+              showToast={showToast}
+            />
+          )}
         </main>
       </div>
     </div>

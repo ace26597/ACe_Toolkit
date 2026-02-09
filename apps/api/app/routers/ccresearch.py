@@ -38,7 +38,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional, List
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, UploadFile, File, Form, Request
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Depends, UploadFile, File, Form, Request, Query
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select, delete, func
@@ -537,7 +537,7 @@ Files created here will appear in the Workspace Files tab.
         uploaded_files=json.dumps(uploaded_files_list) if uploaded_files_list else None,
         auth_mode="oauth",  # Keep for database compatibility
         is_admin=session_mode == "terminal",  # Terminal mode = admin access
-        expires_at=datetime.utcnow() + timedelta(hours=24)
+        expires_at=datetime.utcnow() + timedelta(days=3650)  # Effectively never expires
     )
 
     db.add(session)
@@ -1353,7 +1353,6 @@ async def list_sessions_by_email(
     result = await db.execute(
         select(CCResearchSession)
         .where(CCResearchSession.email == email.lower())
-        .where(CCResearchSession.expires_at > datetime.utcnow())
         .order_by(CCResearchSession.created_at.desc())
     )
     sessions = result.scalars().all()
@@ -1391,7 +1390,6 @@ async def list_sessions(
     result = await db.execute(
         select(CCResearchSession)
         .where(CCResearchSession.session_id == browser_session_id)
-        .where(CCResearchSession.expires_at > datetime.utcnow())
         .order_by(CCResearchSession.created_at.desc())
     )
     sessions = result.scalars().all()
@@ -2071,7 +2069,7 @@ async def create_session_from_project(
         status="created",
         session_mode=session_mode,
         is_admin=session_mode == "terminal",
-        expires_at=datetime.utcnow() + timedelta(hours=24)
+        expires_at=datetime.utcnow() + timedelta(days=3650)  # Effectively never expires
     )
 
     db.add(session)
@@ -2865,6 +2863,49 @@ async def get_session_transcript(
         raise HTTPException(status_code=500, detail=f"Error reading transcript: {e}")
 
 
+@router.get("/sessions/{ccresearch_id}/transcript/download")
+async def download_session_transcript(
+    ccresearch_id: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Download the session transcript as a .md file.
+
+    Auto-generates the transcript if not already cached.
+    """
+    # Verify session exists
+    result = await db.execute(
+        select(CCResearchSession)
+        .where(CCResearchSession.id == ccresearch_id)
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    workspace_dir = Path(session.workspace_dir)
+    transcript_path = workspace_dir / "output" / "transcripts" / "transcript.md"
+
+    # Auto-generate if not cached
+    if not transcript_path.exists():
+        from app.core.transcript_parser import generate_transcript, cache_transcript
+
+        logs_dir = ccresearch_manager.LOGS_DIR
+        transcript = generate_transcript(ccresearch_id, workspace_dir, logs_dir)
+        if not transcript:
+            raise HTTPException(
+                status_code=404,
+                detail="No session data found to generate transcript"
+            )
+        cache_transcript(transcript, workspace_dir)
+
+    return FileResponse(
+        path=str(transcript_path),
+        media_type="text/markdown",
+        filename=f"transcript-{ccresearch_id}.md",
+        headers={"Content-Disposition": f"attachment; filename=transcript-{ccresearch_id}.md"}
+    )
+
+
 # ============ Summary Endpoints ============
 
 @router.post("/sessions/{ccresearch_id}/summary")
@@ -2944,6 +2985,7 @@ async def get_session_summary(
 @router.get("/sessions/{ccresearch_id}/recording")
 async def get_session_recording(
     ccresearch_id: str,
+    download: bool = Query(False),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -2951,6 +2993,7 @@ async def get_session_recording(
 
     Returns the asciinema v2 .cast file as a streaming response,
     suitable for playback with asciinema-player or xterm.js.
+    Pass ?download=true for Content-Disposition: attachment.
     """
     # Verify session exists
     result = await db.execute(
@@ -2965,11 +3008,12 @@ async def get_session_recording(
     if not cast_path:
         raise HTTPException(status_code=404, detail="No recording found for this session")
 
+    disposition = "attachment" if download else "inline"
     return FileResponse(
         path=str(cast_path),
         media_type="application/x-asciicast",
         filename=f"{ccresearch_id}.cast",
-        headers={"Content-Disposition": f"inline; filename={ccresearch_id}.cast"}
+        headers={"Content-Disposition": f"{disposition}; filename={ccresearch_id}.cast"}
     )
 
 
@@ -3130,15 +3174,6 @@ async def terminal_websocket(
                 await websocket.send_json({
                     "type": "error",
                     "error": "Session not found"
-                })
-                await websocket.close()
-                return
-
-            # Check if expired
-            if session.expires_at < datetime.utcnow():
-                await websocket.send_json({
-                    "type": "error",
-                    "error": "Session expired"
                 })
                 await websocket.close()
                 return
@@ -3364,33 +3399,9 @@ async def terminal_websocket(
 # ============ Cleanup Functions ============
 
 async def cleanup_expired_sessions(db: AsyncSession) -> int:
-    """Cleanup expired sessions from database and filesystem"""
-    # Find expired sessions
-    result = await db.execute(
-        select(CCResearchSession)
-        .where(CCResearchSession.expires_at < datetime.utcnow())
-    )
-    expired_sessions = result.scalars().all()
+    """No-op: sessions are now persistent and never auto-deleted.
 
-    deleted = 0
-    for session in expired_sessions:
-        try:
-            # Terminate process if running
-            await ccresearch_manager.terminate_session(session.id)
-
-            # Delete workspace
-            ccresearch_manager.delete_workspace(Path(session.workspace_dir))
-
-            # Delete from database
-            await db.execute(
-                delete(CCResearchSession)
-                .where(CCResearchSession.id == session.id)
-            )
-            deleted += 1
-            logger.info(f"Cleaned up expired session: {session.id}")
-
-        except Exception as e:
-            logger.error(f"Failed to cleanup session {session.id}: {e}")
-
-    await db.commit()
-    return deleted
+    Previously this deleted expired sessions from DB and filesystem.
+    Now sessions persist indefinitely - only manual deletion removes them.
+    """
+    return 0

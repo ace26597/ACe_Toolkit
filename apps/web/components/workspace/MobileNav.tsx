@@ -1,9 +1,9 @@
 "use client";
 
 import React from 'react';
-import { Terminal, FileText, Database, FolderOpen, Menu } from 'lucide-react';
+import { Terminal, FileText, Database, FolderOpen, Menu, MessageSquare } from 'lucide-react';
 
-export type ViewMode = 'terminal' | 'notes' | 'data';
+export type ViewMode = 'terminal' | 'notes' | 'data' | 'chat';
 
 interface MobileNavProps {
   viewMode: ViewMode;
@@ -28,6 +28,7 @@ export function MobileNav({
 }: MobileNavProps) {
   const tabs = [
     { id: 'terminal' as ViewMode, icon: Terminal, label: 'Terminal' },
+    { id: 'chat' as ViewMode, icon: MessageSquare, label: 'Chat' },
     { id: 'notes' as ViewMode, icon: FileText, label: 'Notes' },
     { id: 'data' as ViewMode, icon: Database, label: 'Data' },
   ];

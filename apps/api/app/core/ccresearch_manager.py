@@ -565,22 +565,63 @@ class CastRecorder:
         self._closed = False
         self._buffer: list[str] = []
         self._event_count = 0
+        self._time_offset_base = 0.0
 
-        # Write header immediately
-        header = json.dumps({
-            "version": 2,
-            "width": width,
-            "height": height,
-            "timestamp": int(self.start_time),
-            "env": {"TERM": "xterm-256color", "SHELL": "/bin/bash"}
-        })
         try:
-            with open(cast_path, "w", encoding="utf-8") as f:
-                f.write(header + "\n")
-            logger.debug(f"CastRecorder started: {cast_path}")
+            # Check if cast file already exists with content (resume scenario)
+            if cast_path.exists() and cast_path.stat().st_size > 0:
+                self._time_offset_base = self._read_last_timestamp(cast_path)
+                # Insert a dim gray "Session Resumed" marker
+                resume_marker = json.dumps([
+                    round(self._time_offset_base + 0.1, 6),
+                    "o",
+                    "\r\n\x1b[90m--- Session Resumed ---\x1b[0m\r\n"
+                ])
+                with open(cast_path, "a", encoding="utf-8") as f:
+                    f.write(resume_marker + "\n")
+                self._time_offset_base += 0.2  # Small gap after marker
+                logger.debug(f"CastRecorder resuming: {cast_path} (offset={self._time_offset_base:.2f}s)")
+            else:
+                # New recording - write header
+                header = json.dumps({
+                    "version": 2,
+                    "width": width,
+                    "height": height,
+                    "timestamp": int(self.start_time),
+                    "env": {"TERM": "xterm-256color", "SHELL": "/bin/bash"}
+                })
+                with open(cast_path, "w", encoding="utf-8") as f:
+                    f.write(header + "\n")
+                logger.debug(f"CastRecorder started: {cast_path}")
         except Exception as e:
-            logger.warning(f"Failed to create cast file {cast_path}: {e}")
+            logger.warning(f"Failed to create/resume cast file {cast_path}: {e}")
             self._closed = True  # Disable recording if file can't be created
+
+    @staticmethod
+    def _read_last_timestamp(cast_path: Path) -> float:
+        """Read the last event timestamp from a .cast file efficiently."""
+        try:
+            with open(cast_path, "rb") as f:
+                # Seek to last 4KB for efficiency
+                f.seek(0, 2)  # End of file
+                size = f.tell()
+                f.seek(max(0, size - 4096))
+                tail = f.read().decode("utf-8", errors="replace")
+
+            # Parse lines in reverse to find last valid event
+            for line in reversed(tail.strip().split("\n")):
+                line = line.strip()
+                if not line or line.startswith("{"):
+                    continue  # Skip header or empty lines
+                try:
+                    event = json.loads(line)
+                    if isinstance(event, list) and len(event) >= 3:
+                        return float(event[0])
+                except (json.JSONDecodeError, ValueError, IndexError):
+                    continue
+        except Exception as e:
+            logger.debug(f"Could not read last timestamp from {cast_path}: {e}")
+        return 0.0
 
     def record_output(self, data: bytes):
         """Record an output event."""
@@ -597,7 +638,7 @@ class CastRecorder:
     def _write_event(self, event_type: str, data: bytes):
         """Buffer a single event, flushing periodically."""
         try:
-            elapsed = time.time() - self.start_time
+            elapsed = self._time_offset_base + (time.time() - self.start_time)
             text = data.decode("utf-8", errors="replace")
             # json.dumps handles escaping of newlines, quotes, backslashes
             line = json.dumps([round(elapsed, 6), event_type, text])

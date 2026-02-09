@@ -35,6 +35,7 @@ apps/api/
 │   │   ├── data_studio.py         # C3 Data Studio (Legacy)
 │   │   ├── data_studio_v2.py      # C3 Data Studio V2 (REDESIGNED)
 │   │   ├── video_studio.py        # Remotion Video Studio
+│   │   ├── chat.py                # Chat UI (Claude Code SDK sessions + SSE)
 │   │   └── public_api.py          # Public endpoints
 │   └── core/
 │       ├── config.py              # Settings (Pydantic)
@@ -51,7 +52,8 @@ apps/api/
 │       ├── utils.py               # Shared utilities (sanitize_name)
 │       ├── transcript_parser.py   # Session transcript parser (JSONL + logs)
 │       ├── session_summarizer.py  # AI session summary generator
-│       └── file_watcher.py        # Real-time file watching (watchdog)
+│       ├── file_watcher.py        # Real-time file watching (watchdog)
+│       └── chat_manager.py        # Claude Code SDK wrapper for Chat UI
 ├── requirements.txt
 ├── .env                           # Environment variables
 └── app.db                         # SQLite database
@@ -224,6 +226,30 @@ Legacy Data Studio API using headless Claude Code. See V2 for new implementation
   "recommended_charts": ["histogram", "bar", "line"]
 }
 ```
+
+### Chat UI (`/chat`)
+
+ChatGPT-style conversational interface using the `claude-code-sdk` Python package for structured message streaming.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/sessions` | List chat sessions (optionally filtered by project) |
+| GET | `/sessions/{id}` | Get session details + messages |
+| POST | `/sessions` | Create chat session for a workspace project |
+| POST | `/sessions/{id}/message` | Send message, return SSE `StreamingResponse` |
+| POST | `/sessions/{id}/persist` | Persist messages snapshot to DB (no Claude call) |
+| PATCH | `/sessions/{id}/rename` | Rename chat session title |
+| DELETE | `/sessions/{id}` | Close chat session (soft close, preserves history) |
+
+**Architecture:**
+- `ChatManager` (singleton) manages in-memory sessions with `asyncio.Lock` per session
+- DB persistence via `WorkspaceChatSession` model (survives server restarts)
+- Messages stored as JSON blob in `messages_json` column
+- Uses `claude-code-sdk` `query()` for structured messages (not raw PTY)
+- Session resume via `ClaudeCodeOptions.resume` with captured `session_id`
+- SSE events: `init`, `text`, `text_delta`, `tool_start`, `tool_result`, `thinking`, `thinking_delta`, `result`, `error`
+- `bypassPermissions` mode (no permission prompts)
+- Dedicated `/persist` endpoint for saving messages without triggering Claude SDK call
 
 ### Video Studio (`/video-studio`)
 
@@ -611,6 +637,8 @@ The following modules were removed during cleanup:
 
 | Date | Change |
 |------|--------|
+| 2026-02-09 | **Session Persistence** - Chat: `WorkspaceChatSession` DB model, sessions list/get/rename/persist endpoints, messages stored as JSON, dedicated persist endpoint (no Claude SDK call). Terminal: removed 24h auto-delete (10-year expiry), removed DB/filesystem cleanup, migration extends existing sessions, transcript download endpoint, recording download query param |
+| 2026-02-09 | **NEW: Chat UI** - ChatManager (`chat_manager.py`) wraps `claude-code-sdk` for structured message streaming. Chat router (`chat.py`) with 7 endpoints. Session resume via SDK `session_id`, `asyncio.Lock` per session, ownership verification, shutdown cleanup in lifespan |
 | 2026-02-08 | **Workspace: Typed Projects** - Added project_type (claude/ssh) and ssh_config to ProjectManager, WorkspaceManager, and workspace router. New PATCH /projects/{name}/type endpoint. ProjectCreate schema accepts projectType and sshConfig |
 | 2026-02-07 | **MAJOR: Session Recording & Replay** - CastRecorder (.cast v2 with buffered writes), transcript parser (JSONL + terminal log), AI session summarizer (Claude CLI + fallback), file watcher (watchdog + debouncing), output buffer 2K→50K with .terminal-history persist, recording/transcript/summary API endpoints, DB migration for recording columns |
 | 2026-02-06 | **AUDIT: Security & Quality** - CSRF middleware, path traversal fix (relative_to), JWT fail-fast, account lockout, magic byte validation, health endpoint split, error message sanitization, DB session fix, file handle leak fix, subprocess cleanup, OAuth state cleanup, race condition fix, rate limiting, DB indexes, connection pool, shared utils, config centralization, logging levels |

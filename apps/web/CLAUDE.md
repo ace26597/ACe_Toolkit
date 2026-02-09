@@ -1,6 +1,6 @@
 # CLAUDE.md - Frontend (Next.js)
 
-**Location:** `apps/web/` | **Port:** 3000 | **Framework:** Next.js 16 (App Router) | **Updated:** February 7, 2026
+**Location:** `apps/web/` | **Port:** 3000 | **Framework:** Next.js 16 (App Router) | **Updated:** February 9, 2026
 
 ---
 
@@ -42,7 +42,7 @@ apps/web/
 │   ├── ccresearch/
 │   │   ├── page.tsx               # Redirects to /workspace?tab=terminal
 │   │   └── share/[token]/page.tsx # Public share view
-│   ├── workspace/page.tsx         # Workspace (Notes, Files, Terminal tabs)
+│   ├── workspace/page.tsx         # Workspace (Notes, Files, Terminal, Chat tabs)
 │   ├── data-studio/               # C3 Data Studio V2 (REDESIGNED)
 │   │   └── page.tsx               # Project selector, import, analysis, dashboard
 │   └── video-studio/              # Remotion Video Studio
@@ -65,6 +65,7 @@ apps/web/
 │   │   ├── NotesView.tsx          # Notes editor, file preview (25+ types)
 │   │   ├── SessionPlayer.tsx      # Asciinema player wrapper (speed, fullscreen)
 │   │   ├── RecordingsList.tsx     # Recording list with play/delete
+│   │   ├── ChatView.tsx           # Chat UI (Claude Code SDK, markdown, tool cards)
 │   │   ├── ProjectSidebar.tsx
 │   │   ├── MobileTerminalInput.tsx
 │   │   ├── NoteCard.tsx
@@ -100,6 +101,7 @@ apps/web/
 │   │   ├── auth.ts                # authApi
 │   │   ├── workspace.ts           # workspaceApi
 │   │   ├── dataStudio.ts          # dataStudioApi, dataStudioV2Api
+│   │   ├── chat.ts                # chatApi (Claude Code SDK chat sessions)
 │   │   ├── types.ts               # Shared API types
 │   │   └── index.ts               # Re-exports (backward compatible)
 │   ├── blog.ts                    # Blog utilities (gray-matter frontmatter parsing)
@@ -452,6 +454,7 @@ lib/api/
 - `workspaceApi` - Projects, notes, files, sessions
 - `dataStudioApi` - Data Studio sessions, dashboards, WebSocket
 - `dataStudioV2Api` - Data Studio V2 projects, analysis, dashboards, NLP
+- `chatApi` - Chat UI sessions (create, sendMessage SSE, close)
 - `CSRF_HEADERS` - Shared `X-Requested-With` header for CSRF protection
 - `getApiUrl()` - Centralized API base URL helper
 
@@ -632,6 +635,8 @@ npm run start
 
 | Date | Change |
 |------|--------|
+| 2026-02-09 | **Chat Session Persistence** - Session list sidebar (SessionListPanel) with resume/rename, DB-backed message persistence via `persistMessages` API, session list toggle (localStorage), relative date formatting, inline rename with edit/save/cancel. Updated `chat.ts` with `listSessions`, `getSession`, `renameSession`, `persistMessages` methods and `ChatSessionSummary`/`ChatSessionDetail` types |
+| 2026-02-09 | **NEW: Chat UI Tab** - ChatView component with ChatGPT-style conversational UI. Markdown rendering (ReactMarkdown + remark-gfm), collapsible tool call cards, streaming text deltas, thinking blocks, info bar (model/cost/turns), empty state with suggested prompts, lazy session creation, auto-scroll. New `chat.ts` API client with SSE reader. Chat tab added to desktop header (purple active state) and MobileNav |
 | 2026-02-08 | **Workspace: Typed Projects** - Projects have type (Claude Code/SSH), auto-mode switching on selection, SSH badge in ProjectSidebar, custom working directory input in TerminalView, error toast on missing project, updateProjectType API method |
 | 2026-02-07 | **MAJOR: Session Recording & Replay** - SessionPlayer (asciinema-player wrapper with speed 0.5x-4x, fullscreen), RecordingsList, terminal search (Ctrl+F via @xterm/addon-search), terminal buffer serialize (@xterm/addon-serialize), red REC indicator + Recordings button in TerminalView, rich share pages (replay/transcript/files tabs with OG meta tags), workspace page.tsx split (2988→951 lines into TerminalView + NotesView), recordingsApi in workspace.ts |
 | 2026-02-07 | **Landing Page:** ExperimentalSection (OpenClaw Lab + blog highlights) and WhatsNewSection (Ship Log) |

@@ -1,6 +1,6 @@
 # CLAUDE.md - ACe_Toolkit
 
-**Last Updated:** February 7, 2026 | **Status:** Active | **Deployment:** Mac Mini + Cloudflare Tunnel
+**Last Updated:** February 9, 2026 | **Status:** Active | **Deployment:** Mac Mini + Cloudflare Tunnel
 
 ---
 
@@ -75,6 +75,7 @@ lsof -i :3000 -i :8000         # Check our ports
 - **Terminal restore**: 50K char buffer persists across page refresh/reconnect
 - **File watching**: Real-time file browser updates via watchdog (replaces polling)
 - **Rich share pages**: Public session replay with transcript and file browser tabs
+- **Chat UI tab**: ChatGPT-style conversational interface using Claude Code SDK (structured messages, not raw terminal)
 - Welcome page shows all capabilities when no project selected
 - `/ccresearch` redirects to `/workspace?tab=terminal`
 
@@ -320,6 +321,8 @@ See `~/.secrets/README.md` for usage. CLI: `secrets get api_keys.openai`
 
 | Date | Change |
 |------|--------|
+| 2026-02-09 | **Session Persistence** - Chat sessions persisted to DB (`WorkspaceChatSession` model), session list sidebar with resume/rename, dedicated persist endpoint. Terminal sessions never auto-delete (10-year expiry), removed cleanup of DB rows and workspace dirs, migration extends existing sessions. Transcript download endpoint, recording download param |
+| 2026-02-09 | **NEW: Chat UI Tab** - ChatGPT-style conversational chat in Workspace using Claude Code SDK (`claude-code-sdk`). Structured messages (text, tool calls, thinking, results) instead of raw terminal. SSE streaming, markdown rendering, collapsible tool cards, session resume, lazy session creation. New files: `chat_manager.py`, `chat.py` router, `chat.ts` API client, `ChatView.tsx` component |
 | 2026-02-08 | **Workspace: Typed Projects** - Projects now have type (Claude Code or SSH Terminal), auto-mode switching, SSH badge in sidebar, custom working directory input, error toast on missing project, PATCH endpoint for project type updates |
 | 2026-02-07 | **MAJOR: Session Recording & Replay** - Auto-record terminal sessions as .cast v2, asciinema player with speed control, session transcripts (JSONL parser), AI summaries, terminal search (Ctrl+F), 50K output buffer with reconnect restore, file watching (watchdog), rich share pages with replay/transcript/files tabs, workspace page.tsx split (2988→951 lines) |
 | 2026-02-07 | **FIX: Mobile Terminal** - Reduced xterm font from 16px to 12px on mobile (canvas doesn't trigger iOS auto-zoom) |
